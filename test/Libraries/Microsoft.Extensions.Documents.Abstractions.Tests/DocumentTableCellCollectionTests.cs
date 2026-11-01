@@ -3,6 +3,7 @@
 
 using System;
 using System.Linq;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Documents;
 using Xunit;
 
@@ -13,14 +14,14 @@ public class DocumentTableCellCollectionTests
     [Fact]
     public void EnumeratesNullableCellsInRowMajorOrder()
     {
-        DocumentTableElement table = new("stored table", 2, 3);
-        DocumentTextElement firstContent = new("first");
-        DocumentTextElement lastContent = new("last");
+        ExtractionDocumentTableElement table = new(null, 2, 3);
+        ExtractionDocumentTextElement firstContent = new(new TextContent("first"));
+        ExtractionDocumentTextElement lastContent = new(new TextContent("last"));
 
-        table.Cells[0, 1] = new DocumentTableCell(firstContent);
-        table.Cells[1, 2] = new DocumentTableCell(lastContent);
+        table.Cells[0, 1] = new ExtractionDocumentTableCell(firstContent);
+        table.Cells[1, 2] = new ExtractionDocumentTableCell(lastContent);
 
-        DocumentTableCell?[] cells = table.Cells.ToArray();
+        ExtractionDocumentTableCell?[] cells = table.Cells.ToArray();
 
         Assert.Equal(6, cells.Length);
         Assert.Null(cells[0]);
@@ -30,91 +31,86 @@ public class DocumentTableCellCollectionTests
         Assert.Null(cells[4]);
         Assert.Same(lastContent, cells[5]!.Content);
         Assert.Equal(
-            new DocumentTableCell?[] { null, cells[1], null, null, null, cells[5] },
+            new ExtractionDocumentTableCell?[] { null, cells[1], null, null, null, cells[5] },
             cells);
     }
 
     [Fact]
-    public void Indexer_AttachesNonSectionElement()
+    public void Indexer_PreservesNonSectionElement()
     {
-        using Document document = new("document");
-        DocumentSection section = new("section");
-        DocumentTableElement table = new("stored table", 1, 1);
-        DocumentTextElement content = new("cell");
+        ExtractionDocument document = new("document");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 1, 1);
+        ExtractionDocumentTextElement content = new(new TextContent("cell"));
         document.Sections.Add(section);
         section.Elements.Add(table);
 
-        table.Cells[0, 0] = new DocumentTableCell(content);
+        table.Cells[0, 0] = new ExtractionDocumentTableCell(content);
 
-        DocumentTableCell cell = table.Cells[0, 0]!;
+        ExtractionDocumentTableCell cell = table.Cells[0, 0]!;
         Assert.Same(content, cell.Content);
         Assert.Same(cell, table.Cells[0, 0]);
-        Assert.Null(content.ParentSection);
-        Assert.Equal("s0/e0/c0,0", content.Address);
     }
 
     [Fact]
     public void SupportsImageCellContent()
     {
-        DocumentTableElement table = new("stored table", 1, 1);
+        ExtractionDocumentTableElement table = new(null, 1, 1);
         ReadOnlyMemory<byte> imageContent = new byte[] { 1, 2, 3 };
         Uri source = new("urn:table-image:opaque-1");
-        DocumentImageElement image = new("stored image")
+        ExtractionDocumentImageElement image = new(new TextContent("stored image"))
         {
-            Content = imageContent,
-            MediaType = "image/png",
+            Content = new DataContent(imageContent, "image/png"),
             Source = source,
             AlternativeText = "diagram"
         };
 
-        table.Cells[0, 0] = new DocumentTableCell(image);
+        table.Cells[0, 0] = new ExtractionDocumentTableCell(image);
 
-        DocumentImageElement actual = Assert.IsType<DocumentImageElement>(table.Cells[0, 0]!.Content);
+        ExtractionDocumentImageElement actual = Assert.IsType<ExtractionDocumentImageElement>(table.Cells[0, 0]!.Content);
         Assert.Same(image, actual);
-        Assert.Equal(imageContent.ToArray(), actual.Content!.Value.ToArray());
-        Assert.Equal("image/png", actual.MediaType);
+        Assert.Equal(imageContent.ToArray(), Assert.IsType<DataContent>(actual.Content).Data.ToArray());
+        Assert.Equal("image/png", Assert.IsType<DataContent>(actual.Content).MediaType);
         Assert.Same(source, actual.Source);
         Assert.Equal("diagram", actual.AlternativeText);
     }
 
     [Fact]
-    public void ReplacesAndRemovesContent_DetachCellsAndElements()
+    public void ReplacesAndRemovesContent_ReleasesCellGridAssociation()
     {
-        using Document document = new("document");
-        DocumentSection section = new("section");
-        DocumentTableElement table = new("stored table", 1, 1);
-        DocumentTextElement oldContent = new("old");
-        DocumentTextElement replacementContent = new("replacement");
+        ExtractionDocument document = new("document");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 1, 1);
+        ExtractionDocumentTextElement oldContent = new(new TextContent("old"));
+        ExtractionDocumentTextElement replacementContent = new(new TextContent("replacement"));
         document.Sections.Add(section);
         section.Elements.Add(table);
 
-        table.Cells[0, 0] = new DocumentTableCell(oldContent);
-        DocumentTableCell oldCell = table.Cells[0, 0]!;
+        table.Cells[0, 0] = new ExtractionDocumentTableCell(oldContent);
+        ExtractionDocumentTableCell oldCell = table.Cells[0, 0]!;
 
-        table.Cells[0, 0] = new DocumentTableCell(replacementContent);
+        table.Cells[0, 0] = new ExtractionDocumentTableCell(replacementContent);
 
-        DocumentTableCell replacementCell = table.Cells[0, 0]!;
+        ExtractionDocumentTableCell replacementCell = table.Cells[0, 0]!;
         Assert.NotSame(oldCell, replacementCell);
+        Assert.Null(oldCell.Table);
+        Assert.Same(oldContent, oldCell.Content);
         Assert.Same(replacementContent, replacementCell.Content);
-        Assert.Null(oldCell.Address);
-        Assert.Null(oldContent.Address);
-        Assert.Equal("s0/e0/c0,0", replacementCell.Address);
-        Assert.Equal("s0/e0/c0,0", replacementContent.Address);
 
         table.Cells[0, 0] = null;
 
         Assert.Null(table.Cells[0, 0]);
-        Assert.Null(replacementCell.Address);
-        Assert.Null(replacementContent.Address);
+        Assert.Null(replacementCell.Table);
+        Assert.Same(replacementContent, replacementCell.Content);
     }
 
     [Fact]
     public void RejectsAlreadyOwnedCell()
     {
-        DocumentTableElement firstTable = new("first", 1, 1);
-        DocumentTableElement secondTable = new("second", 1, 1);
-        DocumentTextElement content = new("cell");
-        DocumentTableCell cell = new(content);
+        ExtractionDocumentTableElement firstTable = new(null, 1, 1);
+        ExtractionDocumentTableElement secondTable = new(null, 1, 1);
+        ExtractionDocumentTextElement content = new(new TextContent("cell"));
+        ExtractionDocumentTableCell cell = new(content);
         firstTable.Cells[0, 0] = cell;
 
         Assert.Throws<InvalidOperationException>(() => secondTable.Cells[0, 0] = cell);
@@ -129,145 +125,76 @@ public class DocumentTableCellCollectionTests
     [Fact]
     public void RejectsSectionContent()
     {
-        DocumentTableElement table = new("stored table", 1, 1);
-        DocumentSection section = new("section");
+        ExtractionDocumentTableElement table = new(null, 1, 1);
+        ExtractionDocumentSection section = new(null);
 
-        Assert.Throws<InvalidOperationException>(() => table.Cells[0, 0] = new DocumentTableCell(section));
+        Assert.Throws<InvalidOperationException>(() => table.Cells[0, 0] = new ExtractionDocumentTableCell(section));
 
         Assert.Null(table.Cells[0, 0]);
-        Assert.Null(section.ParentSection);
-        Assert.Null(section.Address);
     }
 
     [Fact]
     public void RejectsTableSelfContent()
     {
-        DocumentTableElement table = new("stored table", 1, 1);
+        ExtractionDocumentTableElement table = new(null, 1, 1);
 
-        Assert.Throws<InvalidOperationException>(() => table.Cells[0, 0] = new DocumentTableCell(table));
+        Assert.Throws<InvalidOperationException>(() => table.Cells[0, 0] = new ExtractionDocumentTableCell(table));
 
         Assert.Null(table.Cells[0, 0]);
-        Assert.Null(table.Address);
     }
 
     [Fact]
-    public void RejectsContentThatCreatesRelationshipCycle()
+    public void IndirectTableCycles_DoNotCauseStructuralTraversalToRecurseIntoCells()
     {
-        DocumentTableElement outerTable = new("outer", 1, 1);
-        DocumentTableElement innerTable = new("inner", 1, 1);
+        ExtractionDocumentTableElement outerTable = new(null, 1, 1);
+        ExtractionDocumentTableElement innerTable = new(null, 1, 1);
 
-        outerTable.Cells[0, 0] = new DocumentTableCell(innerTable);
+        outerTable.Cells[0, 0] = new ExtractionDocumentTableCell(innerTable);
 
-        Assert.Throws<InvalidOperationException>(() => innerTable.Cells[0, 0] = new DocumentTableCell(outerTable));
+        innerTable.Cells[0, 0] = new ExtractionDocumentTableCell(outerTable);
+        ExtractionDocument document = new("cycle");
+        ExtractionDocumentSection section = new();
+        section.Elements.Add(outerTable);
+        document.Sections.Add(section);
+        Assert.Same(outerTable, Assert.Single(document.EnumerateContent()));
 
         Assert.Same(innerTable, outerTable.Cells[0, 0]!.Content);
-        Assert.Null(innerTable.Cells[0, 0]);
-        Assert.Null(outerTable.Address);
-        Assert.Null(innerTable.Address);
+        Assert.Same(outerTable, innerTable.Cells[0, 0]!.Content);
     }
 
     [Fact]
-    public void RejectsContentAlreadyAttachedElsewhere()
+    public void SameCellAssignment_PreservesGridAndPayload()
     {
-        DocumentSection section = new("section");
-        DocumentTableElement table = new("stored table", 1, 1);
-        DocumentTextElement content = new("cell");
-        section.Elements.Add(content);
-
-        Assert.Throws<InvalidOperationException>(() => table.Cells[0, 0] = new DocumentTableCell(content));
-
-        Assert.Same(section, content.ParentSection);
-        Assert.Same(content, section.Elements[0]);
-        Assert.Null(table.Cells[0, 0]);
-    }
-
-    [Fact]
-    public void RejectsDanglingTableRelationships()
-    {
-        DocumentTableElement table = new("stored table", 1, 2);
-        DocumentTextElement firstContent = new("first");
-        DocumentTextElement secondContent = new("second");
-        DocumentSection invalidReplacement = new("invalid replacement");
-
-        table.Cells[0, 0] = new DocumentTableCell(firstContent);
-        table.Cells[0, 1] = new DocumentTableCell(secondContent);
-
-        Assert.Throws<InvalidOperationException>(() => table.Cells[0, 0] = new DocumentTableCell(invalidReplacement));
-        Assert.Throws<InvalidOperationException>(() => table.Cells[0, 0] = new DocumentTableCell(secondContent));
-
-        Assert.Same(firstContent, table.Cells[0, 0]!.Content);
-        Assert.Same(secondContent, table.Cells[0, 1]!.Content);
-        Assert.Null(invalidReplacement.ParentSection);
-        Assert.Null(invalidReplacement.Address);
-        Assert.Null(firstContent.Address);
-        Assert.Null(secondContent.Address);
-    }
-
-    [Fact]
-    public void Mutations_IncrementDocumentVersion()
-    {
-        using Document document = new("document");
-        DocumentSection section = new("section");
-        DocumentTableElement table = new("stored table", 1, 1);
-        DocumentTextElement firstContent = new("first");
-        DocumentTextElement replacementContent = new("replacement");
+        ExtractionDocument document = new("document");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 1, 1);
+        ExtractionDocumentTextElement content = new(new TextContent("content"));
         document.Sections.Add(section);
         section.Elements.Add(table);
 
-        long version = document.Version;
-        table.Cells[0, 0] = new DocumentTableCell(firstContent);
-        Assert.Equal(version + 1, document.Version);
-
-        version = document.Version;
-        table.Cells[0, 0] = new DocumentTableCell(replacementContent);
-        Assert.Equal(version + 1, document.Version);
-
-        version = document.Version;
-        table.Cells[0, 0] = null;
-        Assert.Equal(version + 1, document.Version);
-    }
-
-    [Fact]
-    public void SameContentAssignment_DoesNotIncrementVersion()
-    {
-        using Document document = new("document");
-        DocumentSection section = new("section");
-        DocumentTableElement table = new("stored table", 1, 1);
-        DocumentTextElement content = new("content");
-        document.Sections.Add(section);
-        section.Elements.Add(table);
-
-        table.Cells[0, 0] = new DocumentTableCell(content);
-        DocumentTableCell cell = table.Cells[0, 0]!;
-        long version = document.Version;
+        table.Cells[0, 0] = new ExtractionDocumentTableCell(content);
+        ExtractionDocumentTableCell cell = table.Cells[0, 0]!;
 
         table.Cells[0, 0] = cell;
 
-        Assert.Equal(version, document.Version);
         Assert.Same(cell, table.Cells[0, 0]);
         Assert.Same(content, cell.Content);
-        Assert.Equal("s0/e0/c0,0", content.Address);
-        Assert.Equal("| content |", document.ToMarkdown());
 
         table.Cells[0, 0] = null;
-        version = document.Version;
         table.Cells[0, 0] = null;
 
-        Assert.Equal(version, document.Version);
         Assert.Null(table.Cells[0, 0]);
         Assert.Null(cell.Table);
-        Assert.Null(content.Address);
-        Assert.Equal("|  |", document.ToMarkdown());
     }
 
     [Fact]
     public void MergedCells_PreserveAnchorSpansRolesAndDistinctCoveredPositions()
     {
-        using Document document = new("merged");
-        DocumentSection section = new("");
-        DocumentTableElement table = new("", 3, 3);
-        DocumentTableCell anchor = new(new DocumentTextElement("MERGED_A"), 2, 2, "header");
-        DocumentTableCell ordinary = new(new DocumentTextElement("B"));
+        ExtractionDocument document = new("merged");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 3, 3);
+        ExtractionDocumentTableCell anchor = new(new ExtractionDocumentTextElement(new TextContent("MERGED_A")), 2, 2, "header");
+        ExtractionDocumentTableCell ordinary = new(new ExtractionDocumentTextElement(new TextContent("B")));
         table.Cells[0, 0] = anchor;
         table.Cells[2, 0] = ordinary;
         section.Elements.Add(table);
@@ -287,54 +214,43 @@ public class DocumentTableCellCollectionTests
         Assert.Null(table.Cells[2, 2]);
         Assert.False(table.Cells.IsCovered(2, 2));
         Assert.Null(table.Cells.GetCoveringCell(2, 2));
-        Assert.Equal(new DocumentTableCell?[] { anchor, null, null, null, null, null, ordinary, null, null }, table.Cells.ToArray());
-        Assert.Equal(new[] { "s0/e0/c0,0", "s0/e0/c2,0" }, table.Cells.Where(cell => cell is not null).Select(cell => cell!.Address));
-        Assert.Equal("s0/e0/c0,0", anchor.Content!.Address);
+        Assert.Equal(new ExtractionDocumentTableCell?[] { anchor, null, null, null, null, null, ordinary, null, null }, table.Cells.ToArray());
     }
 
     [Fact]
     public void MergedCells_OverlapCoveredEditsAndReuseRejectWithoutMutation()
     {
-        using Document document = new("invalid-merged");
-        DocumentSection section = new("");
-        DocumentTableElement table = new("", 3, 3);
-        DocumentTextElement text = new("MERGED_A");
-        DocumentAnnotationTestData.CountingStream stream = new(new byte[] { 1, 2, 3 });
-        using DocumentArtifact artifact = new("application/octet-stream", stream);
+        ExtractionDocument document = new("invalid-merged");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 3, 3);
+        ExtractionDocumentTextElement text = new(new TextContent("MERGED_A"));
+        using DocumentAnnotationTestData.CountingStream stream = new(new byte[] { 1, 2, 3 });
+        ExtractionDocumentArtifact artifact = new("application/octet-stream", stream.ToArray());
         text.Sources.Add(new(new("merged-page", 1, sourceOutput: new("merged-operation", rawContent: artifact))));
-        DocumentTableCell anchor = new(text, 2, 2);
+        ExtractionDocumentTableCell anchor = new(text, 2, 2);
         table.Cells[0, 0] = anchor;
         section.Elements.Add(table);
         document.Sections.Add(section);
-        long version = document.Version;
-        DocumentTableCell?[] before = table.Cells.ToArray();
-        DocumentTableCell overlap = new(2, 1);
-        DocumentTableCell candidate = new();
+        ExtractionDocumentTableCell?[] before = table.Cells.ToArray();
+        ExtractionDocumentTableCell overlap = new(2, 1);
+        ExtractionDocumentTableCell candidate = new();
 
         Assert.Throws<InvalidOperationException>(() => table.Cells[0, 1] = candidate);
         Assert.Throws<InvalidOperationException>(() => table.Cells[1, 1] = null);
         Assert.Throws<InvalidOperationException>(() => table.Cells[1, 0] = null);
         table.Cells[2, 2] = candidate;
-        long afterCandidate = document.Version;
         Assert.Throws<InvalidOperationException>(() => table.Cells[1, 2] = overlap);
         Assert.Throws<InvalidOperationException>(() => table.Cells[2, 1] = candidate);
-        Assert.Equal(afterCandidate, document.Version);
-        Assert.Null(overlap.Address);
-        Assert.Equal("s0/e0/c2,2", candidate.Address);
         table.Cells[2, 2] = null;
         Assert.Equal(before, table.Cells.ToArray());
-        Assert.Equal(version + 2, document.Version);
-        Assert.Equal("s0/e0/c0,0", text.Address);
         Assert.Equal(new byte[] { 1, 2, 3 }, stream.ToArray());
         Assert.Equal(0, stream.DisposeCount);
 
         table.Cells[0, 0] = null;
         Assert.False(table.Cells.IsCovered(1, 1));
         Assert.Null(table.Cells.GetCoveringCell(1, 1));
-        Assert.Null(anchor.Address);
-        Assert.Null(text.Address);
-        document.Dispose();
-        Assert.Equal(1, stream.DisposeCount);
+        Assert.Equal(0, stream.DisposeCount);
+        Assert.Equal(new byte[] { 1, 2, 3 }, artifact.Content.ToArray());
     }
 
     [Theory]
@@ -342,43 +258,35 @@ public class DocumentTableCellCollectionTests
     [InlineData(1, 2)]
     public void MergedCells_OutOfBoundsSpanRejectsWithoutTakingOwnership(int rowSpan, int columnSpan)
     {
-        using Document document = new("bounds");
-        DocumentSection section = new("");
-        DocumentTableElement table = new("", 3, 3);
+        ExtractionDocument document = new("bounds");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 3, 3);
         section.Elements.Add(table);
         document.Sections.Add(section);
-        DocumentTableCell candidate = new(rowSpan, columnSpan);
-        long version = document.Version;
+        ExtractionDocumentTableCell candidate = new(rowSpan, columnSpan);
 
         Assert.Throws<ArgumentException>("cell", () => table.Cells[2, 2] = candidate);
-        Assert.Null(candidate.Address);
         Assert.Null(table.Cells[2, 2]);
-        Assert.Equal(version, document.Version);
         table.Cells[0, 0] = candidate;
-        Assert.Equal("s0/e0/c0,0", candidate.Address);
-        Assert.Equal(version + 1, document.Version);
     }
 
     [Fact]
     public void MergedCells_ProspectiveSpanCrossingCoveredSlotOnlyRejectsWithoutMutation()
     {
-        using Document document = new("covered-slot-overlap");
-        DocumentSection section = new("");
-        DocumentTableElement table = new("", 3, 3);
-        DocumentTextElement anchorText = new("MERGED_A", "merged anchor");
-        DocumentTableCell anchor = new(anchorText, 2, 2);
+        ExtractionDocument document = new("covered-slot-overlap");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 3, 3);
+        ExtractionDocumentTextElement anchorText = new(new TextContent("MERGED_A"), "merged anchor");
+        ExtractionDocumentTableCell anchor = new(anchorText, 2, 2);
         table.Cells[1, 1] = anchor;
         section.Elements.Add(table);
         document.Sections.Add(section);
-        DocumentAnnotationTestData.CountingStream stream = new(new byte[] { 61, 62, 63 });
-        using DocumentArtifact artifact = new("application/octet-stream", stream);
-        DocumentTextElement candidateText = new("candidate **value**", "candidate value");
+        using DocumentAnnotationTestData.CountingStream stream = new(new byte[] { 61, 62, 63 });
+        ExtractionDocumentArtifact artifact = new("application/octet-stream", stream.ToArray());
+        ExtractionDocumentTextElement candidateText = new(new TextContent("candidate **value**"), "candidate value");
         candidateText.Sources.Add(new(new("candidate-page", 1, sourceOutput: new("candidate-operation", rawContent: artifact))));
-        DocumentTableCell candidate = new(candidateText, 2, 1);
-        long version = document.Version;
-        DocumentTableCell?[] before = table.Cells.ToArray();
-        const string Projection = "<table><tr><td></td><td></td><td></td></tr>" +
-            "<tr><td></td><td rowspan=\"2\" colspan=\"2\">MERGED_A</td></tr><tr><td></td></tr></table>";
+        ExtractionDocumentTableCell candidate = new(candidateText, 2, 1);
+        ExtractionDocumentTableCell?[] before = table.Cells.ToArray();
 
         // Candidate occupies (0,2) and (1,2), never the existing anchor at (1,1).
         Assert.Null(table.Cells[0, 2]);
@@ -387,12 +295,10 @@ public class DocumentTableCellCollectionTests
         Assert.Null(table.Cells[1, 2]);
         Assert.True(table.Cells.IsCovered(1, 2));
         Assert.Same(anchor, table.Cells.GetCoveringCell(1, 2));
-        Assert.Equal(Projection, document.ToMarkdown());
 
         Assert.Throws<InvalidOperationException>(() => table.Cells[0, 2] = candidate);
 
         Assert.Equal(before, table.Cells.ToArray());
-        Assert.Equal(version, document.Version);
         for (int row = 0; row < 3; row++)
         {
             for (int column = 0; column < 3; column++)
@@ -404,82 +310,61 @@ public class DocumentTableCellCollectionTests
         }
 
         Assert.Same(anchor, table.Cells[1, 1]);
-        Assert.Equal("s0/e0/c1,1", anchor.Address);
-        Assert.Equal("s0/e0/c1,1", anchorText.Address);
-        Assert.Null(candidate.Address);
-        Assert.Null(candidateText.Address);
-        Assert.False(artifact.IsDocumentOwned);
-        Assert.Empty(document.Artifacts);
         Assert.Empty(document.SourcePages);
         Assert.Empty(document.SourceOutputs);
         Assert.Equal(new byte[] { 61, 62, 63 }, stream.ToArray());
         Assert.Equal(0, stream.DisposeCount);
-        Assert.Equal(Projection, document.ToMarkdown());
 
         // Success in another attached table proves rejection took neither cell nor content ownership.
-        using Document other = new("candidate-owner");
-        DocumentSection otherSection = new("");
-        DocumentTableElement otherTable = new("", 2, 1);
+        ExtractionDocument other = new("candidate-owner");
+        ExtractionDocumentSection otherSection = new(null);
+        ExtractionDocumentTableElement otherTable = new(null, 2, 1);
         otherSection.Elements.Add(otherTable);
         other.Sections.Add(otherSection);
-        long otherVersion = other.Version;
         otherTable.Cells[0, 0] = candidate;
+        other.AddSourcePage(candidateText.Sources[0].Page);
         Assert.Same(candidate, otherTable.Cells[0, 0]);
-        Assert.Equal("s0/e0/c0,0", candidate.Address);
-        Assert.Equal("s0/e0/c0,0", candidateText.Address);
         Assert.Same(candidate, otherTable.Cells.GetCoveringCell(1, 0));
         Assert.True(otherTable.Cells.IsCovered(1, 0));
-        Assert.Equal(otherVersion + 1, other.Version);
-        Assert.True(artifact.IsDocumentOwned);
-        Assert.Same(artifact, Assert.Single(other.Artifacts));
         Assert.Same(artifact, Assert.Single(other.SourceOutputs).GetRawContent());
         Assert.Same(candidateText.Sources[0].Page, Assert.Single(other.SourcePages));
-        Assert.Equal("<table><tr><td rowspan=\"2\" colspan=\"1\">candidate **value**</td></tr><tr></tr></table>", other.ToMarkdown());
         Assert.Equal("candidate value", candidateText.Text);
-        Assert.Equal(version, document.Version);
         Assert.Equal(before, table.Cells.ToArray());
 
-        document.Dispose();
         Assert.Equal(0, stream.DisposeCount);
         Assert.Equal(new byte[] { 61, 62, 63 }, stream.ToArray());
-        other.Dispose();
-        other.Dispose();
-        Assert.Equal(1, stream.DisposeCount);
+        Assert.Equal(0, stream.DisposeCount);
+        stream.Dispose();
         Assert.False(stream.CanRead);
+        Assert.Equal(new byte[] { 61, 62, 63 }, artifact.Content.ToArray());
     }
 
     [Fact]
-    public void MergedAnchorReplacement_ReleasesCoveredSlotsAndRetainsRegisteredRawOwnership()
+    public void MergedAnchorReplacement_ReleasesCoveredSlotsAndRetainsExplicitSourceData()
     {
-        using Document document = new("replacement-lifetime");
-        DocumentAnnotationTestData.CountingStream stream = new(DocumentAnnotationTestData.OriginalBytes());
-        using DocumentArtifact artifact = new("application/json", stream);
+        ExtractionDocument document = new("replacement-lifetime");
+        using DocumentAnnotationTestData.CountingStream stream = new(DocumentAnnotationTestData.OriginalBytes());
+        ExtractionDocumentArtifact artifact = new("application/json", stream.ToArray());
         using DocumentAnnotationTestData.BorrowedNative native = new();
-        DocumentSourceOutput output = new("operation-A", native, artifact);
-        DocumentSourcePage frame = DocumentAnnotationTestData.PdfPage(output);
-        DocumentTextElement oldText = new("lO0? &", "lO0? &");
-        DocumentTableCell oldAnchor = new(oldText, 2, 2, "rowHeader");
-        oldAnchor.Sources.Add(new DocumentSourceReference(frame, DocumentAnnotationTestData.Polygon()));
-        DocumentTableElement table = new("stored table", 4, 4);
+        ExtractionDocumentSourceOutput output = new("operation-A", native, artifact);
+        ExtractionDocumentSourcePage frame = DocumentAnnotationTestData.PdfPage(output);
+        document.AddSourcePage(frame);
+        ExtractionDocumentTextElement oldText = new(new TextContent("lO0? &"), "lO0? &");
+        ExtractionDocumentTableCell oldAnchor = new(oldText, 2, 2, "rowHeader");
+        oldAnchor.Sources.Add(new ExtractionDocumentSourceReference(frame, DocumentAnnotationTestData.Polygon()));
+        ExtractionDocumentTableElement table = new(null, 4, 4);
         table.Cells[0, 0] = oldAnchor;
-        DocumentSection section = new("");
+        ExtractionDocumentSection section = new(null);
         section.Elements.Add(table);
         document.Sections.Add(section);
-        long version = document.Version;
         Assert.Same(oldAnchor, table.Cells.GetCoveringCell(1, 1));
         Assert.True(table.Cells.IsCovered(1, 1));
-        Assert.True(artifact.IsDocumentOwned);
 
-        DocumentTextElement replacementText = new("replacement?", "replacement?");
-        DocumentTableCell replacement = new(replacementText);
+        ExtractionDocumentTextElement replacementText = new(new TextContent("replacement?"), "replacement?");
+        ExtractionDocumentTableCell replacement = new(replacementText);
         table.Cells[0, 0] = replacement;
 
-        Assert.Equal(version + 1, document.Version);
         Assert.Same(replacement, table.Cells.GetCoveringCell(0, 0));
-        Assert.Null(oldAnchor.Address);
-        Assert.Null(oldText.Address);
-        Assert.Equal("s0/e0/c0,0", replacement.Address);
-        Assert.Equal("s0/e0/c0,0", replacementText.Address);
         foreach ((int row, int column) in new[] { (0, 1), (1, 0), (1, 1) })
         {
             Assert.Null(table.Cells[row, column]);
@@ -487,28 +372,19 @@ public class DocumentTableCellCollectionTests
             Assert.False(table.Cells.IsCovered(row, column));
         }
 
-        Assert.Equal(
-            $"| replacement? |  |  |  |{Environment.NewLine}|  |  |  |  |{Environment.NewLine}" +
-            $"|  |  |  |  |{Environment.NewLine}|  |  |  |  |",
-            document.ToMarkdown());
         Assert.Same(frame, Assert.Single(document.SourcePages));
         Assert.Same(output, Assert.Single(document.SourceOutputs));
-        Assert.Same(artifact, Assert.Single(document.Artifacts));
-        Assert.True(artifact.IsDocumentOwned);
         Assert.Equal(0, stream.DisposeCount);
         Assert.True(stream.CanRead);
-        Assert.Equal(123, output.GetRawContent()!.Content.ReadByte());
+        Assert.Equal(123, output.GetRawContent()!.Content.Span[0]);
         Assert.Equal(DocumentAnnotationTestData.OriginalBytes(), stream.ToArray());
 
-        DocumentTableCell empty = new();
+        ExtractionDocumentTableCell empty = new();
         table.Cells[0, 1] = empty;
-        Assert.Equal(version + 2, document.Version);
-        Assert.Equal("s0/e0/c0,1", empty.Address);
         Assert.Same(empty, table.Cells.GetCoveringCell(0, 1));
         Assert.False(table.Cells.IsCovered(0, 1));
         table.Cells[2, 2] = oldAnchor;
 
-        Assert.Equal(version + 3, document.Version);
         Assert.Equal(4, table.Cells.RowCount);
         Assert.Equal(4, table.Cells.ColumnCount);
         Assert.Equal(2, oldAnchor.RowIndex);
@@ -516,8 +392,6 @@ public class DocumentTableCellCollectionTests
         Assert.Equal(2, oldAnchor.RowSpan);
         Assert.Equal(2, oldAnchor.ColumnSpan);
         Assert.Equal("rowHeader", oldAnchor.Role);
-        Assert.Equal("s0/e0/c2,2", oldAnchor.Address);
-        Assert.Equal("s0/e0/c2,2", oldText.Address);
         Assert.Equal("lO0? &", oldText.Text);
         Assert.Equal("replacement?", replacementText.Text);
         Assert.Null(empty.Content);
@@ -525,7 +399,7 @@ public class DocumentTableCellCollectionTests
         {
             for (int column = 0; column < 4; column++)
             {
-                DocumentTableCell? covering = null;
+                ExtractionDocumentTableCell? covering = null;
                 if (row >= 2 && column >= 2)
                 {
                     covering = oldAnchor;
@@ -545,38 +419,29 @@ public class DocumentTableCellCollectionTests
         }
 
         Assert.Equal(
-            new DocumentTableCell?[]
+            new ExtractionDocumentTableCell?[]
             {
                 replacement, empty, null, null, null, null, null, null,
                 null, null, oldAnchor, null, null, null, null, null
             },
             table.Cells.ToArray());
-        Assert.Equal(
-            "<table><tr><td rowspan=\"1\" colspan=\"1\">replacement?</td><td rowspan=\"1\" colspan=\"1\"></td><td></td><td></td></tr>" +
-            "<tr><td></td><td></td><td></td><td></td></tr>" +
-            "<tr><td></td><td></td><th rowspan=\"2\" colspan=\"2\" data-kind=\"rowHeader\">lO0? &amp;</th></tr>" +
-            "<tr><td></td><td></td></tr></table>",
-            document.ToMarkdown());
-        Assert.Equal("stored table", table.Markdown);
+        Assert.Null(table.Content);
         Assert.Same(frame, Assert.Single(document.SourcePages));
         Assert.Same(frame, oldAnchor.Sources[0].Page);
         Assert.Equal(DocumentAnnotationTestData.Polygon(), oldAnchor.Sources[0].Polygon);
         Assert.Same(output, Assert.Single(document.SourceOutputs));
-        Assert.Same(artifact, Assert.Single(document.Artifacts));
         Assert.Same(artifact, output.GetRawContent());
         Assert.Same(native, output.GetRawRepresentation());
         Assert.Equal(0, stream.DisposeCount);
         Assert.Equal(0, native.DisposeCount);
         Assert.True(stream.CanRead);
-        Assert.Equal(34, output.GetRawContent()!.Content.ReadByte());
+        Assert.Equal(34, output.GetRawContent()!.Content.Span[1]);
         Assert.Equal(DocumentAnnotationTestData.OriginalBytes(), stream.ToArray());
-        Assert.Equal(version + 3, document.Version);
 
-        document.Dispose();
-        document.Dispose();
+        stream.Dispose();
         Assert.Equal(1, stream.DisposeCount);
         Assert.False(stream.CanRead);
-        Assert.True(artifact.IsDisposed);
+        Assert.Equal(DocumentAnnotationTestData.OriginalBytes(), artifact.Content.ToArray());
         Assert.Equal(0, native.DisposeCount);
     }
 }

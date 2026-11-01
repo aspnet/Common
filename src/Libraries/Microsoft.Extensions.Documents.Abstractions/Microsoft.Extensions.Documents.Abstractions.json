@@ -2,554 +2,502 @@
   "Name": "Microsoft.Extensions.Documents.Abstractions, Version=10.10.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
   "Types": [
     {
-      "Type": "sealed class Microsoft.Extensions.Documents.Document : System.IDisposable",
+      "Type": "sealed class Microsoft.Extensions.Documents.ExtractionDocument",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.Document.Document(string identifier, string? markdown = null);",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocument.ExtractionDocument(string identifier, Microsoft.Extensions.AI.AIContent? content = null);",
           "Stage": "Experimental"
         },
         {
-          "Member": "void Microsoft.Extensions.Documents.Document.AddSourceOutput(Microsoft.Extensions.Documents.DocumentSourceOutput sourceOutput);",
+          "Member": "void Microsoft.Extensions.Documents.ExtractionDocument.AddSourceOutput(Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput sourceOutput);",
           "Stage": "Experimental"
         },
         {
-          "Member": "void Microsoft.Extensions.Documents.Document.AddSourcePage(Microsoft.Extensions.Documents.DocumentSourcePage page);",
+          "Member": "void Microsoft.Extensions.Documents.ExtractionDocument.AddSourcePage(Microsoft.Extensions.Documents.ExtractionDocumentSourcePage page);",
           "Stage": "Experimental"
         },
         {
-          "Member": "void Microsoft.Extensions.Documents.Document.Dispose();",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "System.Collections.Generic.IEnumerable<Microsoft.Extensions.Documents.DocumentElement> Microsoft.Extensions.Documents.Document.EnumerateContent();",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "string Microsoft.Extensions.Documents.Document.ToMarkdown();",
+          "Member": "System.Collections.Generic.IEnumerable<Microsoft.Extensions.Documents.ExtractionDocumentElement> Microsoft.Extensions.Documents.ExtractionDocument.EnumerateContent();",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "string Microsoft.Extensions.Documents.Document.Identifier { get; }",
+          "Member": "Microsoft.Extensions.AI.AIContent? Microsoft.Extensions.Documents.ExtractionDocument.Content { get; set; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "string? Microsoft.Extensions.Documents.Document.Markdown { get; set; }",
+          "Member": "string Microsoft.Extensions.Documents.ExtractionDocument.Identifier { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "System.Collections.Generic.IDictionary<string, object?> Microsoft.Extensions.Documents.Document.Metadata { get; }",
+          "Member": "System.Collections.Generic.Dictionary<string, object?> Microsoft.Extensions.Documents.ExtractionDocument.Metadata { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "System.Collections.Generic.IList<Microsoft.Extensions.Documents.DocumentSection> Microsoft.Extensions.Documents.Document.Sections { get; }",
+          "Member": "System.Collections.Generic.List<Microsoft.Extensions.Documents.ExtractionDocumentSection> Microsoft.Extensions.Documents.ExtractionDocument.Sections { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Documents.DocumentSourceOutput> Microsoft.Extensions.Documents.Document.SourceOutputs { get; }",
+          "Member": "System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput> Microsoft.Extensions.Documents.ExtractionDocument.SourceOutputs { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Documents.DocumentSourcePage> Microsoft.Extensions.Documents.Document.SourcePages { get; }",
+          "Member": "System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Documents.ExtractionDocumentSourcePage> Microsoft.Extensions.Documents.ExtractionDocument.SourcePages { get; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "sealed class Microsoft.Extensions.Documents.DocumentArtifact : System.IDisposable",
+      "Type": "sealed class Microsoft.Extensions.Documents.ExtractionDocumentArtifact",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentArtifact.DocumentArtifact(string mediaType, System.IO.Stream content, System.Uri? source = null);",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "void Microsoft.Extensions.Documents.DocumentArtifact.Dispose();",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentArtifact.ExtractionDocumentArtifact(string mediaType, System.ReadOnlyMemory<byte> content, System.Uri? source = null);",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "System.IO.Stream Microsoft.Extensions.Documents.DocumentArtifact.Content { get; }",
+          "Member": "System.ReadOnlyMemory<byte> Microsoft.Extensions.Documents.ExtractionDocumentArtifact.Content { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "bool Microsoft.Extensions.Documents.DocumentArtifact.IsDocumentOwned { get; }",
+          "Member": "string Microsoft.Extensions.Documents.ExtractionDocumentArtifact.MediaType { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "string Microsoft.Extensions.Documents.DocumentArtifact.MediaType { get; }",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "System.Uri? Microsoft.Extensions.Documents.DocumentArtifact.Source { get; }",
+          "Member": "System.Uri? Microsoft.Extensions.Documents.ExtractionDocumentArtifact.Source { get; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "enum Microsoft.Extensions.Documents.DocumentCoordinateOrigin",
+      "Type": "enum Microsoft.Extensions.Documents.ExtractionDocumentCoordinateOrigin",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentCoordinateOrigin.DocumentCoordinateOrigin();",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentCoordinateOrigin.ExtractionDocumentCoordinateOrigin();",
           "Stage": "Experimental"
         }
       ],
       "Fields": [
         {
-          "Member": "const Microsoft.Extensions.Documents.DocumentCoordinateOrigin Microsoft.Extensions.Documents.DocumentCoordinateOrigin.BottomLeft",
+          "Member": "const Microsoft.Extensions.Documents.ExtractionDocumentCoordinateOrigin Microsoft.Extensions.Documents.ExtractionDocumentCoordinateOrigin.BottomLeft",
           "Stage": "Experimental",
           "Value": "1"
         },
         {
-          "Member": "const Microsoft.Extensions.Documents.DocumentCoordinateOrigin Microsoft.Extensions.Documents.DocumentCoordinateOrigin.TopLeft",
+          "Member": "const Microsoft.Extensions.Documents.ExtractionDocumentCoordinateOrigin Microsoft.Extensions.Documents.ExtractionDocumentCoordinateOrigin.TopLeft",
           "Stage": "Experimental",
           "Value": "0"
         }
       ]
     },
     {
-      "Type": "enum Microsoft.Extensions.Documents.DocumentCoordinateUnit",
+      "Type": "enum Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentCoordinateUnit.DocumentCoordinateUnit();",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit.ExtractionDocumentCoordinateUnit();",
           "Stage": "Experimental"
         }
       ],
       "Fields": [
         {
-          "Member": "const Microsoft.Extensions.Documents.DocumentCoordinateUnit Microsoft.Extensions.Documents.DocumentCoordinateUnit.Inch",
+          "Member": "const Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit.Inch",
           "Stage": "Experimental",
           "Value": "2"
         },
         {
-          "Member": "const Microsoft.Extensions.Documents.DocumentCoordinateUnit Microsoft.Extensions.Documents.DocumentCoordinateUnit.Normalized",
+          "Member": "const Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit.Normalized",
           "Stage": "Experimental",
           "Value": "3"
         },
         {
-          "Member": "const Microsoft.Extensions.Documents.DocumentCoordinateUnit Microsoft.Extensions.Documents.DocumentCoordinateUnit.Pixel",
+          "Member": "const Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit.Pixel",
           "Stage": "Experimental",
           "Value": "0"
         },
         {
-          "Member": "const Microsoft.Extensions.Documents.DocumentCoordinateUnit Microsoft.Extensions.Documents.DocumentCoordinateUnit.Point",
+          "Member": "const Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit.Point",
           "Stage": "Experimental",
           "Value": "1"
         }
       ]
     },
     {
-      "Type": "abstract class Microsoft.Extensions.Documents.DocumentElement",
+      "Type": "abstract class Microsoft.Extensions.Documents.ExtractionDocumentElement",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentElement.DocumentElement(string markdown);",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "virtual string Microsoft.Extensions.Documents.DocumentElement.ToMarkdown();",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentElement.ExtractionDocumentElement(Microsoft.Extensions.AI.AIContent? content);",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "string Microsoft.Extensions.Documents.DocumentElement.Markdown { get; set; }",
+          "Member": "Microsoft.Extensions.AI.AIContent? Microsoft.Extensions.Documents.ExtractionDocumentElement.Content { get; set; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentSection? Microsoft.Extensions.Documents.DocumentElement.ParentSection { get; }",
+          "Member": "System.Collections.Generic.List<Microsoft.Extensions.Documents.ExtractionDocumentSourceReference> Microsoft.Extensions.Documents.ExtractionDocumentElement.Sources { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "System.Collections.Generic.IList<Microsoft.Extensions.Documents.DocumentSourceReference> Microsoft.Extensions.Documents.DocumentElement.Sources { get; }",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "string? Microsoft.Extensions.Documents.DocumentElement.Text { get; set; }",
+          "Member": "string? Microsoft.Extensions.Documents.ExtractionDocumentElement.Text { get; set; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "sealed class Microsoft.Extensions.Documents.DocumentImageElement : Microsoft.Extensions.Documents.DocumentElement",
+      "Type": "sealed class Microsoft.Extensions.Documents.ExtractionDocumentImageElement : Microsoft.Extensions.Documents.ExtractionDocumentElement",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentImageElement.DocumentImageElement(string markdown, string? text = null);",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "override string Microsoft.Extensions.Documents.DocumentImageElement.ToMarkdown();",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentImageElement.ExtractionDocumentImageElement(Microsoft.Extensions.AI.AIContent? content = null, string? text = null);",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "string? Microsoft.Extensions.Documents.DocumentImageElement.AlternativeText { get; set; }",
+          "Member": "string? Microsoft.Extensions.Documents.ExtractionDocumentImageElement.AlternativeText { get; set; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "System.ReadOnlyMemory<byte>? Microsoft.Extensions.Documents.DocumentImageElement.Content { get; set; }",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "string? Microsoft.Extensions.Documents.DocumentImageElement.MediaType { get; set; }",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "System.Uri? Microsoft.Extensions.Documents.DocumentImageElement.Source { get; set; }",
+          "Member": "System.Uri? Microsoft.Extensions.Documents.ExtractionDocumentImageElement.Source { get; set; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "readonly class Microsoft.Extensions.Documents.DocumentPageDimensions",
+      "Type": "readonly struct Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions : System.IEquatable<Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions>",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentPageDimensions.DocumentPageDimensions(double width, double height);",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions.ExtractionDocumentPageDimensions(double width, double height);",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentPageDimensions.DocumentPageDimensions();",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions.ExtractionDocumentPageDimensions();",
           "Stage": "Experimental"
         },
         {
-          "Member": "override bool Microsoft.Extensions.Documents.DocumentPageDimensions.Equals(object obj);",
+          "Member": "bool Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions.Equals(Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions other);",
           "Stage": "Experimental"
         },
         {
-          "Member": "bool Microsoft.Extensions.Documents.DocumentPageDimensions.Equals(Microsoft.Extensions.Documents.DocumentPageDimensions other);",
+          "Member": "override bool Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions.Equals(object? obj);",
           "Stage": "Experimental"
         },
         {
-          "Member": "override int Microsoft.Extensions.Documents.DocumentPageDimensions.GetHashCode();",
+          "Member": "override int Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions.GetHashCode();",
           "Stage": "Experimental"
         },
         {
-          "Member": "static bool Microsoft.Extensions.Documents.DocumentPageDimensions.operator ==(Microsoft.Extensions.Documents.DocumentPageDimensions left, Microsoft.Extensions.Documents.DocumentPageDimensions right);",
+          "Member": "static bool Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions.operator ==(Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions left, Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions right);",
           "Stage": "Experimental"
         },
         {
-          "Member": "static bool Microsoft.Extensions.Documents.DocumentPageDimensions.operator !=(Microsoft.Extensions.Documents.DocumentPageDimensions left, Microsoft.Extensions.Documents.DocumentPageDimensions right);",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "override string Microsoft.Extensions.Documents.DocumentPageDimensions.ToString();",
+          "Member": "static bool Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions.operator !=(Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions left, Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions right);",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "double Microsoft.Extensions.Documents.DocumentPageDimensions.Height { get; }",
+          "Member": "double Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions.Height { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "double Microsoft.Extensions.Documents.DocumentPageDimensions.Width { get; }",
+          "Member": "double Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions.Width { get; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "readonly class Microsoft.Extensions.Documents.DocumentPoint",
+      "Type": "readonly struct Microsoft.Extensions.Documents.ExtractionDocumentPoint : System.IEquatable<Microsoft.Extensions.Documents.ExtractionDocumentPoint>",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentPoint.DocumentPoint(double x, double y);",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentPoint.ExtractionDocumentPoint(double x, double y);",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentPoint.DocumentPoint();",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentPoint.ExtractionDocumentPoint();",
           "Stage": "Experimental"
         },
         {
-          "Member": "override bool Microsoft.Extensions.Documents.DocumentPoint.Equals(object obj);",
+          "Member": "bool Microsoft.Extensions.Documents.ExtractionDocumentPoint.Equals(Microsoft.Extensions.Documents.ExtractionDocumentPoint other);",
           "Stage": "Experimental"
         },
         {
-          "Member": "bool Microsoft.Extensions.Documents.DocumentPoint.Equals(Microsoft.Extensions.Documents.DocumentPoint other);",
+          "Member": "override bool Microsoft.Extensions.Documents.ExtractionDocumentPoint.Equals(object? obj);",
           "Stage": "Experimental"
         },
         {
-          "Member": "override int Microsoft.Extensions.Documents.DocumentPoint.GetHashCode();",
+          "Member": "override int Microsoft.Extensions.Documents.ExtractionDocumentPoint.GetHashCode();",
           "Stage": "Experimental"
         },
         {
-          "Member": "static bool Microsoft.Extensions.Documents.DocumentPoint.operator ==(Microsoft.Extensions.Documents.DocumentPoint left, Microsoft.Extensions.Documents.DocumentPoint right);",
+          "Member": "static bool Microsoft.Extensions.Documents.ExtractionDocumentPoint.operator ==(Microsoft.Extensions.Documents.ExtractionDocumentPoint left, Microsoft.Extensions.Documents.ExtractionDocumentPoint right);",
           "Stage": "Experimental"
         },
         {
-          "Member": "static bool Microsoft.Extensions.Documents.DocumentPoint.operator !=(Microsoft.Extensions.Documents.DocumentPoint left, Microsoft.Extensions.Documents.DocumentPoint right);",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "override string Microsoft.Extensions.Documents.DocumentPoint.ToString();",
+          "Member": "static bool Microsoft.Extensions.Documents.ExtractionDocumentPoint.operator !=(Microsoft.Extensions.Documents.ExtractionDocumentPoint left, Microsoft.Extensions.Documents.ExtractionDocumentPoint right);",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "double Microsoft.Extensions.Documents.DocumentPoint.X { get; }",
+          "Member": "double Microsoft.Extensions.Documents.ExtractionDocumentPoint.X { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "double Microsoft.Extensions.Documents.DocumentPoint.Y { get; }",
+          "Member": "double Microsoft.Extensions.Documents.ExtractionDocumentPoint.Y { get; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "enum Microsoft.Extensions.Documents.DocumentRawContentStatus",
+      "Type": "enum Microsoft.Extensions.Documents.ExtractionDocumentRawContentStatus",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentRawContentStatus.DocumentRawContentStatus();",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentRawContentStatus.ExtractionDocumentRawContentStatus();",
           "Stage": "Experimental"
         }
       ],
       "Fields": [
         {
-          "Member": "const Microsoft.Extensions.Documents.DocumentRawContentStatus Microsoft.Extensions.Documents.DocumentRawContentStatus.Disabled",
+          "Member": "const Microsoft.Extensions.Documents.ExtractionDocumentRawContentStatus Microsoft.Extensions.Documents.ExtractionDocumentRawContentStatus.Disabled",
           "Stage": "Experimental",
           "Value": "2"
         },
         {
-          "Member": "const Microsoft.Extensions.Documents.DocumentRawContentStatus Microsoft.Extensions.Documents.DocumentRawContentStatus.Retained",
+          "Member": "const Microsoft.Extensions.Documents.ExtractionDocumentRawContentStatus Microsoft.Extensions.Documents.ExtractionDocumentRawContentStatus.Retained",
           "Stage": "Experimental",
           "Value": "1"
         },
         {
-          "Member": "const Microsoft.Extensions.Documents.DocumentRawContentStatus Microsoft.Extensions.Documents.DocumentRawContentStatus.Unavailable",
+          "Member": "const Microsoft.Extensions.Documents.ExtractionDocumentRawContentStatus Microsoft.Extensions.Documents.ExtractionDocumentRawContentStatus.Unavailable",
           "Stage": "Experimental",
           "Value": "0"
         }
       ]
     },
     {
-      "Type": "sealed class Microsoft.Extensions.Documents.DocumentSection : Microsoft.Extensions.Documents.DocumentElement",
+      "Type": "sealed class Microsoft.Extensions.Documents.ExtractionDocumentSection : Microsoft.Extensions.Documents.ExtractionDocumentElement",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentSection.DocumentSection(string markdown);",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "override string Microsoft.Extensions.Documents.DocumentSection.ToMarkdown();",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentSection.ExtractionDocumentSection(Microsoft.Extensions.AI.AIContent? content = null);",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "System.Collections.Generic.IList<Microsoft.Extensions.Documents.DocumentElement> Microsoft.Extensions.Documents.DocumentSection.Elements { get; }",
+          "Member": "System.Collections.Generic.List<Microsoft.Extensions.Documents.ExtractionDocumentElement> Microsoft.Extensions.Documents.ExtractionDocumentSection.Elements { get; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "sealed class Microsoft.Extensions.Documents.DocumentSourceOutput",
+      "Type": "sealed class Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentSourceOutput.DocumentSourceOutput(string identifier, object? rawRepresentation = null, Microsoft.Extensions.Documents.DocumentArtifact? rawContent = null, bool contentCaptureDisabled = false, string? providerName = null, string? modelId = null);",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput.ExtractionDocumentSourceOutput(string identifier, object? rawRepresentation = null, Microsoft.Extensions.Documents.ExtractionDocumentArtifact? rawContent = null, bool contentCaptureDisabled = false, string? providerName = null, string? modelId = null);",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentArtifact? Microsoft.Extensions.Documents.DocumentSourceOutput.GetRawContent();",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentArtifact? Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput.GetRawContent();",
           "Stage": "Experimental"
         },
         {
-          "Member": "object? Microsoft.Extensions.Documents.DocumentSourceOutput.GetRawRepresentation();",
+          "Member": "object? Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput.GetRawRepresentation();",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentRawContentStatus Microsoft.Extensions.Documents.DocumentSourceOutput.ContentStatus { get; }",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentRawContentStatus Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput.ContentStatus { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "string Microsoft.Extensions.Documents.DocumentSourceOutput.Identifier { get; }",
+          "Member": "string Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput.Identifier { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "string? Microsoft.Extensions.Documents.DocumentSourceOutput.ModelId { get; }",
+          "Member": "string? Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput.ModelId { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "string? Microsoft.Extensions.Documents.DocumentSourceOutput.ProviderName { get; }",
+          "Member": "string? Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput.ProviderName { get; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "sealed class Microsoft.Extensions.Documents.DocumentSourcePage",
+      "Type": "sealed class Microsoft.Extensions.Documents.ExtractionDocumentSourcePage",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentSourcePage.DocumentSourcePage(string identifier, int pageNumber, Microsoft.Extensions.Documents.DocumentPageDimensions? dimensions = null, Microsoft.Extensions.Documents.DocumentCoordinateUnit? coordinateUnit = null, Microsoft.Extensions.Documents.DocumentCoordinateOrigin? coordinateOrigin = null, Microsoft.Extensions.Documents.DocumentSourceOutput? sourceOutput = null);",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentSourcePage.ExtractionDocumentSourcePage(string identifier, int? pageNumber, Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions? dimensions = null, Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit? coordinateUnit = null, Microsoft.Extensions.Documents.ExtractionDocumentCoordinateOrigin? coordinateOrigin = null, Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput? sourceOutput = null);",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentCoordinateOrigin? Microsoft.Extensions.Documents.DocumentSourcePage.CoordinateOrigin { get; }",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentCoordinateOrigin? Microsoft.Extensions.Documents.ExtractionDocumentSourcePage.CoordinateOrigin { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentCoordinateUnit? Microsoft.Extensions.Documents.DocumentSourcePage.CoordinateUnit { get; }",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentCoordinateUnit? Microsoft.Extensions.Documents.ExtractionDocumentSourcePage.CoordinateUnit { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentPageDimensions? Microsoft.Extensions.Documents.DocumentSourcePage.Dimensions { get; }",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentPageDimensions? Microsoft.Extensions.Documents.ExtractionDocumentSourcePage.Dimensions { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "string Microsoft.Extensions.Documents.DocumentSourcePage.Identifier { get; }",
+          "Member": "string Microsoft.Extensions.Documents.ExtractionDocumentSourcePage.Identifier { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "int Microsoft.Extensions.Documents.DocumentSourcePage.PageNumber { get; }",
+          "Member": "int? Microsoft.Extensions.Documents.ExtractionDocumentSourcePage.PageNumber { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentSourceOutput? Microsoft.Extensions.Documents.DocumentSourcePage.SourceOutput { get; }",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentSourceOutput? Microsoft.Extensions.Documents.ExtractionDocumentSourcePage.SourceOutput { get; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "sealed class Microsoft.Extensions.Documents.DocumentSourceReference",
+      "Type": "sealed class Microsoft.Extensions.Documents.ExtractionDocumentSourceReference",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentSourceReference.DocumentSourceReference(Microsoft.Extensions.Documents.DocumentSourcePage page, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Documents.DocumentPoint>? polygon = null, object? rawRepresentation = null);",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentSourceReference.ExtractionDocumentSourceReference(Microsoft.Extensions.Documents.ExtractionDocumentSourcePage page, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Documents.ExtractionDocumentPoint>? polygon = null, object? rawRepresentation = null);",
           "Stage": "Experimental"
         },
         {
-          "Member": "object? Microsoft.Extensions.Documents.DocumentSourceReference.GetRawRepresentation();",
+          "Member": "object? Microsoft.Extensions.Documents.ExtractionDocumentSourceReference.GetRawRepresentation();",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentSourcePage Microsoft.Extensions.Documents.DocumentSourceReference.Page { get; }",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentSourcePage Microsoft.Extensions.Documents.ExtractionDocumentSourceReference.Page { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Documents.DocumentPoint> Microsoft.Extensions.Documents.DocumentSourceReference.Polygon { get; }",
+          "Member": "System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Documents.ExtractionDocumentPoint> Microsoft.Extensions.Documents.ExtractionDocumentSourceReference.Polygon { get; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "sealed class Microsoft.Extensions.Documents.DocumentTableCell",
+      "Type": "sealed class Microsoft.Extensions.Documents.ExtractionDocumentTableCell",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentTableCell.DocumentTableCell(Microsoft.Extensions.Documents.DocumentElement content, int rowSpan = 1, int columnSpan = 1, string? role = null);",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentTableCell.ExtractionDocumentTableCell(Microsoft.Extensions.Documents.ExtractionDocumentElement content, int rowSpan = 1, int columnSpan = 1, string? role = null);",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentTableCell.DocumentTableCell(int rowSpan = 1, int columnSpan = 1, string? role = null);",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentTableCell.ExtractionDocumentTableCell(int rowSpan = 1, int columnSpan = 1, string? role = null);",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "int Microsoft.Extensions.Documents.DocumentTableCell.ColumnIndex { get; internal set; }",
+          "Member": "int Microsoft.Extensions.Documents.ExtractionDocumentTableCell.ColumnIndex { get; internal set; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "int Microsoft.Extensions.Documents.DocumentTableCell.ColumnSpan { get; }",
+          "Member": "int Microsoft.Extensions.Documents.ExtractionDocumentTableCell.ColumnSpan { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentElement? Microsoft.Extensions.Documents.DocumentTableCell.Content { get; }",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentElement? Microsoft.Extensions.Documents.ExtractionDocumentTableCell.Content { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "string? Microsoft.Extensions.Documents.DocumentTableCell.Role { get; }",
+          "Member": "string? Microsoft.Extensions.Documents.ExtractionDocumentTableCell.Role { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "int Microsoft.Extensions.Documents.DocumentTableCell.RowIndex { get; internal set; }",
+          "Member": "int Microsoft.Extensions.Documents.ExtractionDocumentTableCell.RowIndex { get; internal set; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "int Microsoft.Extensions.Documents.DocumentTableCell.RowSpan { get; }",
+          "Member": "int Microsoft.Extensions.Documents.ExtractionDocumentTableCell.RowSpan { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "System.Collections.Generic.IList<Microsoft.Extensions.Documents.DocumentSourceReference> Microsoft.Extensions.Documents.DocumentTableCell.Sources { get; }",
+          "Member": "System.Collections.Generic.List<Microsoft.Extensions.Documents.ExtractionDocumentSourceReference> Microsoft.Extensions.Documents.ExtractionDocumentTableCell.Sources { get; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "sealed class Microsoft.Extensions.Documents.DocumentTableCellCollection : System.Collections.Generic.IEnumerable<Microsoft.Extensions.Documents.DocumentTableCell?>, System.Collections.IEnumerable",
+      "Type": "sealed class Microsoft.Extensions.Documents.ExtractionDocumentTableCellCollection : System.Collections.Generic.IEnumerable<Microsoft.Extensions.Documents.ExtractionDocumentTableCell?>, System.Collections.IEnumerable",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "System.Collections.Generic.IEnumerator<Microsoft.Extensions.Documents.DocumentTableCell?> Microsoft.Extensions.Documents.DocumentTableCellCollection.GetEnumerator();",
+          "Member": "System.Collections.Generic.IEnumerator<Microsoft.Extensions.Documents.ExtractionDocumentTableCell?> Microsoft.Extensions.Documents.ExtractionDocumentTableCellCollection.GetEnumerator();",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "int Microsoft.Extensions.Documents.DocumentTableCellCollection.ColumnCount { get; }",
+          "Member": "int Microsoft.Extensions.Documents.ExtractionDocumentTableCellCollection.ColumnCount { get; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentTableCell? Microsoft.Extensions.Documents.DocumentTableCellCollection.this[int row, int column] { get; set; }",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentTableCell? Microsoft.Extensions.Documents.ExtractionDocumentTableCellCollection.this[int row, int column] { get; set; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "int Microsoft.Extensions.Documents.DocumentTableCellCollection.RowCount { get; }",
+          "Member": "int Microsoft.Extensions.Documents.ExtractionDocumentTableCellCollection.RowCount { get; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "sealed class Microsoft.Extensions.Documents.DocumentTableElement : Microsoft.Extensions.Documents.DocumentElement",
+      "Type": "sealed class Microsoft.Extensions.Documents.ExtractionDocumentTableElement : Microsoft.Extensions.Documents.ExtractionDocumentElement",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentTableElement.DocumentTableElement(string markdown, int rowCount, int columnCount);",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "override string Microsoft.Extensions.Documents.DocumentTableElement.ToMarkdown();",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentTableElement.ExtractionDocumentTableElement(Microsoft.Extensions.AI.AIContent? content, int rowCount, int columnCount);",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentTableCellCollection Microsoft.Extensions.Documents.DocumentTableElement.Cells { get; }",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentTableCellCollection Microsoft.Extensions.Documents.ExtractionDocumentTableElement.Cells { get; }",
           "Stage": "Experimental"
         }
       ]
     },
     {
-      "Type": "sealed class Microsoft.Extensions.Documents.DocumentTextElement : Microsoft.Extensions.Documents.DocumentElement",
+      "Type": "sealed class Microsoft.Extensions.Documents.ExtractionDocumentTextElement : Microsoft.Extensions.Documents.ExtractionDocumentElement",
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.DocumentTextElement.DocumentTextElement(string markdown, string? text = null, string? role = null);",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentTextElement.ExtractionDocumentTextElement(Microsoft.Extensions.AI.TextContent content, string? text = null, string? role = null);",
           "Stage": "Experimental"
         }
       ],
       "Properties": [
         {
-          "Member": "int? Microsoft.Extensions.Documents.DocumentTextElement.HeadingLevel { get; set; }",
+          "Member": "int? Microsoft.Extensions.Documents.ExtractionDocumentTextElement.HeadingLevel { get; set; }",
           "Stage": "Experimental"
         },
         {
-          "Member": "string? Microsoft.Extensions.Documents.DocumentTextElement.Role { get; }",
+          "Member": "string? Microsoft.Extensions.Documents.ExtractionDocumentTextElement.Role { get; }",
           "Stage": "Experimental"
         }
       ]

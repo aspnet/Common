@@ -13,7 +13,8 @@
     <EnablePackageValidation>false</EnablePackageValidation>
     <!-- These rules conflict with intentionally compact experimental contracts: the table uses explicit two-dimensional
          addressing, hierarchy validation uses type-directed traversal, and several related contracts are kept together. -->
-    <NoWarn>$(NoWarn);CA1307;CA1721;CA1814;CA1822;IDE0021;IDE0032;IDE0058;S2302;S3060;S3967;S4059;SA1402;SA1600;SA1649</NoWarn>
+    <!-- The API review explicitly chose ordinary List data surfaces rather than editing collections. -->
+    <NoWarn>$(NoWarn);CA1002;CA1307;CA1721;CA1814;CA1822;IDE0021;IDE0032;IDE0058;S2302;S3060;S3967;S4059;SA1402;SA1600;SA1649</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -21,7 +22,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Microsoft.Extensions.AI.Abstractions\Microsoft.Extensions.AI.Abstractions.csproj" />
     <InternalsVisibleToTest Include="$(AssemblyName).Tests" />
-    <PackageReference Include="System.Memory" Condition="'$(TargetFrameworkIdentifier)' != '.NETCoreApp'" />
   </ItemGroup>
 </Project>
