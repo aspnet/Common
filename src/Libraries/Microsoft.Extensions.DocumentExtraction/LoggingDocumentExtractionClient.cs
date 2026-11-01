@@ -27,7 +27,7 @@ public partial class LoggingDocumentExtractionClient : DelegatingDocumentExtract
     }
 
     /// <inheritdoc />
-    public override async Task<Document> ExtractAsync(
+    public override async Task<ExtractionDocument> ExtractAsync(
         System.IO.Stream document,
         string identifier,
         string mediaType,
@@ -36,7 +36,7 @@ public partial class LoggingDocumentExtractionClient : DelegatingDocumentExtract
     {
         LogInvoked();
 
-        Document result;
+        ExtractionDocument result;
         try
         {
             result = await base.ExtractAsync(document, identifier, mediaType, options, cancellationToken).ConfigureAwait(false);
@@ -52,24 +52,8 @@ public partial class LoggingDocumentExtractionClient : DelegatingDocumentExtract
             throw;
         }
 
-        try
-        {
-            LogCompleted();
-            return result;
-        }
-        catch (Exception failure)
-        {
-            try
-            {
-                result.Dispose();
-            }
-            catch (Exception cleanupFailure)
-            {
-                throw new AggregateException(failure, cleanupFailure);
-            }
-
-            throw;
-        }
+        LogCompleted();
+        return result;
     }
 
     private void LogFailure(Exception failure, bool canceled)

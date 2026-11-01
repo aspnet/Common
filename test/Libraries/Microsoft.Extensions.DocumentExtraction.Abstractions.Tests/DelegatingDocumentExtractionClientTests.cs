@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DocumentExtraction;
 using Microsoft.Extensions.Documents;
 using Xunit;
@@ -19,10 +20,10 @@ public sealed class DelegatingDocumentExtractionClientTests
     {
         using Native opaque = new();
         DocumentExtractionOptions options = new();
-        Assert.Null(options.ModelId);
+        Assert.Null(options.ExtractorName);
         Assert.False(options.CaptureRawContent);
         Assert.Empty(options.AdditionalProperties);
-        options.ModelId = "model:A";
+        options.ExtractorName = "model:A";
         options.CaptureRawContent = true;
         options.AdditionalProperties.Add("setting", opaque);
         options.AdditionalProperties.Add("Setting", null);
@@ -30,16 +31,18 @@ public sealed class DelegatingDocumentExtractionClientTests
         DocumentExtractionOptions copy = options.Clone();
         Assert.NotSame(options, copy);
         Assert.NotSame(options.AdditionalProperties, copy.AdditionalProperties);
-        Assert.Equal("model:A", copy.ModelId);
+        Assert.Equal("model:A", copy.ExtractorName);
         Assert.True(copy.CaptureRawContent);
         Assert.Same(opaque, copy.AdditionalProperties["setting"]);
-        Assert.Null(copy.AdditionalProperties["Setting"]);
+        Assert.True(copy.AdditionalProperties.TryGetValue("Setting", out object? presentNull));
+        Assert.Null(presentNull);
+        Assert.False(copy.AdditionalProperties.TryGetValue("missing", out _));
         Assert.False(copy.AdditionalProperties.ContainsKey("SETTING"));
         options.AdditionalProperties.Clear();
-        options.ModelId = null;
+        options.ExtractorName = null;
         options.CaptureRawContent = false;
         Assert.Equal(2, copy.AdditionalProperties.Count);
-        Assert.Equal("model:A", copy.ModelId);
+        Assert.Equal("model:A", copy.ExtractorName);
         Assert.True(copy.CaptureRawContent);
         copy.AdditionalProperties["setting"] = "replacement";
         Assert.Empty(options.AdditionalProperties);
@@ -50,14 +53,14 @@ public sealed class DelegatingDocumentExtractionClientTests
     [InlineData("")]
     [InlineData(" ")]
     [InlineData("\t")]
-    public void Options_InvalidModelDoesNotReplacePriorValue(string invalid)
+    public void Options_InvalidExtractorDoesNotReplacePriorValue(string invalid)
     {
-        DocumentExtractionOptions options = new() { ModelId = "model:A", CaptureRawContent = true };
-        Assert.Throws<ArgumentException>("value", () => options.ModelId = invalid);
-        Assert.Equal("model:A", options.ModelId);
+        DocumentExtractionOptions options = new() { ExtractorName = "model:A", CaptureRawContent = true };
+        Assert.Throws<ArgumentException>("value", () => options.ExtractorName = invalid);
+        Assert.Equal("model:A", options.ExtractorName);
         Assert.True(options.CaptureRawContent);
-        options.ModelId = null;
-        Assert.Null(options.ModelId);
+        options.ExtractorName = null;
+        Assert.Null(options.ExtractorName);
     }
 
     [Fact]
@@ -65,18 +68,18 @@ public sealed class DelegatingDocumentExtractionClientTests
     {
         using MemoryStream input = new([42, 43]);
         using CancellationTokenSource cancellation = new();
-        using Document expected = new("urn:document");
-        DocumentSection section = new("provider section");
-        section.Elements.Add(new DocumentTextElement("**body**", "plain body", "heading") { HeadingLevel = 3 });
+        ExtractionDocument expected = new("urn:document");
+        ExtractionDocumentSection section = new();
+        section.Elements.Add(new ExtractionDocumentTextElement(new TextContent("**body**"), "plain body", "heading") { HeadingLevel = 3 });
         expected.Sections.Add(section);
         using Client inner = new((_, _, _, _, _) => Task.FromResult(expected));
         using Delegating wrapper = new(inner);
 
-        Document actual = await wrapper.ExtractAsync(input, "urn:document", "application/pdf", cancellationToken: cancellation.Token);
+        ExtractionDocument actual = await wrapper.ExtractAsync(input, "urn:document", "application/pdf", cancellationToken: cancellation.Token);
 
         Assert.Same(expected, actual);
         Assert.Equal("urn:document", actual.Identifier);
-        Assert.Equal("**body**", actual.ToMarkdown());
+        Assert.Equal("**body**", Assert.IsType<TextContent>(Assert.Single(actual.EnumerateContent()).Content).Text);
         Assert.Equal(1, inner.CallCount);
         Assert.Same(input, inner.Source);
         Assert.Equal("urn:document", inner.Identifier);
@@ -86,7 +89,7 @@ public sealed class DelegatingDocumentExtractionClientTests
         wrapper.Dispose();
         wrapper.Dispose();
         Assert.Equal(1, inner.DisposeCount);
-        Assert.Equal("**body**", actual.ToMarkdown());
+        Assert.Equal("**body**", Assert.IsType<TextContent>(Assert.Single(actual.EnumerateContent()).Content).Text);
         Assert.Equal(42, input.ReadByte());
     }
 
@@ -112,9 +115,9 @@ public sealed class DelegatingDocumentExtractionClientTests
     {
         using MemoryStream input = new([42]);
         using Native opaque = new();
-        using Document expected = new("document");
+        ExtractionDocument expected = new("document");
         using SemaphoreSlim completion = new(0, 1);
-        DocumentExtractionOptions options = new() { ModelId = "model:A", CaptureRawContent = capture };
+        DocumentExtractionOptions options = new() { ExtractorName = "model:A", CaptureRawContent = capture };
         options.AdditionalProperties.Add("setting", opaque);
         options.AdditionalProperties.Add("Setting", null);
         using Client inner = new(async (_, _, _, _, _) =>
@@ -124,27 +127,27 @@ public sealed class DelegatingDocumentExtractionClientTests
         });
         using Delegating wrapper = new(inner);
 
-        Task<Document> pending = wrapper.ExtractAsync(input, "document", "application/pdf", options);
+        Task<ExtractionDocument> pending = wrapper.ExtractAsync(input, "document", "application/pdf", options);
         DocumentExtractionOptions forwarded = Assert.IsType<DocumentExtractionOptions>(inner.Options);
         Assert.NotSame(options, forwarded);
         Assert.NotSame(options.AdditionalProperties, forwarded.AdditionalProperties);
-        Assert.Equal("model:A", forwarded.ModelId);
+        Assert.Equal("model:A", forwarded.ExtractorName);
         Assert.Equal(capture, forwarded.CaptureRawContent);
         Assert.Same(opaque, forwarded.AdditionalProperties["setting"]);
         Assert.Null(forwarded.AdditionalProperties["Setting"]);
         Assert.False(forwarded.AdditionalProperties.ContainsKey("SETTING"));
         Assert.False(pending.IsCompleted);
 
-        options.ModelId = "caller:B";
+        options.ExtractorName = "caller:B";
         options.CaptureRawContent = !capture;
         options.AdditionalProperties.Clear();
-        Assert.Equal("model:A", forwarded.ModelId);
+        Assert.Equal("model:A", forwarded.ExtractorName);
         Assert.Equal(capture, forwarded.CaptureRawContent);
         Assert.Equal(2, forwarded.AdditionalProperties.Count);
-        forwarded.ModelId = "provider:C";
+        forwarded.ExtractorName = "provider:C";
         forwarded.CaptureRawContent = !capture;
         forwarded.AdditionalProperties.Clear();
-        Assert.Equal("caller:B", options.ModelId);
+        Assert.Equal("caller:B", options.ExtractorName);
         Assert.Equal(!capture, options.CaptureRawContent);
         Assert.Empty(options.AdditionalProperties);
         completion.Release();
@@ -158,15 +161,15 @@ public sealed class DelegatingDocumentExtractionClientTests
     public async Task DelegatingClient_AbsentOptionsStayAbsent()
     {
         using MemoryStream input = new([42]);
-        using Document expected = new("document");
+        ExtractionDocument expected = new("document");
         using Client inner = new((_, _, _, _, _) => Task.FromResult(expected));
         using Delegating wrapper = new(inner);
         Assert.Same(expected, await wrapper.ExtractAsync(input, "first", "application/pdf"));
         Assert.Null(inner.Options);
-        DocumentExtractionOptions explicitOptions = new() { ModelId = "explicit" };
+        DocumentExtractionOptions explicitOptions = new() { ExtractorName = "explicit" };
         Assert.Same(expected, await wrapper.ExtractAsync(input, "second", "application/pdf", explicitOptions));
         Assert.NotSame(explicitOptions, inner.Options);
-        Assert.Equal("explicit", inner.Options!.ModelId);
+        Assert.Equal("explicit", inner.Options!.ExtractorName);
         Assert.Same(expected, await wrapper.ExtractAsync(input, "third", "application/pdf", null));
         Assert.Null(inner.Options);
         Assert.Equal(3, inner.CallCount);
@@ -181,7 +184,7 @@ public sealed class DelegatingDocumentExtractionClientTests
         using MemoryStream input = new([42]);
         using CancellationTokenSource cancellation = new();
         Exception primary = cancel ? new OperationCanceledException(cancellation.Token) : new IOException("provider failure");
-        using Client inner = new((_, _, _, _, _) => Task.FromException<Document>(primary));
+        using Client inner = new((_, _, _, _, _) => Task.FromException<ExtractionDocument>(primary));
         using Delegating wrapper = new(inner);
         Exception actual = await Assert.ThrowsAnyAsync<Exception>(() =>
             wrapper.ExtractAsync(input, "document", "application/pdf", cancellationToken: cancellation.Token));
@@ -223,7 +226,7 @@ public sealed class DelegatingDocumentExtractionClientTests
         public void Dispose() => DisposeCount++;
     }
 
-    private sealed class Client(Func<Stream, string, string, DocumentExtractionOptions?, CancellationToken, Task<Document>> extract)
+    private sealed class Client(Func<Stream, string, string, DocumentExtractionOptions?, CancellationToken, Task<ExtractionDocument>> extract)
         : IDocumentExtractionClient
     {
         internal int CallCount { get; private set; }
@@ -238,7 +241,7 @@ public sealed class DelegatingDocumentExtractionClientTests
         internal Type? ServiceType { get; private set; }
         internal object? ServiceKey { get; private set; }
 
-        public Task<Document> ExtractAsync(Stream document, string identifier, string mediaType,
+        public Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
             DocumentExtractionOptions? options = null, CancellationToken cancellationToken = default)
         {
             CallCount++;

@@ -3,6 +3,7 @@
 
 using System;
 using System.Linq;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Documents;
 using Xunit;
 
@@ -11,52 +12,82 @@ namespace Microsoft.Extensions.Documents.Tests;
 public class DocumentTableElementTests
 {
     [Fact]
+    public void NestedTables_PreserveHierarchyAndLiteralText()
+    {
+        ExtractionDocumentTextElement leaf = new(new TextContent("L|R"), "L and R");
+        ExtractionDocumentTableElement inner = new(null, 1, 1);
+        ExtractionDocumentTableElement middle = new(null, 1, 1);
+        ExtractionDocumentTableElement outer = new(null, 1, 1);
+        inner.Cells[0, 0] = new ExtractionDocumentTableCell(leaf);
+        middle.Cells[0, 0] = new ExtractionDocumentTableCell(inner);
+        outer.Cells[0, 0] = new ExtractionDocumentTableCell(middle);
+
+        Assert.Same(leaf, inner.Cells[0, 0]!.Content);
+        Assert.Same(inner, middle.Cells[0, 0]!.Content);
+        Assert.Same(middle, outer.Cells[0, 0]!.Content);
+        Assert.Equal("L and R", leaf.Text);
+        Assert.Equal("L|R", Assert.IsType<TextContent>(leaf.Content).Text);
+    }
+
+    [Fact]
+    public void NestedTable_PreservesLiteralRoleTextAndImageAlternative()
+    {
+        ExtractionDocumentTextElement text = new(new TextContent("A|<&"));
+        ExtractionDocumentImageElement image = new(new UriContent("urn:image", "image/png"))
+        {
+            AlternativeText = "alt|\"<&"
+        };
+        ExtractionDocumentTableElement inner = new(null, 1, 2);
+        ExtractionDocumentTableCell first = new(text, role: "vendor|\"<");
+        inner.Cells[0, 0] = first;
+        inner.Cells[0, 1] = new ExtractionDocumentTableCell(image);
+        ExtractionDocumentTableElement outer = new(null, 1, 1);
+        outer.Cells[0, 0] = new ExtractionDocumentTableCell(inner);
+
+        Assert.Equal("vendor|\"<", first.Role);
+        Assert.Equal("alt|\"<&", image.AlternativeText);
+        Assert.Equal("A|<&", Assert.IsType<TextContent>(text.Content).Text);
+        Assert.Same(image, inner.Cells[0, 1]!.Content);
+        Assert.Equal(1, inner.Cells.RowCount);
+        Assert.Equal(2, inner.Cells.ColumnCount);
+    }
+
+    [Fact]
     public void Coverage_TracksSpanReplacementRemovalAndRejectedEdits()
     {
-        using Document document = new("coverage");
-        DocumentSection section = new("");
-        DocumentTableElement table = new("", 3, 4);
+        ExtractionDocument document = new("coverage");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 3, 4);
         section.Elements.Add(table);
         document.Sections.Add(section);
-        DocumentTableCell wide = new(new DocumentTextElement("wide"), 2, 3);
-        DocumentTableCell corner = new(new DocumentTextElement("corner"), role: "rowHeader");
+        ExtractionDocumentTableCell wide = new(new ExtractionDocumentTextElement(new TextContent("wide")), 2, 3);
+        ExtractionDocumentTableCell corner = new(new ExtractionDocumentTextElement(new TextContent("corner")), role: "rowHeader");
         table.Cells[0, 0] = wide;
         table.Cells[2, 3] = corner;
         AssertCoverage(wide, 2, 3);
-        long version = document.Version;
 
-        Assert.Throws<InvalidOperationException>(() => table.Cells[1, 1] = new DocumentTableCell());
-        Assert.Throws<InvalidOperationException>(() => table.Cells[0, 3] = new DocumentTableCell(3, 1));
-        Assert.Throws<ArgumentException>(() => table.Cells[0, 0] = new DocumentTableCell(4, 1));
-        Assert.Equal(version, document.Version);
+        Assert.Throws<InvalidOperationException>(() => table.Cells[1, 1] = new ExtractionDocumentTableCell());
+        Assert.Throws<InvalidOperationException>(() => table.Cells[0, 3] = new ExtractionDocumentTableCell(3, 1));
+        Assert.Throws<ArgumentException>(() => table.Cells[0, 0] = new ExtractionDocumentTableCell(4, 1));
         AssertCoverage(wide, 2, 3);
 
-        DocumentTableCell small = new(new DocumentTextElement("small"));
+        ExtractionDocumentTableCell small = new(new ExtractionDocumentTextElement(new TextContent("small")));
         table.Cells[0, 0] = small;
         AssertCoverage(small, 1, 1);
-        Assert.Null(wide.Content!.Address);
-        Assert.Equal("s0/e0/c0,0", small.Content!.Address);
         table.Cells[0, 0] = null;
         AssertCoverage(null, 0, 0);
-        Assert.Null(small.Content.Address);
         table.Cells[0, 0] = wide;
         AssertCoverage(wide, 2, 3);
-        Assert.Equal("s0/e0/c0,0", wide.Content.Address);
-        Assert.Equal(
-            "<table><tr><td rowspan=\"2\" colspan=\"3\">wide</td><td></td></tr>" +
-            "<tr><td></td></tr><tr><td></td><td></td><td></td>" +
-            "<th rowspan=\"1\" colspan=\"1\" data-kind=\"rowHeader\">corner</th></tr></table>",
-            table.ToMarkdown());
 
-        void AssertCoverage(DocumentTableCell? anchor, int rows, int columns)
+        void AssertCoverage(ExtractionDocumentTableCell? anchor, int rows, int columns)
         {
             for (int row = 0; row < 3; row++)
             {
                 for (int column = 0; column < 4; column++)
                 {
                     bool inSpan = row < rows && column < columns;
-                    DocumentTableCell? cornerCell = row == 2 && column == 3 ? corner : null;
-                    DocumentTableCell? expected = inSpan ? anchor : cornerCell;
+                    ExtractionDocumentTableCell? cornerCell = row == 2 && column == 3 ? corner : null;
+                    ExtractionDocumentTableCell? expected = inSpan ? anchor : cornerCell;
                     Assert.Same(expected, table.Cells.GetCoveringCell(row, column));
                     Assert.Equal(inSpan && (row != 0 || column != 0),
                         table.Cells.IsCovered(row, column));
@@ -67,26 +98,16 @@ public class DocumentTableElementTests
         }
     }
 
-    private const string RowSpanProjection =
-        "<table><tr><td rowspan=\"1\" colspan=\"1\"></td><td></td><td></td><td></td></tr>" +
-        "<tr><td></td><td rowspan=\"2\" colspan=\"1\">A|&lt;</td><td></td><td></td></tr>" +
-        "<tr><td></td><td></td><td></td></tr></table>";
-
-    private const string ColumnSpanProjection =
-        "<table><tr><td rowspan=\"1\" colspan=\"1\"></td><td></td><td></td><td></td></tr>" +
-        "<tr><td></td><td rowspan=\"1\" colspan=\"3\">A|&lt;</td></tr>" +
-        "<tr><td></td><td></td><td></td><td></td></tr></table>";
-
     [Fact]
     public void StoresDimensionsAndCreatesNullableCells()
     {
-        DocumentTableElement table = new("stored table", 2, 3);
+        ExtractionDocumentTableElement table = new(new TextContent("stored table"), 2, 3);
 
-        Assert.Equal("stored table", table.Markdown);
+        Assert.Equal("stored table", Assert.IsType<TextContent>(table.Content).Text);
         Assert.Equal(2, table.Cells.RowCount);
         Assert.Equal(3, table.Cells.ColumnCount);
         Assert.Equal(
-            new DocumentTableCell?[] { null, null, null, null, null, null },
+            new ExtractionDocumentTableCell?[] { null, null, null, null, null, null },
             table.Cells.ToArray());
     }
 
@@ -97,17 +118,20 @@ public class DocumentTableElementTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(
             parameterName,
-            () => new DocumentTableElement("stored table", rowCount, columnCount));
+            () => new ExtractionDocumentTableElement(null, rowCount, columnCount));
     }
 
     [Theory]
     [InlineData(0, 2)]
     [InlineData(2, 0)]
-    public void ZeroDimensions_ToMarkdownReturnsMarkdown(int rowCount, int columnCount)
+    public void ZeroDimensions_RetainLocalPayloadWithoutFabricatingCells(int rowCount, int columnCount)
     {
-        DocumentTableElement table = new("stored table", rowCount, columnCount);
+        ExtractionDocumentTableElement table = new(new TextContent("stored table"), rowCount, columnCount);
 
-        Assert.Equal("stored table", table.ToMarkdown());
+        Assert.Equal(rowCount, table.Cells.RowCount);
+        Assert.Equal(columnCount, table.Cells.ColumnCount);
+        Assert.Empty(table.Cells);
+        Assert.Equal("stored table", Assert.IsType<TextContent>(table.Content).Text);
     }
 
     [Theory]
@@ -117,9 +141,9 @@ public class DocumentTableElementTests
     [InlineData(0, 2, "column")]
     public void RejectsInvalidCellAddresses(int row, int column, string parameterName)
     {
-        DocumentTableElement table = new("stored table", 2, 2);
-        DocumentTextElement text = new("candidate");
-        DocumentTableCell candidate = new(text);
+        ExtractionDocumentTableElement table = new(null, 2, 2);
+        ExtractionDocumentTextElement text = new(new TextContent("candidate"));
+        ExtractionDocumentTableCell candidate = new(text);
 
         Assert.Throws<ArgumentOutOfRangeException>(
             parameterName,
@@ -132,140 +156,131 @@ public class DocumentTableElementTests
             () => table.Cells[row, column] = null);
 
         Assert.Null(candidate.Table);
-        Assert.Null(text.OwningDocument);
-        Assert.Null(text.Parent);
-        Assert.Equal("candidate", text.ToMarkdown());
         Assert.Equal(
-            new DocumentTableCell?[] { null, null, null, null },
+            new ExtractionDocumentTableCell?[] { null, null, null, null },
             table.Cells.ToArray());
     }
 
     [Fact]
-    public void ToMarkdown_ProjectsEveryCellAndUsesEmptyValueForNull()
+    public void CellGrid_PreservesPayloadsAndNullPositions()
     {
-        DocumentTableElement table = new("stored table", 2, 3);
-        table.Cells[0, 1] = new DocumentTableCell(new DocumentTextElement("one"));
-        table.Cells[1, 0] = new DocumentTableCell(new DocumentTextElement("two"));
+        ExtractionDocumentTableElement table = new(null, 2, 3);
+        table.Cells[0, 1] = new ExtractionDocumentTableCell(new ExtractionDocumentTextElement(new TextContent("one")));
+        table.Cells[1, 0] = new ExtractionDocumentTableCell(new ExtractionDocumentTextElement(new TextContent("two")));
 
-        Assert.Equal(
-            $"|  | one |  |{Environment.NewLine}| two |  |  |",
-            table.ToMarkdown());
+        Assert.Equal(6, table.Cells.Count());
+        Assert.Null(table.Cells[0, 0]);
+        Assert.Null(table.Cells[0, 2]);
+        Assert.Null(table.Cells[1, 1]);
+        Assert.Null(table.Cells[1, 2]);
+        Assert.Equal("one", Assert.IsType<TextContent>(table.Cells[0, 1]!.Content!.Content).Text);
+        Assert.Equal("two", Assert.IsType<TextContent>(table.Cells[1, 0]!.Content!.Content).Text);
     }
 
     [Fact]
-    public void ToMarkdown_EscapesPipesInCellProjections()
+    public void CellPayload_PreservesLiteralPipes()
     {
-        DocumentTableElement table = new("stored table", 1, 1);
-        table.Cells[0, 0] = new DocumentTableCell(new DocumentTextElement("left|right"));
+        ExtractionDocumentTableElement table = new(null, 1, 1);
+        table.Cells[0, 0] = new ExtractionDocumentTableCell(new ExtractionDocumentTextElement(new TextContent("left|right")));
 
-        Assert.Equal("| left\\|right |", table.ToMarkdown());
+        Assert.Equal("left|right", Assert.IsType<TextContent>(table.Cells[0, 0]!.Content!.Content).Text);
     }
 
     [Fact]
-    public void Markdown_RemainsSuppliedWhileToMarkdownProjectsCells()
+    public void AbsentTablePayload_DoesNotAggregateCellPayloads()
     {
-        DocumentTableElement table = new("stored table", 1, 1);
-        table.Cells[0, 0] = new DocumentTableCell(new DocumentTextElement("semantic cell"));
+        ExtractionDocumentTableElement table = new(null, 1, 1);
+        table.Cells[0, 0] = new ExtractionDocumentTableCell(new ExtractionDocumentTextElement(new TextContent("semantic cell")));
 
-        Assert.Equal("stored table", table.Markdown);
-        Assert.Equal("| semantic cell |", table.ToMarkdown());
+        Assert.Null(table.Content);
+        Assert.Equal("semantic cell", Assert.IsType<TextContent>(table.Cells[0, 0]!.Content!.Content).Text);
     }
 
     [Fact]
-    public void MergedCells_ProjectAnchorContentExactlyOnceWithRolesAndHtmlEscaping()
+    public void MergedCells_PreserveAnchorContentRolesAndCoveredPositions()
     {
-        DocumentTableElement table = new("stored table", 3, 3);
-        DocumentTableCell anchor = new(new DocumentTextElement("MERGED_A<&"), 2, 2, "columnHeader");
+        ExtractionDocumentTableElement table = new(null, 3, 3);
+        ExtractionDocumentTableCell anchor = new(new ExtractionDocumentTextElement(new TextContent("MERGED_A<&")), 2, 2, "columnHeader");
         table.Cells[0, 0] = anchor;
-        table.Cells[2, 0] = new DocumentTableCell(new DocumentTextElement("B"), role: "rowHeader");
-        DocumentTableCell empty = new(role: "vendor\"role");
+        table.Cells[2, 0] = new ExtractionDocumentTableCell(new ExtractionDocumentTextElement(new TextContent("B")), role: "rowHeader");
+        ExtractionDocumentTableCell empty = new(role: "vendor\"role");
         table.Cells[2, 2] = empty;
-        DocumentTableCell?[] before = table.Cells.ToArray();
+        ExtractionDocumentTableCell?[] before = table.Cells.ToArray();
 
-        Assert.Equal(
-            "<table><tr><th rowspan=\"2\" colspan=\"2\" data-kind=\"columnHeader\">MERGED_A&lt;&amp;</th><td></td></tr>" +
-            "<tr><td></td></tr><tr><th rowspan=\"1\" colspan=\"1\" data-kind=\"rowHeader\">B</th><td></td>" +
-            "<td rowspan=\"1\" colspan=\"1\" data-kind=\"vendor&quot;role\"></td></tr></table>",
-            table.ToMarkdown());
         Assert.Equal(before, table.Cells.ToArray());
+        Assert.Equal("columnHeader", anchor.Role);
+        Assert.Equal("MERGED_A<&", Assert.IsType<TextContent>(anchor.Content!.Content).Text);
+        Assert.Equal("rowHeader", table.Cells[2, 0]!.Role);
+        Assert.Equal("vendor\"role", empty.Role);
         Assert.Same(anchor, table.Cells.GetCoveringCell(1, 1));
         Assert.Null(table.Cells[1, 1]);
         Assert.False(table.Cells.IsCovered(2, 2));
         Assert.Null(empty.Content);
-        Assert.Equal("stored table", table.Markdown);
+        Assert.Null(table.Content);
     }
 
     [Theory]
-    [InlineData(null, "|  INV0ICE  1O0? <&\\|  |")]
-    [InlineData("columnHeader", "<table><tr><th rowspan=\"1\" colspan=\"1\" data-kind=\"columnHeader\"> INV0ICE  1O0? &lt;&amp;| </th></tr></table>")]
-    [InlineData("rowHeader", "<table><tr><th rowspan=\"1\" colspan=\"1\" data-kind=\"rowHeader\"> INV0ICE  1O0? &lt;&amp;| </th></tr></table>")]
-    [InlineData("ColumnHeader", "<table><tr><td rowspan=\"1\" colspan=\"1\" data-kind=\"ColumnHeader\"> INV0ICE  1O0? &lt;&amp;| </td></tr></table>")]
-    [InlineData("header", "<table><tr><td rowspan=\"1\" colspan=\"1\" data-kind=\"header\"> INV0ICE  1O0? &lt;&amp;| </td></tr></table>")]
-    [InlineData("vendor\"role", "<table><tr><td rowspan=\"1\" colspan=\"1\" data-kind=\"vendor&quot;role\"> INV0ICE  1O0? &lt;&amp;| </td></tr></table>")]
-    public void ToMarkdown_UsesOnlyExplicitCellRolesWithoutCorrectingTranscription(string? role, string expected)
+    [InlineData(null)]
+    [InlineData("columnHeader")]
+    [InlineData("rowHeader")]
+    [InlineData("ColumnHeader")]
+    [InlineData("header")]
+    [InlineData("vendor\"role")]
+    public void CellRoles_AreExplicitWithoutCorrectingTranscription(string? role)
     {
-        using Document document = new("explicit-roles", "stored document");
-        DocumentSection section = new("stored section");
-        DocumentTableElement table = new("stored imperfect table", 1, 1);
+        ExtractionDocument document = new("explicit-roles", null);
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 1, 1);
 
         // Header text is not permission to invent a table-cell role or repair recognition.
-        DocumentTextElement text = new(" INV0ICE  1O0? <&| ", " INV0ICE  1O0? <&| ", role: "heading");
-        DocumentTableCell cell = new(text, role: role);
+        ExtractionDocumentTextElement text = new(new TextContent(" INV0ICE  1O0? <&| "), " INV0ICE  1O0? <&| ", role: "heading");
+        ExtractionDocumentTableCell cell = new(text, role: role);
         table.Cells[0, 0] = cell;
         section.Elements.Add(table);
         document.Sections.Add(section);
-        long version = document.Version;
 
-        Assert.Equal(expected, document.ToMarkdown());
-        Assert.Equal(expected, table.ToMarkdown());
-        Assert.Equal("stored imperfect table", table.Markdown);
-        Assert.Equal("stored document", document.Markdown);
-        Assert.Equal(" INV0ICE  1O0? <&| ", text.Markdown);
+        Assert.Null(table.Content);
+        Assert.Null(document.Content);
+        Assert.Equal(" INV0ICE  1O0? <&| ", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Equal(" INV0ICE  1O0? <&| ", text.Text);
         Assert.Equal(role, cell.Role);
         Assert.Same(cell, table.Cells.GetCoveringCell(0, 0));
         Assert.False(table.Cells.IsCovered(0, 0));
-        Assert.Equal("s0/e0/c0,0", text.Address);
-        Assert.Equal(version, document.Version);
     }
 
     [Theory]
-    [InlineData(2, 1, RowSpanProjection)]
-    [InlineData(1, 3, ColumnSpanProjection)]
-    public void ToMarkdown_NonOriginSingleAxisSpansRespectDeclaredGrid(int rowSpan, int columnSpan, string expected)
+    [InlineData(2, 1)]
+    [InlineData(1, 3)]
+    public void NonOriginSingleAxisSpans_RespectDeclaredGrid(int rowSpan, int columnSpan)
     {
-        using Document document = new("single-axis");
-        DocumentSection section = new("");
-        DocumentTableElement table = new("stored grid", 3, 4);
-        DocumentTableCell empty = new();
-        DocumentTextElement text = new("A|<", "A|<");
-        DocumentTableCell anchor = new(text, rowSpan, columnSpan);
+        ExtractionDocument document = new("single-axis");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 3, 4);
+        ExtractionDocumentTableCell empty = new();
+        ExtractionDocumentTextElement text = new(new TextContent("A|<"), "A|<");
+        ExtractionDocumentTableCell anchor = new(text, rowSpan, columnSpan);
         table.Cells[0, 0] = empty;
         table.Cells[1, 1] = anchor;
         section.Elements.Add(table);
         document.Sections.Add(section);
-        long version = document.Version;
 
-        Assert.Equal(expected, document.ToMarkdown());
         Assert.Equal(3, table.Cells.RowCount);
         Assert.Equal(4, table.Cells.ColumnCount);
         Assert.Equal(1, anchor.RowIndex);
         Assert.Equal(1, anchor.ColumnIndex);
         Assert.Equal(rowSpan, anchor.RowSpan);
         Assert.Equal(columnSpan, anchor.ColumnSpan);
-        Assert.Equal("s0/e0/c1,1", anchor.Address);
-        Assert.Equal("s0/e0/c1,1", text.Address);
         Assert.Equal("A|<", text.Text);
         Assert.Null(anchor.Role);
         Assert.Equal(
-            new DocumentTableCell?[] { empty, null, null, null, null, anchor, null, null, null, null, null, null },
+            new ExtractionDocumentTableCell?[] { empty, null, null, null, null, anchor, null, null, null, null, null, null },
             table.Cells.ToArray());
         for (int row = 0; row < 3; row++)
         {
             for (int column = 0; column < 4; column++)
             {
                 bool inSpan = row >= 1 && row < 1 + rowSpan && column >= 1 && column < 1 + columnSpan;
-                DocumentTableCell? covering = inSpan ? anchor : null;
+                ExtractionDocumentTableCell? covering = inSpan ? anchor : null;
                 if (row == 0 && column == 0)
                 {
                     covering = empty;
@@ -276,153 +291,129 @@ public class DocumentTableElementTests
             }
         }
 
-        Assert.Equal("stored grid", table.Markdown);
+        Assert.Null(table.Content);
         Assert.Same(table, Assert.Single(document.EnumerateContent()));
-        Assert.Equal(version, document.Version);
     }
 
     [Fact]
-    public void PipeProjection_DoesNotSerializeEmptyCellSources()
+    public void EmptyCellSources_RemainDistinctFromMissingCells()
     {
-        using Document document = new("projection-loss", "stored document");
-        DocumentSection section = new("");
-        DocumentTableElement table = new("stored source table", 1, 3);
-        DocumentTableCell empty = new();
-        DocumentSourcePage frame = DocumentAnnotationTestData.PdfPage();
-        empty.Sources.Add(new DocumentSourceReference(frame, DocumentAnnotationTestData.Polygon(), "NATIVE_ONLY"));
-        DocumentTextElement text = new("INV0ICE  1O0?", "INV0ICE  1O0?");
+        ExtractionDocument document = new("projection-loss", null);
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 1, 3);
+        ExtractionDocumentTableCell empty = new();
+        ExtractionDocumentSourcePage frame = DocumentAnnotationTestData.PdfPage();
+        document.AddSourcePage(frame);
+        empty.Sources.Add(new ExtractionDocumentSourceReference(frame, DocumentAnnotationTestData.Polygon(), "NATIVE_ONLY"));
+        ExtractionDocumentTextElement text = new(new TextContent("INV0ICE  1O0?"), "INV0ICE  1O0?");
         table.Cells[0, 1] = empty;
-        table.Cells[0, 2] = new DocumentTableCell(text);
+        table.Cells[0, 2] = new ExtractionDocumentTableCell(text);
         section.Elements.Add(table);
         document.Sections.Add(section);
-        long version = document.Version;
 
-        Assert.Equal("|  |  | INV0ICE  1O0? |", document.ToMarkdown());
-        Assert.Equal(version, document.Version);
         Assert.Null(table.Cells[0, 0]);
         Assert.Null(table.Cells.GetCoveringCell(0, 0));
         Assert.False(table.Cells.IsCovered(0, 0));
         Assert.Same(empty, table.Cells.GetCoveringCell(0, 1));
         Assert.False(table.Cells.IsCovered(0, 1));
         Assert.Null(empty.Content);
-        Assert.Equal("s0/e0/c0,1", empty.Address);
         Assert.Same(frame, Assert.Single(empty.Sources).Page);
         Assert.Same(frame, Assert.Single(document.SourcePages));
         Assert.Equal(DocumentAnnotationTestData.Polygon(), empty.Sources[0].Polygon);
         Assert.Equal("NATIVE_ONLY", empty.Sources[0].GetRawRepresentation());
         Assert.Equal("INV0ICE  1O0?", text.Text);
-        Assert.Equal("stored source table", table.Markdown);
-        Assert.Equal("stored document", document.Markdown);
+        Assert.Null(table.Content);
+        Assert.Null(document.Content);
 
-        // Structurally different tables can have the same semantic projection; this is not a wire format.
+        // Removing a cell does not remove its explicitly registered source frame.
         table.Cells[0, 1] = null;
 
-        Assert.Equal("|  |  | INV0ICE  1O0? |", document.ToMarkdown());
         Assert.Null(table.Cells[0, 1]);
         Assert.Null(table.Cells.GetCoveringCell(0, 1));
-        Assert.Null(empty.Address);
         Assert.Same(frame, Assert.Single(document.SourcePages));
-        Assert.Equal(version + 1, document.Version);
-        Assert.Equal("s0/e0/c0,2", text.Address);
     }
 
     [Fact]
-    public void MarkdownViews_NoSuppliedCellsRetainSourceAndProjectEmptyGrid()
+    public void NoSuppliedCells_RetainSourceAndEmptyGrid()
     {
         string providerMarkdown = $"|A|B|{Environment.NewLine}|---|---|{Environment.NewLine}|1O0?|B|";
-        using Document document = new("unstructured-table");
-        DocumentSection section = new("");
-        DocumentTableElement table = new(providerMarkdown, 2, 2);
+        ExtractionDocument document = new("unstructured-table");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 2, 2);
+        ExtractionDocumentSourceOutput output = new("provider-table", rawRepresentation: providerMarkdown);
+        table.Sources.Add(new ExtractionDocumentSourceReference(new ExtractionDocumentSourcePage("provider-page", 1, sourceOutput: output)));
         section.Elements.Add(table);
         document.Sections.Add(section);
-        long version = document.Version;
 
         Assert.Equal(2, table.Cells.RowCount);
         Assert.Equal(2, table.Cells.ColumnCount);
-        Assert.Equal(new DocumentTableCell?[] { null, null, null, null }, table.Cells.ToArray());
+        Assert.Equal(new ExtractionDocumentTableCell?[] { null, null, null, null }, table.Cells.ToArray());
         Assert.Null(table.Cells.GetCoveringCell(0, 0));
         Assert.False(table.Cells.IsCovered(0, 0));
         Assert.Same(table, Assert.Single(document.EnumerateContent()));
-        Assert.Equal("s0/e0", table.Address);
-        Assert.Equal($"|  |  |{Environment.NewLine}|  |  |", table.ToMarkdown());
-        Assert.Equal($"|  |  |{Environment.NewLine}|  |  |", document.ToMarkdown());
-        Assert.Equal(providerMarkdown, table.Markdown);
-        Assert.Null(document.Markdown);
-        Assert.Equal(new DocumentTableCell?[] { null, null, null, null }, table.Cells.ToArray());
-        Assert.Equal(version, document.Version);
+        Assert.Null(table.Content);
+        Assert.Same(providerMarkdown, output.GetRawRepresentation());
+        Assert.Null(document.Content);
+        Assert.Equal(new ExtractionDocumentTableCell?[] { null, null, null, null }, table.Cells.ToArray());
     }
 
     [Fact]
-    public void MarkdownViews_ExplicitEmptyCellRetainsSourceAndProjectsEmptyGrid()
+    public void ExplicitEmptyCell_RetainsSourceAndGridPosition()
     {
         string providerMarkdown = $"|A|B|{Environment.NewLine}|---|---|{Environment.NewLine}|1O0?|B|";
-        using Document document = new("explicit-empty-table");
-        DocumentSection section = new("");
-        DocumentTableElement table = new(providerMarkdown, 2, 2);
-        DocumentTableCell empty = new();
+        ExtractionDocument document = new("explicit-empty-table");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 2, 2);
+        ExtractionDocumentSourceOutput output = new("provider-table", rawRepresentation: providerMarkdown);
+        table.Sources.Add(new ExtractionDocumentSourceReference(new ExtractionDocumentSourcePage("provider-page", 1, sourceOutput: output)));
+        ExtractionDocumentTableCell empty = new();
         table.Cells[1, 1] = empty;
         section.Elements.Add(table);
         document.Sections.Add(section);
-        long version = document.Version;
 
-        Assert.Equal($"|  |  |{Environment.NewLine}|  |  |", table.ToMarkdown());
-        Assert.Equal($"|  |  |{Environment.NewLine}|  |  |", document.ToMarkdown());
-        Assert.Equal(providerMarkdown, table.Markdown);
-        Assert.Null(document.Markdown);
-        Assert.Equal(new DocumentTableCell?[] { null, null, null, empty }, table.Cells.ToArray());
+        Assert.Null(table.Content);
+        Assert.Same(providerMarkdown, output.GetRawRepresentation());
+        Assert.Null(document.Content);
+        Assert.Equal(new ExtractionDocumentTableCell?[] { null, null, null, empty }, table.Cells.ToArray());
         Assert.Null(empty.Content);
         Assert.Same(empty, table.Cells.GetCoveringCell(1, 1));
         Assert.False(table.Cells.IsCovered(1, 1));
         Assert.Null(table.Cells.GetCoveringCell(0, 0));
-        Assert.Equal("s0/e0/c1,1", empty.Address);
-        Assert.Equal(version, document.Version);
     }
 
     [Fact]
-    public void MarkdownViews_RemovingAllCellsRetainsSourceAndProjectsCurrentEmptyGrid()
+    public void RemovingAllCells_RetainsSourceAndCurrentEmptyGrid()
     {
         string providerMarkdown = $"|A|B|{Environment.NewLine}|---|---|{Environment.NewLine}|1O0?|B|";
-        using Document document = new("cleared-table");
-        DocumentSection section = new("");
-        DocumentTableElement table = new(providerMarkdown, 2, 2);
-        DocumentTextElement text = new("mapped A", "mapped A");
-        DocumentTableCell populated = new(text);
-        DocumentTableCell empty = new();
+        ExtractionDocument document = new("cleared-table");
+        ExtractionDocumentSection section = new(null);
+        ExtractionDocumentTableElement table = new(null, 2, 2);
+        ExtractionDocumentSourceOutput output = new("provider-table", rawRepresentation: providerMarkdown);
+        table.Sources.Add(new ExtractionDocumentSourceReference(new ExtractionDocumentSourcePage("provider-page", 1, sourceOutput: output)));
+        ExtractionDocumentTextElement text = new(new TextContent("mapped A"), "mapped A");
+        ExtractionDocumentTableCell populated = new(text);
+        ExtractionDocumentTableCell empty = new();
         table.Cells[0, 0] = populated;
         table.Cells[1, 1] = empty;
         section.Elements.Add(table);
         document.Sections.Add(section);
-        long version = document.Version;
 
-        Assert.Equal($"| mapped A |  |{Environment.NewLine}|  |  |", table.ToMarkdown());
-        Assert.Equal($"| mapped A |  |{Environment.NewLine}|  |  |", document.ToMarkdown());
-        Assert.Equal("s0/e0/c0,0", populated.Address);
-        Assert.Equal("s0/e0/c0,0", text.Address);
-        Assert.Equal("s0/e0/c1,1", empty.Address);
-        Assert.Equal(providerMarkdown, table.Markdown);
-        Assert.Equal(version, document.Version);
+        Assert.Null(table.Content);
+        Assert.Same(providerMarkdown, output.GetRawRepresentation());
 
         table.Cells[0, 0] = null;
 
-        Assert.Equal(version + 1, document.Version);
-        Assert.Null(populated.Address);
-        Assert.Null(text.Address);
         Assert.Same(empty, table.Cells.GetCoveringCell(1, 1));
-        Assert.Equal("s0/e0/c1,1", empty.Address);
         table.Cells[1, 1] = null;
 
-        Assert.Equal($"|  |  |{Environment.NewLine}|  |  |", table.ToMarkdown());
-        Assert.Equal($"|  |  |{Environment.NewLine}|  |  |", document.ToMarkdown());
-        Assert.Equal(providerMarkdown, table.Markdown);
-        Assert.Null(document.Markdown);
-        Assert.Equal(new DocumentTableCell?[] { null, null, null, null }, table.Cells.ToArray());
+        Assert.Null(table.Content);
+        Assert.Null(document.Content);
+        Assert.Equal(new ExtractionDocumentTableCell?[] { null, null, null, null }, table.Cells.ToArray());
         Assert.Equal(2, table.Cells.RowCount);
         Assert.Equal(2, table.Cells.ColumnCount);
-        Assert.Null(empty.Address);
         Assert.Equal("mapped A", text.Text);
-        Assert.Equal("mapped A", text.Markdown);
+        Assert.Equal("mapped A", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Same(table, Assert.Single(document.EnumerateContent()));
-        Assert.Equal("s0/e0", table.Address);
         for (int row = 0; row < 2; row++)
         {
             for (int column = 0; column < 2; column++)
@@ -432,6 +423,5 @@ public class DocumentTableElementTests
             }
         }
 
-        Assert.Equal(version + 2, document.Version);
     }
 }

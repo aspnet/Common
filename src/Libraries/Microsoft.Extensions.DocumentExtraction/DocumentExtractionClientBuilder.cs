@@ -74,9 +74,17 @@ public sealed class DocumentExtractionClientBuilder
 
             return client;
         }
-        catch
+        catch (Exception failure)
         {
-            client.Dispose();
+            try
+            {
+                client.Dispose();
+            }
+            catch (Exception cleanupFailure)
+            {
+                throw new AggregateException(failure, cleanupFailure);
+            }
+
             throw;
         }
     }

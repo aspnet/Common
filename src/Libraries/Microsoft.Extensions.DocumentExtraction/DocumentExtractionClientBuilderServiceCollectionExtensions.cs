@@ -17,9 +17,9 @@ public static class DocumentExtractionClientBuilderServiceCollectionExtensions
     /// Registers a document extraction client and returns its middleware builder.
     /// </summary>
     /// <remarks>
-    /// The supplied inner client is shared by all resolutions, including scoped or transient pipelines.
-    /// Disposing one pipeline disposes that inner client. Use the factory overload to create independent
-    /// clients for scoped or transient lifetimes.
+    /// The supplied inner client can only be registered as a singleton. The container owns the
+    /// composed pipeline and disposes the inner client when the container is disposed.
+    /// Use the factory overload to create independent clients for scoped or transient lifetimes.
     /// </remarks>
     /// <returns>The middleware builder.</returns>
     public static DocumentExtractionClientBuilder AddDocumentExtractionClient(
@@ -27,7 +27,13 @@ public static class DocumentExtractionClientBuilderServiceCollectionExtensions
         IDocumentExtractionClient innerClient,
         ServiceLifetime lifetime = ServiceLifetime.Singleton)
     {
+        _ = Throw.IfNull(services);
         _ = Throw.IfNull(innerClient);
+        if (lifetime != ServiceLifetime.Singleton)
+        {
+            Throw.ArgumentOutOfRangeException(nameof(lifetime), lifetime, "An existing client instance requires a singleton lifetime.");
+        }
+
         return AddDocumentExtractionClient(services, _ => innerClient, lifetime);
     }
 

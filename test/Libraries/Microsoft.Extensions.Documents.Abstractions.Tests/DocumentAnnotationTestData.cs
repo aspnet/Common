@@ -13,15 +13,15 @@ internal static class DocumentAnnotationTestData
 
     internal static byte[] OriginalBytes() => Encoding.UTF8.GetBytes(RawBody);
 
-    internal static DocumentPoint[] Polygon() =>
+    internal static ExtractionDocumentPoint[] Polygon() =>
     [
         new(10.25, 20.5), new(40.75, 18.25), new(44.5, 60.125),
         new(12.875, 58.75), new(8.5, 35.25)
     ];
 
-    internal static DocumentSourcePage PdfPage(DocumentSourceOutput? output = null) =>
-        new("urn:frame:pdf-A", 7, new DocumentPageDimensions(200, 100),
-            DocumentCoordinateUnit.Point, DocumentCoordinateOrigin.BottomLeft, output);
+    internal static ExtractionDocumentSourcePage PdfPage(ExtractionDocumentSourceOutput? output = null) =>
+        new("urn:frame:pdf-A", 7, new ExtractionDocumentPageDimensions(200, 100),
+            ExtractionDocumentCoordinateUnit.Point, ExtractionDocumentCoordinateOrigin.BottomLeft, output);
 
     internal sealed class CountingStream(byte[] bytes) : MemoryStream(bytes)
     {

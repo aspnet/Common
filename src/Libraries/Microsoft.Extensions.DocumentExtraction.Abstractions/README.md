@@ -7,7 +7,7 @@ second document tree or require an authoring, page-streaming or observation prot
 The primary operation is:
 
 ```csharp
-Task<Document> ExtractAsync(
+Task<ExtractionDocument> ExtractAsync(
     Stream document,
     string identifier,
     string mediaType,
@@ -15,15 +15,17 @@ Task<Document> ExtractAsync(
     CancellationToken cancellationToken = default);
 ```
 
-An adapter returns the canonical `Microsoft.Extensions.Documents.Document` directly.
-The caller owns the input stream and the returned document. Disposing the document
-releases its registered original-response body streams, never borrowed native SDK
-objects. Adapters own partial-result cleanup on failure or cancellation, must attempt
-every acquired body, and must preserve the primary error if cleanup also fails.
-They must honor cancellation without disposing the caller's input.
+An adapter returns the canonical `Microsoft.Extensions.Documents.ExtractionDocument` directly.
+The caller owns the input stream. The returned document is non-disposable data;
+retained original-response bytes are copied into managed memory. Adapters clean up
+their parser, response, stream and temporary resources on success, failure and
+cancellation, must attempt every acquired resource, and must preserve the primary
+error if cleanup also fails. They must not dispose caller streams or borrowed native
+SDK objects.
 
 Documents can be constructed or consumed without Extraction. Extraction depends on
-Documents, not MEDI, AI or provider SDK packages. MEDI or another consumer can accept
+Documents, not MEDI or provider SDK packages. Documents uses standard AIContent
+payloads from MEAI. MEDI or another consumer can accept
 the same shared document from any producer without requiring Extraction. The
 packages compose through the exchanged document rather than a mandatory pipeline.
 
@@ -32,13 +34,16 @@ packages compose through the exchanged document rather than a mandatory pipeline
 Adapters map provider output to shared text, image, table and section elements.
 Text roles such as `heading`, `pageHeader`, `pageFooter`, custom roles and optional
 heading levels are preserved without inventing unspecified information.
-Exact supplied `Markdown` is distinct from `ToMarkdown()`, the projection of the
-current document structure.
+Local standard `AIContent` payloads are inspected directly through the hierarchy.
+The shared model has no structural renderer or required Markdown convention.
+Plain/OCR `Text` and image `AlternativeText` remain independent of the payload.
 
 Typed `Sources` retain source pages, coordinate frames and ordered polygons, with
 explicit native-object access. A source without a polygon identifies a page, not a
 precise location. Adapters register real blank-page frames and source operations
-even when no element refers to them. Table spans, roles and sources are independent
+even when no element refers to them. Adding references does not register frames;
+call `AddSourcePage` explicitly. Page numbers are nullable and positive when present;
+named frames do not acquire a number from assembly position. Table spans, roles and sources are independent
 of whether a cell has content.
 
 The Extraction contract has no staged element metadata, arbitrary semantic-artifact
@@ -49,7 +54,10 @@ verified grounding or calibrated confidence.
 
 ## Per-call options and break-glass output
 
-`DocumentExtractionOptions` provides an optional model override and an
+`DocumentExtractionOptions.ExtractorName` selects an extractor/analyzer within an
+already configured provider; it does not select the DI provider. Null uses that
+provider's default, and nonblank opaque selectors are preserved verbatim. Genuine
+reported output `ModelId` remains independent. Options also provide an
 adapter-specific `AdditionalProperties` dictionary. Providers must reject unsupported
 explicit settings, create fresh requests per operation, and avoid mutating caller
 arguments or shared defaults. Implementations must snapshot options before
@@ -71,9 +79,9 @@ honestly distinguishes `Disabled`, `Unavailable` and `Retained`; a native getter
 returning `null` means that representation was not supplied. Unsupported explicit
 settings are errors, not the same as legitimately unavailable output.
 
-Successful source-body registration transfers ownership to the returned document.
-Shared operation bodies are owned once. Borrowed native objects and bodies already
-owned by another document must not be implicitly disposed during failed extraction.
+Artifacts retain content, MIME and optional source URI without ownership transfer
+or disposed state. Detached bytes remain usable after provider cleanup, including
+for results with zero sections. Retained empty bytes are not unavailable content.
 Raw output is accessed explicitly through `GetRawRepresentation()`/`GetRawContent()`
 and must not automatically enter Markdown, logs, embeddings or ingestion records.
 Providers must not capture request credentials or authorization headers.

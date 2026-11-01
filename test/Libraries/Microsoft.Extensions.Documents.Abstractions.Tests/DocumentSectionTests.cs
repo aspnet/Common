@@ -1,8 +1,8 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System;
 using System.Linq;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Documents;
 using Xunit;
 
@@ -11,34 +11,34 @@ namespace Microsoft.Extensions.Documents.Tests;
 public class DocumentSectionTests
 {
     [Fact]
-    public void StoresMarkdownAndStartsWithEmptyElements()
+    public void StoresLocalPayloadAndStartsWithEmptyElements()
     {
-        DocumentSection section = new("stored section markdown");
+        ExtractionDocumentSection section = new(new TextContent("stored section markdown"));
 
-        Assert.Equal("stored section markdown", section.Markdown);
+        Assert.Equal("stored section markdown", Assert.IsType<TextContent>(section.Content).Text);
         Assert.Empty(section.Elements);
-        Assert.Null(section.ParentSection);
-        Assert.Null(section.Address);
     }
 
     [Fact]
-    public void ToMarkdown_ReturnsMarkdownWhenSectionIsEmpty()
+    public void LocalPayloadMutation_DoesNotPopulateSectionElements()
     {
-        DocumentSection section = new("stored section markdown");
+        ExtractionDocumentSection section = new(new TextContent("stored section markdown"));
 
-        Assert.Equal("stored section markdown", section.ToMarkdown());
+        Assert.IsType<TextContent>(section.Content).Text = "plain section text";
+        Assert.Equal("plain section text", Assert.IsType<TextContent>(section.Content).Text);
+        Assert.Empty(section.Elements);
     }
 
     [Fact]
     public void NestedSections_AreEnumeratedDepthFirst()
     {
-        using Document document = new("document");
-        DocumentSection root = new("root");
-        DocumentTextElement first = new("first");
-        DocumentSection nested = new("nested");
-        DocumentTextElement nestedFirst = new("nested-first");
-        DocumentTextElement nestedLast = new("nested-last");
-        DocumentTextElement last = new("last");
+        ExtractionDocument document = new("document");
+        ExtractionDocumentSection root = new(null);
+        ExtractionDocumentTextElement first = new(new TextContent("first"));
+        ExtractionDocumentSection nested = new(null);
+        ExtractionDocumentTextElement nestedFirst = new(new TextContent("nested-first"));
+        ExtractionDocumentTextElement nestedLast = new(new TextContent("nested-last"));
+        ExtractionDocumentTextElement last = new(new TextContent("last"));
 
         nested.Elements.Add(nestedFirst);
         nested.Elements.Add(nestedLast);
@@ -47,58 +47,10 @@ public class DocumentSectionTests
         root.Elements.Add(last);
         document.Sections.Add(root);
 
-        DocumentElement[] content = document.EnumerateContent().ToArray();
+        ExtractionDocumentElement[] content = document.EnumerateContent().ToArray();
 
-        Assert.Equal(new DocumentElement[] { first, nestedFirst, nestedLast, last }, content);
+        Assert.Equal(new ExtractionDocumentElement[] { first, nestedFirst, nestedLast, last }, content);
         Assert.DoesNotContain(nested, content);
     }
 
-    [Fact]
-    public void SectionCollection_RejectsDuplicateSectionOwnership()
-    {
-        using Document firstDocument = new("first-document");
-        using Document secondDocument = new("second-document");
-        DocumentSection section = new("section");
-
-        firstDocument.Sections.Add(section);
-
-        Assert.Throws<InvalidOperationException>(() => secondDocument.Sections.Add(section));
-
-        Assert.Single(firstDocument.Sections);
-        Assert.Empty(secondDocument.Sections);
-        Assert.Equal("s0", section.Address);
-    }
-
-    [Fact]
-    public void SectionCollection_SetRemoveAndClear_UpdateOwnership()
-    {
-        using Document document = new("document");
-        DocumentSection oldSection = new("old");
-        DocumentTextElement oldContent = new("old content");
-        oldSection.Elements.Add(oldContent);
-        DocumentSection secondSection = new("second");
-        DocumentSection replacement = new("replacement");
-        DocumentTextElement replacementContent = new("replacement content");
-        replacement.Elements.Add(replacementContent);
-
-        document.Sections.Add(oldSection);
-        document.Sections.Add(secondSection);
-        document.Sections[0] = replacement;
-
-        Assert.Null(oldSection.Address);
-        Assert.Null(oldContent.Address);
-        Assert.Equal("s0", replacement.Address);
-        Assert.Equal("s0/e0", replacementContent.Address);
-
-        document.Sections.Remove(replacement);
-
-        Assert.Null(replacement.Address);
-        Assert.Null(replacementContent.Address);
-        Assert.Equal("s0", secondSection.Address);
-
-        document.Sections.Clear();
-
-        Assert.Empty(document.Sections);
-        Assert.Null(secondSection.Address);
-    }
 }

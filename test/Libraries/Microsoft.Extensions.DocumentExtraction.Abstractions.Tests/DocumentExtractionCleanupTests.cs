@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,27 +20,24 @@ public sealed class DocumentExtractionCleanupTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public async Task Adapter_FailureOrCancellationDisposesPartialDocumentAndKeepsPrimaryFirst(bool cancel, bool throwingCleanup)
+    public async Task Adapter_FailureOrCancellationCleansProviderStreamsAndKeepsPrimaryFirst(bool cancel, bool throwingCleanup)
     {
         using MemoryStream input = new([42, 43]);
         using Native native = new();
         using CancellationTokenSource cancellation = new();
         IOException firstFailure = new("first body cleanup");
         IOException lastFailure = new("last body cleanup");
-        CleanupStream first = new(throwingCleanup ? firstFailure : null);
-        CleanupStream middle = new();
-        CleanupStream last = new(throwingCleanup ? lastFailure : null);
-        using DocumentArtifact firstBody = new("application/json", first);
-        using DocumentArtifact middleBody = new("application/json", middle);
-        using DocumentArtifact lastBody = new("application/json", last);
+        using CleanupStream first = new(throwingCleanup ? firstFailure : null);
+        using CleanupStream middle = new();
+        using CleanupStream last = new(throwingCleanup ? lastFailure : null);
         InvalidOperationException primary = new("provider mapping failed");
         using SemaphoreSlim acquired = new(0, 1);
         using SemaphoreSlim release = new(0, 1);
-        using PartialAdapter adapter = new([firstBody, middleBody, lastBody], native, primary, acquired, release);
+        using PartialAdapter adapter = new([first, middle, last], native, primary, acquired, release);
 
         Exception actual = await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
-            Task<Document> pending = adapter.ExtractAsync(input, "partial", "application/pdf",
+            Task<ExtractionDocument> pending = adapter.ExtractAsync(input, "partial", "application/pdf",
                 new DocumentExtractionOptions { CaptureRawContent = true }, cancellation.Token);
             await acquired.WaitAsync();
             Assert.False(pending.IsCompleted);
@@ -94,11 +93,10 @@ public sealed class DocumentExtractionCleanupTests
         using Native native = new();
         using CancellationTokenSource cancellation = new();
         cancellation.Cancel();
-        CleanupStream stream = new();
-        using DocumentArtifact body = new("application/json", stream);
+        using CleanupStream stream = new();
         using SemaphoreSlim acquired = new(0, 1);
         using SemaphoreSlim release = new(0, 1);
-        using PartialAdapter adapter = new([body], native, new InvalidOperationException("unused"), acquired, release);
+        using PartialAdapter adapter = new([stream], native, new InvalidOperationException("unused"), acquired, release);
 
         OperationCanceledException error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             adapter.ExtractAsync(input, "document", "application/pdf", cancellationToken: cancellation.Token));
@@ -113,23 +111,26 @@ public sealed class DocumentExtractionCleanupTests
     }
 
     // This fake models an adapter's responsibility, not middleware or a core body collector.
-    // A real adapter maps provider output directly into its partially constructed Document.
-    private sealed class PartialAdapter(DocumentArtifact[] bodies, Native native, Exception primary, SemaphoreSlim acquired, SemaphoreSlim release) : IDocumentExtractionClient
+    // Resources belong to the adapter's operation, never to the data result.
+    private sealed class PartialAdapter(CleanupStream[] bodies, Native native, Exception primary, SemaphoreSlim acquired, SemaphoreSlim release) : IDocumentExtractionClient
     {
         internal int AcquireCount { get; private set; }
         internal CancellationToken Token { get; private set; }
 
-        public async Task<Document> ExtractAsync(Stream document, string identifier, string mediaType,
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Attempts cleanup of every resource before reporting primary and cleanup failures together.")]
+        public async Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
             DocumentExtractionOptions? options = null, CancellationToken cancellationToken = default)
         {
             Token = cancellationToken;
             cancellationToken.ThrowIfCancellationRequested();
-            using Document partial = new(identifier);
+            ExtractionDocument partial = new(identifier);
             try
             {
-                foreach (DocumentArtifact body in bodies)
+                foreach (CleanupStream body in bodies)
                 {
-                    partial.AddSourceOutput(new DocumentSourceOutput("response:" + AcquireCount, native, body));
+                    ExtractionDocumentArtifact artifact = new("application/json", body.ToArray());
+                    partial.AddSourceOutput(new ExtractionDocumentSourceOutput("response:" + AcquireCount, native, artifact));
                     AcquireCount++;
                 }
 
@@ -142,13 +143,22 @@ public sealed class DocumentExtractionCleanupTests
             }
             catch (Exception failure)
             {
-                try
+                List<Exception> failures = [failure];
+                for (int i = 0; i < AcquireCount; i++)
                 {
-                    partial.Dispose();
+                    try
+                    {
+                        bodies[i].Dispose();
+                    }
+                    catch (Exception cleanup)
+                    {
+                        failures.Add(cleanup);
+                    }
                 }
-                catch (Exception cleanup)
+
+                if (failures.Count > 1)
                 {
-                    throw new AggregateException(failure, cleanup);
+                    throw new AggregateException(failures);
                 }
 
                 throw;
@@ -179,6 +189,11 @@ public sealed class DocumentExtractionCleanupTests
 
         protected override void Dispose(bool disposing)
         {
+            if (DisposeCount != 0)
+            {
+                return;
+            }
+
             if (disposing)
             {
                 DisposeCount++;

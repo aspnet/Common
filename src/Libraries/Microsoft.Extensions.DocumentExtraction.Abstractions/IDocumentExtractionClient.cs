@@ -14,9 +14,11 @@ namespace Microsoft.Extensions.DocumentExtraction;
 /// </summary>
 /// <remarks>
 /// Implementations do not own or dispose the source stream. They must snapshot per-call options before
-/// asynchronous work, honor cancellation, and release provider resources and partially acquired documents
+/// asynchronous work, honor cancellation, and release provider resources
 /// on failure or cancellation. Cleanup failures must not replace the primary error.
-/// The caller owns the returned document and disposes it to release registered original response content.
+/// The returned document is data and requires no disposal. Retained original response content must be
+/// detached into managed bytes before provider responses, parsers, and temporary streams are released.
+/// Providers register source frames and operations explicitly, including operations producing no sections.
 /// Native result and source-reference objects are borrowed and may be exposed regardless of content capture.
 /// Original response content is retained only when <see cref="DocumentExtractionOptions.CaptureRawContent"/> is enabled.
 /// Providers must document unsupported explicit settings separately from response content that is legitimately
@@ -33,7 +35,7 @@ public interface IDocumentExtractionClient : IDisposable
     /// <param name="options">Optional per-call overrides. Providers must reject unsupported explicit settings.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task producing the caller-owned extracted document.</returns>
-    Task<Document> ExtractAsync(
+    Task<ExtractionDocument> ExtractAsync(
         Stream document,
         string identifier,
         string mediaType,

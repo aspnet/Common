@@ -30,7 +30,7 @@ public class DelegatingDocumentExtractionClient : IDocumentExtractionClient
     protected IDocumentExtractionClient InnerClient { get; }
 
     /// <inheritdoc />
-    public virtual Task<Document> ExtractAsync(
+    public virtual Task<ExtractionDocument> ExtractAsync(
         Stream document,
         string identifier,
         string mediaType,
