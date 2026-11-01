@@ -11,6 +11,7 @@
     <EnablePackageValidation>false</EnablePackageValidation>
     <MinCodeCoverage>75</MinCodeCoverage>
     <MinMutationScore>75</MinMutationScore>
+    <NoWarn>$(NoWarn);EXTEXP0019</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

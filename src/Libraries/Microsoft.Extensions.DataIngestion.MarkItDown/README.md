@@ -30,7 +30,7 @@ using Microsoft.Extensions.DataIngestion;
 IngestionDocumentReader reader =
     new MarkItDownReader(new FileInfo(@"pathToMarkItDown.exe"), extractImages: true);
 
-using IngestionPipeline<string> pipeline = new(reader, CreateChunker(), CreateWriter());
+using IngestionPipeline pipeline = new(reader, CreateChunker(), CreateWriter());
 ```
 
 ### Creating a MarkItDownMcpReader for Data Ingestion (MCP Server)
@@ -44,7 +44,7 @@ using Microsoft.Extensions.DataIngestion;
 IngestionDocumentReader reader =
     new MarkItDownMcpReader(new Uri("http://localhost:3001/mcp"));
 
-using IngestionPipeline<string> pipeline = new(reader, CreateChunker(), CreateWriter());
+using IngestionPipeline pipeline = new(reader, CreateChunker(), CreateWriter());
 ```
 
 The MarkItDown MCP server can be run using Docker:

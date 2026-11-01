@@ -12,7 +12,7 @@
     <MinCodeCoverage>75</MinCodeCoverage>
     <MinMutationScore>75</MinMutationScore>
     <!--  Convert abstract class into interface -->
-    <NoWarn>$(NoWarn);S1694;S2368</NoWarn>
+    <NoWarn>$(NoWarn);S1694;S2368;EXTEXP0019</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Microsoft.Extensions.AI.Abstractions\Microsoft.Extensions.AI.Abstractions.csproj" />
+    <ProjectReference Include="..\Microsoft.Extensions.Documents.Abstractions\Microsoft.Extensions.Documents.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

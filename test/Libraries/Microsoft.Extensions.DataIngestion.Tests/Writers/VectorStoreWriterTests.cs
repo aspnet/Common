@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DataIngestion.Tests;
+using Microsoft.Extensions.Documents;
 using Microsoft.Extensions.VectorData;
 using Xunit;
 
@@ -47,7 +48,7 @@ public abstract class VectorStoreWriterTests
 
         using VectorStoreWriter<IngestionChunkVectorRecord> writer = new(collection);
 
-        IngestionDocument document = new(documentId);
+        ExtractionDocument document = new(documentId);
         IngestionChunk chunk = TestChunkFactory.CreateChunk("custom schema content", document);
 
         List<IngestionChunk> chunks = [chunk];
@@ -78,7 +79,7 @@ public abstract class VectorStoreWriterTests
 
         using VectorStoreWriter<IngestionChunkVectorRecord> writer = new(collection);
 
-        IngestionDocument document = new(documentId);
+        ExtractionDocument document = new(documentId);
         IngestionChunk chunk = TestChunkFactory.CreateChunk("some content", document);
 
         List<IngestionChunk> chunks = [chunk];
@@ -110,7 +111,7 @@ public abstract class VectorStoreWriterTests
             "chunks-meta", TestEmbeddingGenerator<AIContent>.DimensionCount);
         using TestVectorStoreWriterWithMetadata writer = new(collection);
 
-        IngestionDocument document = new(documentId);
+        ExtractionDocument document = new(documentId);
         IngestionChunk chunk = TestChunkFactory.CreateChunk("some content", document);
         chunk.Metadata["Classification"] = "important";
 
@@ -147,7 +148,7 @@ public abstract class VectorStoreWriterTests
                 IncrementalIngestion = true,
             });
 
-        IngestionDocument document = new(documentId);
+        ExtractionDocument document = new(documentId);
         IngestionChunk chunk1 = TestChunkFactory.CreateChunk("first chunk", document);
         IngestionChunk chunk2 = TestChunkFactory.CreateChunk("second chunk", document);
 
@@ -215,7 +216,7 @@ public abstract class VectorStoreWriterTests
             collection,
             options: options);
 
-        IngestionDocument document = new(documentId);
+        ExtractionDocument document = new(documentId);
         List<IngestionChunk> chunks = [];
         for (int i = 0; i < chunkTokenCounts.Length; i++)
         {
@@ -249,7 +250,7 @@ public abstract class VectorStoreWriterTests
                 IncrementalIngestion = true,
             });
 
-        IngestionDocument document = new(documentId);
+        ExtractionDocument document = new(documentId);
 
         // Create enough chunks to exercise the incremental ingestion delete-all behavior in DEBUG builds
         List<IngestionChunk> chunks = [];
@@ -295,8 +296,8 @@ public abstract class VectorStoreWriterTests
 
         using VectorStoreWriter<IngestionChunkVectorRecord> writer = new(collection);
 
-        IngestionDocument document1 = new("doc1");
-        IngestionDocument document2 = new("doc2");
+        ExtractionDocument document1 = new("doc1");
+        ExtractionDocument document2 = new("doc2");
 
         IngestionChunk chunk1 = TestChunkFactory.CreateChunk("chunk from doc1", document1);
         IngestionChunk chunk2 = TestChunkFactory.CreateChunk("chunk from doc2", document2);

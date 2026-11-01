@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
 using Xunit;
@@ -15,6 +16,72 @@ namespace Microsoft.Extensions.DataIngestion.Processors.Tests;
 public class AlternativeTextEnricherTests
 {
     private readonly ReadOnlyMemory<byte> _imageContent = new byte[256];
+
+    [Fact]
+    public async Task NestedTableImages_AreEnrichedOnceAndRetainSourceIdentity()
+    {
+        int calls = 0;
+        using TestChatClient client = new()
+        {
+            GetResponseAsyncCallback = (messages, options, cancellationToken) =>
+            {
+                calls++;
+                ChatMessage user = messages.Last();
+                DataContent payload = Assert.IsType<DataContent>(Assert.Single(user.Contents));
+                Assert.Equal(new byte[] { 1, 2, 3 }, payload.Data.ToArray());
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                    JsonSerializer.Serialize(new Envelope<string[]> { data = new[] { "nested image description" } }))));
+            }
+        };
+        ExtractionDocumentImageElement image = new(new DataContent(new byte[] { 1, 2, 3 }, "image/png"));
+        ExtractionDocumentSourcePage page = new("frame", null);
+        ExtractionDocumentSourceReference source = new(page);
+        image.Sources.Add(source);
+        ExtractionDocumentTableElement inner = new(null, 1, 1);
+        inner.Cells[0, 0] = new(image);
+        ExtractionDocumentTableElement outer = new(null, 1, 1);
+        outer.Cells[0, 0] = new(inner);
+        ExtractionDocument document = new("nested")
+        {
+            Sections = { new() { Elements = { outer, image } } }
+        };
+        ImageAlternativeTextEnricher enricher = new(new(client));
+
+        ExtractionDocument result = await enricher.ProcessAsync(document);
+
+        Assert.Same(document, result);
+        Assert.Equal(1, calls);
+        Assert.Equal("nested image description", image.AlternativeText);
+        Assert.Same(image, inner.Cells[0, 0]!.Content);
+        Assert.Same(source, Assert.Single(image.Sources));
+        Assert.Same(page, source.Page);
+    }
+
+    [Fact]
+    public async Task NestedTableCycles_AreRejectedBeforeChatRequests()
+    {
+        int calls = 0;
+        using TestChatClient client = new()
+        {
+            GetResponseAsyncCallback = (messages, options, cancellationToken) =>
+            {
+                calls++;
+                throw new InvalidOperationException("No chat request expected.");
+            }
+        };
+        ExtractionDocumentTableElement first = new(null, 1, 1);
+        ExtractionDocumentTableElement second = new(null, 1, 1);
+        first.Cells[0, 0] = new(second);
+        second.Cells[0, 0] = new(first);
+        ExtractionDocument document = new("cycle") { Sections = { new() { Elements = { first } } } };
+        ImageAlternativeTextEnricher enricher = new(new(client));
+
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => enricher.ProcessAsync(document));
+
+        Assert.Contains("Cyclic table", error.Message);
+        Assert.Equal(0, calls);
+        Assert.Same(second, first.Cells[0, 0]!.Content);
+    }
 
     [Fact]
     public void ThrowsOnNullOptions()
@@ -64,50 +131,48 @@ public class AlternativeTextEnricherTests
         };
         ImageAlternativeTextEnricher sut = new(new(chatClient));
 
-        IngestionDocumentImage documentImage = new($"![](nonExisting.png)")
+        ExtractionDocumentImageElement documentImage = new()
         {
             AlternativeText = null,
-            Content = _imageContent,
-            MediaType = "image/png"
+            Content = new DataContent(_imageContent, "image/png")
         };
 
-        IngestionDocumentImage tableCell = new($"![](another.png)")
+        ExtractionDocumentImageElement tableCell = new()
         {
             AlternativeText = null,
-            Content = _imageContent,
-            MediaType = "image/png"
+            Content = new DataContent(_imageContent, "image/png")
         };
 
-        IngestionDocumentImage imageWithAltText = new($"![](noChangesNeeded.png)")
+        ExtractionDocumentImageElement imageWithAltText = new()
         {
             AlternativeText = PreExistingAltText,
-            Content = _imageContent,
-            MediaType = "image/png"
+            Content = new DataContent(_imageContent, "image/png")
         };
 
-        IngestionDocumentImage imageWithNoContent = new($"![](noImage.png)")
+        ExtractionDocumentImageElement imageWithNoContent = new()
         {
             AlternativeText = null,
-            Content = default,
-            MediaType = "image/png"
+            Content = null
         };
 
-        IngestionDocument document = new("withImage")
+        ExtractionDocument document = new("withImage")
         {
             Sections =
             {
-                new IngestionDocumentSection
+                new ExtractionDocumentSection
                 {
                     Elements =
                     {
                         documentImage,
-                        new IngestionDocumentTable("nvm", new[,] { { tableCell } })
+                        TestDocumentFactory.CreateTable(new ExtractionDocumentElement[,] { { tableCell } }),
+                        imageWithAltText,
+                        imageWithNoContent
                     }
                 }
             }
         };
 
-        await sut.ProcessAsync(document);
+        Assert.Same(document, await sut.ProcessAsync(document));
 
         Assert.Equal(descriptions[0], documentImage.AlternativeText);
         Assert.Equal(descriptions[1], tableCell.AlternativeText);
@@ -150,10 +215,14 @@ public class AlternativeTextEnricherTests
 
         ImageAlternativeTextEnricher sut = new(new(chatClient) { BatchSize = batchSize });
 
-        IngestionDocument document = CreateDocument(batchSize, batchCount, _imageContent);
+        ExtractionDocument document = CreateDocument(batchSize, batchCount, _imageContent);
 
         await sut.ProcessAsync(document);
         Assert.Equal(batchCount, callsCount);
+        Assert.Equal(batchSize * batchCount, document.EnumerateContent().Count());
+        Assert.Equal(
+            Enumerable.Range(0, batchCount).SelectMany(_ => Enumerable.Range(0, batchSize).Select(i => i.ToString())),
+            document.EnumerateContent().OfType<ExtractionDocumentImageElement>().Select(image => image.AlternativeText));
     }
 
     [Fact]
@@ -170,9 +239,11 @@ public class AlternativeTextEnricherTests
         ImageAlternativeTextEnricher sut = new(options);
 
         const int BatchCount = 2;
-        IngestionDocument document = CreateDocument(options.BatchSize, BatchCount, _imageContent);
-        IngestionDocument got = await sut.ProcessAsync(document);
+        ExtractionDocument document = CreateDocument(options.BatchSize, BatchCount, _imageContent);
+        ExtractionDocument got = await sut.ProcessAsync(document);
 
+        Assert.Same(document, got);
+        Assert.All(document.EnumerateContent().OfType<ExtractionDocumentImageElement>(), image => Assert.Null(image.AlternativeText));
         Assert.Equal(BatchCount, collector.Count);
         Assert.All(collector.GetSnapshot(), record =>
         {
@@ -181,15 +252,14 @@ public class AlternativeTextEnricherTests
         });
     }
 
-    private static IngestionDocument CreateDocument(int batchSize, int batchCount, ReadOnlyMemory<byte> imageContent)
+    private static ExtractionDocument CreateDocument(int batchSize, int batchCount, ReadOnlyMemory<byte> imageContent)
     {
-        IngestionDocumentSection rootSection = new();
+        ExtractionDocumentSection rootSection = new();
         for (int i = 0; i < batchSize * batchCount; i++)
         {
-            IngestionDocumentImage image = new($"![](image{i}.png)")
+            ExtractionDocumentImageElement image = new()
             {
-                Content = imageContent,
-                MediaType = "image/png",
+                Content = new DataContent(imageContent, "image/png"),
                 AlternativeText = null
             };
 

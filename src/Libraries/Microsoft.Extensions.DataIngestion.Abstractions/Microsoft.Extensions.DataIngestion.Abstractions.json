@@ -1,0 +1,131 @@
+{
+  "Name": "Microsoft.Extensions.DataIngestion.Abstractions, Version=10.8.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+  "Types": [
+    {
+      "Type": "class Microsoft.Extensions.DataIngestion.IngestionChunk",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionChunk.IngestionChunk(Microsoft.Extensions.AI.AIContent content, Microsoft.Extensions.Documents.ExtractionDocument document, int tokenCount, string? context = null);",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "Microsoft.Extensions.AI.AIContent Microsoft.Extensions.DataIngestion.IngestionChunk.Content { get; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "string? Microsoft.Extensions.DataIngestion.IngestionChunk.Context { get; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocument Microsoft.Extensions.DataIngestion.IngestionChunk.Document { get; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "bool Microsoft.Extensions.DataIngestion.IngestionChunk.HasMetadata { get; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "System.Collections.Generic.IDictionary<string, object> Microsoft.Extensions.DataIngestion.IngestionChunk.Metadata { get; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Documents.ExtractionDocumentElement> Microsoft.Extensions.DataIngestion.IngestionChunk.SourceElements { get; init; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "int Microsoft.Extensions.DataIngestion.IngestionChunk.TokenCount { get; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "abstract class Microsoft.Extensions.DataIngestion.IngestionChunker",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionChunker.IngestionChunker();",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "abstract System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.IngestionChunker.ProcessAsync(Microsoft.Extensions.Documents.ExtractionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "abstract class Microsoft.Extensions.DataIngestion.IngestionChunkProcessor",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionChunkProcessor.IngestionChunkProcessor();",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "abstract System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.IngestionChunkProcessor.ProcessAsync(System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> chunks, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "abstract class Microsoft.Extensions.DataIngestion.IngestionChunkWriter : System.IDisposable",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionChunkWriter.IngestionChunkWriter();",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "void Microsoft.Extensions.DataIngestion.IngestionChunkWriter.Dispose();",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "virtual void Microsoft.Extensions.DataIngestion.IngestionChunkWriter.Dispose(bool disposing);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "abstract System.Threading.Tasks.Task Microsoft.Extensions.DataIngestion.IngestionChunkWriter.WriteAsync(System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> chunks, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "abstract class Microsoft.Extensions.DataIngestion.IngestionDocumentProcessor",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionDocumentProcessor.IngestionDocumentProcessor();",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "abstract System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DataIngestion.IngestionDocumentProcessor.ProcessAsync(Microsoft.Extensions.Documents.ExtractionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "abstract class Microsoft.Extensions.DataIngestion.IngestionDocumentReader",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionDocumentReader.IngestionDocumentReader();",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DataIngestion.IngestionDocumentReader.ReadAsync(System.IO.FileInfo source, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "virtual System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DataIngestion.IngestionDocumentReader.ReadAsync(System.IO.FileInfo source, string identifier, string? mediaType = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "abstract System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DataIngestion.IngestionDocumentReader.ReadAsync(System.IO.Stream source, string identifier, string mediaType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    }
+  ]
+}

@@ -7,7 +7,9 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DataIngestion.Tests.Utils;
+using Microsoft.Extensions.Documents;
 using Microsoft.TestUtilities;
 using Xunit;
 
@@ -80,7 +82,7 @@ public abstract class DocumentReaderConformanceTests
     {
         using HttpResponseMessage response = await DownloadAsync(new(source));
 
-        IngestionDocument document = await CreateDocumentReader().ReadAsync(
+        ExtractionDocument document = await CreateDocumentReader().ReadAsync(
             await response.Content.ReadAsStreamAsync(),
             source, mediaType: response.Content.Headers.ContentType?.MediaType!);
 
@@ -95,7 +97,7 @@ public abstract class DocumentReaderConformanceTests
 
         try
         {
-            IngestionDocument document = await CreateDocumentReader().ReadAsync(inputFile);
+            ExtractionDocument document = await CreateDocumentReader().ReadAsync(inputFile);
 
             SimpleAsserts(document, inputFile.FullName, inputFile.FullName);
         }
@@ -120,7 +122,8 @@ public abstract class DocumentReaderConformanceTests
 
             SimpleAsserts(document, inputFile.FullName, expectedId: inputFile.FullName);
             var elements = document.EnumerateContent().ToArray();
-            Assert.Contains(elements, element => element is IngestionDocumentImage img && img.Content.HasValue && !string.IsNullOrEmpty(img.MediaType));
+            Assert.Contains(elements, element => element is ExtractionDocumentImageElement { Content: DataContent data } && !data.Data.IsEmpty &&
+                !string.IsNullOrEmpty(data.MediaType));
         }
         finally
         {
@@ -143,11 +146,17 @@ public abstract class DocumentReaderConformanceTests
 
         var document = await CreateDocumentReader().ReadAsync(wordDoc, "doc", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
-        IngestionDocumentTable documentTable = Assert.Single(document.EnumerateContent().OfType<IngestionDocumentTable>());
-        Assert.Equal(5, documentTable.Cells.GetLength(0));
-        Assert.Equal(4, documentTable.Cells.GetLength(1));
+        ExtractionDocumentTableElement documentTable = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTableElement>());
+        Assert.Equal(5, documentTable.Cells.RowCount);
+        Assert.Equal(4, documentTable.Cells.ColumnCount);
 
-        Assert.Equal(expected, documentTable.Cells.Map(NormalizeCell));
+        for (int row = 0; row < documentTable.Cells.RowCount; row++)
+        {
+            for (int column = 0; column < documentTable.Cells.ColumnCount; column++)
+            {
+                Assert.Equal(expected[row, column], NormalizeCell(documentTable.Cells[row, column]));
+            }
+        }
     }
 
     protected static async Task<HttpResponseMessage> DownloadAsync(Uri uri)
@@ -196,24 +205,34 @@ public abstract class DocumentReaderConformanceTests
         return file;
     }
 
-    protected virtual void SimpleAsserts(IngestionDocument document, string source, string expectedId)
+    protected virtual void SimpleAsserts(ExtractionDocument document, string source, string expectedId)
     {
         Assert.NotNull(document);
         Assert.Equal(expectedId, document.Identifier);
         Assert.NotEmpty(document.Sections);
 
         var elements = document.EnumerateContent().ToArray();
-        Assert.Contains(elements, element => element is IngestionDocumentHeader);
-        Assert.Contains(elements, element => element is IngestionDocumentParagraph);
-        Assert.Contains(elements, element => element is IngestionDocumentTable);
-        Assert.All(elements.Where(element => element is not IngestionDocumentImage), element => Assert.NotEmpty(element.GetMarkdown()));
+        Assert.Contains(elements, element => element is ExtractionDocumentTextElement { Role: "heading" });
+        Assert.Contains(elements, element => element is ExtractionDocumentTextElement { Role: null });
+        Assert.Contains(elements, element => element is ExtractionDocumentTableElement);
+        Assert.All(elements.Where(element => element is not ExtractionDocumentImageElement), element =>
+        {
+            if (element is ExtractionDocumentTableElement table)
+            {
+                Assert.Contains(table.Cells, cell => cell?.Content?.Content is TextContent { Text.Length: > 0 });
+            }
+            else
+            {
+                Assert.NotEmpty(Assert.IsType<TextContent>(element.Content).Text);
+            }
+        });
     }
 
-    private static string? NormalizeCell(IngestionDocumentElement? ingestionDocumentElement)
+    private static string NormalizeCell(ExtractionDocumentTableCell? cell)
     {
-        Assert.NotNull(ingestionDocumentElement);
+        Assert.NotNull(cell);
 
         // Some readers add extra spaces or asterisks for bold/italic text for headers.
-        return ingestionDocumentElement.GetMarkdown().Trim().Trim('*');
+        return Assert.IsType<TextContent>(Assert.IsType<ExtractionDocumentTextElement>(cell.Content).Content).Text.Trim().Trim('*');
     }
 }

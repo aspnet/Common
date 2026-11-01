@@ -4,6 +4,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.ML.Tokenizers;
 using Xunit;
 
@@ -20,13 +22,13 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task OneSection()
         {
-            IngestionDocument doc = new IngestionDocument("doc");
-            doc.Sections.Add(new IngestionDocumentSection
+            ExtractionDocument doc = new ExtractionDocument("doc");
+            doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
                 {
-                    new IngestionDocumentParagraph("This is a paragraph."),
-                    new IngestionDocumentParagraph("This is another paragraph.")
+                    new ExtractionDocumentTextElement(new TextContent("This is a paragraph.")),
+                    new ExtractionDocumentTextElement(new TextContent("This is another paragraph."))
                 }
             });
             IngestionChunker chunker = CreateDocumentChunker();
@@ -39,7 +41,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task TwoSections()
         {
-            IngestionDocument doc = new("doc")
+            ExtractionDocument doc = new("doc")
             {
                 Sections =
                 {
@@ -47,16 +49,16 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
                     {
                         Elements =
                         {
-                            new IngestionDocumentParagraph("This is a paragraph."),
-                            new IngestionDocumentParagraph("This is another paragraph.")
+                            new ExtractionDocumentTextElement(new TextContent("This is a paragraph.")),
+                            new ExtractionDocumentTextElement(new TextContent("This is another paragraph."))
                         }
                     },
                     new()
                     {
                         Elements =
                         {
-                            new IngestionDocumentParagraph("This is a paragraph in section 2."),
-                            new IngestionDocumentParagraph("This is another paragraph in section 2.")
+                            new ExtractionDocumentTextElement(new TextContent("This is a paragraph in section 2.")),
+                            new ExtractionDocumentTextElement(new TextContent("This is another paragraph in section 2."))
                         }
                     }
                 }
@@ -75,8 +77,8 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task EmptySection()
         {
-            IngestionDocument doc = new IngestionDocument("doc");
-            doc.Sections.Add(new IngestionDocumentSection
+            ExtractionDocument doc = new ExtractionDocument("doc");
+            doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements = { }
             });
@@ -88,7 +90,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task NestedSections()
         {
-            IngestionDocument doc = new("doc")
+            ExtractionDocument doc = new("doc")
             {
                 Sections =
                 {
@@ -96,26 +98,26 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
                     {
                         Elements =
                         {
-                            new IngestionDocumentHeader("# Section title"),
-                            new IngestionDocumentParagraph("This is a paragraph in section 1."),
-                            new IngestionDocumentParagraph("This is another paragraph in section 1."),
-                            new IngestionDocumentSection
+                            new ExtractionDocumentTextElement(new TextContent("Section title"), role: "heading"),
+                            new ExtractionDocumentTextElement(new TextContent("This is a paragraph in section 1.")),
+                            new ExtractionDocumentTextElement(new TextContent("This is another paragraph in section 1.")),
+                            new ExtractionDocumentSection
                             {
                                 Elements =
                                 {
-                                    new IngestionDocumentHeader("## Subsection title"),
-                                    new IngestionDocumentParagraph("This is a paragraph in subsection 1.1."),
-                                    new IngestionDocumentParagraph("This is another paragraph in subsection 1.1."),
-                                    new IngestionDocumentSection
+                                    new ExtractionDocumentTextElement(new TextContent("Subsection title"), role: "heading"),
+                                    new ExtractionDocumentTextElement(new TextContent("This is a paragraph in subsection 1.1.")),
+                                    new ExtractionDocumentTextElement(new TextContent("This is another paragraph in subsection 1.1.")),
+                                    new ExtractionDocumentSection
                                     {
                                         Elements =
                                         {
-                                            new IngestionDocumentHeader("### Subsubsection title"),
-                                            new IngestionDocumentParagraph("This is a paragraph in subsubsection 1.1.1."),
-                                            new IngestionDocumentParagraph("This is another paragraph in subsubsection 1.1.1.")
+                                            new ExtractionDocumentTextElement(new TextContent("Subsubsection title"), role: "heading"),
+                                            new ExtractionDocumentTextElement(new TextContent("This is a paragraph in subsubsection 1.1.1.")),
+                                            new ExtractionDocumentTextElement(new TextContent("This is another paragraph in subsubsection 1.1.1."))
                                         }
                                     },
-                                    new IngestionDocumentParagraph("This is the last paragraph in subsection 1.2."),
+                                    new ExtractionDocumentTextElement(new TextContent("This is the last paragraph in subsection 1.2.")),
                                 }
                             }
                         }
@@ -127,29 +129,29 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
             IReadOnlyList<IngestionChunk> chunks = await chunker.ProcessAsync(doc).ToListAsync();
 
             Assert.Equal(4, chunks.Count);
-            Assert.Equal("# Section title", chunks[0].Context);
-            Assert.Equal("# Section title\nThis is a paragraph in section 1.\nThis is another paragraph in section 1.",
+            Assert.Equal("Section title", chunks[0].Context);
+            Assert.Equal("Section title\nThis is a paragraph in section 1.\nThis is another paragraph in section 1.",
                 GetText(chunks[0]), ignoreLineEndingDifferences: true);
-            Assert.Equal("# Section title ## Subsection title", chunks[1].Context);
-            Assert.Equal("# Section title ## Subsection title\nThis is a paragraph in subsection 1.1.\nThis is another paragraph in subsection 1.1.",
+            Assert.Equal("Section title Subsection title", chunks[1].Context);
+            Assert.Equal("Section title Subsection title\nThis is a paragraph in subsection 1.1.\nThis is another paragraph in subsection 1.1.",
                 GetText(chunks[1]), ignoreLineEndingDifferences: true);
-            Assert.Equal("# Section title ## Subsection title ### Subsubsection title", chunks[2].Context);
-            Assert.Equal("# Section title ## Subsection title ### Subsubsection title\nThis is a paragraph in subsubsection 1.1.1.\nThis is another paragraph in subsubsection 1.1.1.",
+            Assert.Equal("Section title Subsection title Subsubsection title", chunks[2].Context);
+            Assert.Equal("Section title Subsection title Subsubsection title\nThis is a paragraph in subsubsection 1.1.1.\nThis is another paragraph in subsubsection 1.1.1.",
                 GetText(chunks[2]), ignoreLineEndingDifferences: true);
-            Assert.Equal("# Section title ## Subsection title", chunks[3].Context);
-            Assert.Equal("# Section title ## Subsection title\nThis is the last paragraph in subsection 1.2.", GetText(chunks[3]), ignoreLineEndingDifferences: true);
+            Assert.Equal("Section title Subsection title", chunks[3].Context);
+            Assert.Equal("Section title Subsection title\nThis is the last paragraph in subsection 1.2.", GetText(chunks[3]), ignoreLineEndingDifferences: true);
         }
 
         [Fact]
         public async Task SizeLimit_TwoChunks()
         {
             string text = string.Join(" ", Enumerable.Repeat("word", 600)); // each word is 1 token
-            IngestionDocument doc = new IngestionDocument("twoChunksNoOverlapDoc");
-            doc.Sections.Add(new IngestionDocumentSection
+            ExtractionDocument doc = new ExtractionDocument("twoChunksNoOverlapDoc");
+            doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
                 {
-                    new IngestionDocumentParagraph(text)
+                    new ExtractionDocumentTextElement(new TextContent(text))
                 }
             });
             IngestionChunker chunker = CreateDocumentChunker(maxTokensPerChunk: 512);
@@ -163,14 +165,14 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task SectionWithHeader()
         {
-            IngestionDocument doc = new IngestionDocument("doc");
-            doc.Sections.Add(new IngestionDocumentSection
+            ExtractionDocument doc = new ExtractionDocument("doc");
+            doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
                 {
-                    new IngestionDocumentHeader("Section 1"),
-                    new IngestionDocumentParagraph("This is a paragraph in section 1."),
-                    new IngestionDocumentParagraph("This is another paragraph in section 1.")
+                    new ExtractionDocumentTextElement(new TextContent("Section 1"), role: "heading"),
+                    new ExtractionDocumentTextElement(new TextContent("This is a paragraph in section 1.")),
+                    new ExtractionDocumentTextElement(new TextContent("This is another paragraph in section 1."))
                 }
             });
             IngestionChunker chunker = CreateDocumentChunker();

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <!--  Multidimensional arrays should not be used -->
-    <NoWarn>$(NoWarn);S3967</NoWarn>
+    <NoWarn>$(NoWarn);S3967;EXTEXP0019;MEDE0001</NoWarn>
     <!--  Implement IDisposable correctly -->
     <NoWarn>$(NoWarn);CA1063</NoWarn>
 
@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.DataIngestion.DocumentExtraction\Microsoft.Extensions.DataIngestion.DocumentExtraction.csproj" />
     <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.DataIngestion.Markdig\Microsoft.Extensions.DataIngestion.Markdig.csproj" />
     <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.DataIngestion.MarkItDown\Microsoft.Extensions.DataIngestion.MarkItDown.csproj" />
     <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.DataIngestion\Microsoft.Extensions.DataIngestion.csproj" />

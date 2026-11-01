@@ -9,13 +9,15 @@ using Markdig;
 using Markdig.Extensions.Tables;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.DataIngestion;
 
 internal static class MarkdownParser
 {
-    internal static IngestionDocument Parse(string markdown, string identifier)
+    internal static ExtractionDocument Parse(string markdown, string identifier)
     {
         _ = Throw.IfNullOrEmpty(markdown);
         _ = Throw.IfNullOrEmpty(identifier);
@@ -36,10 +38,10 @@ internal static class MarkdownParser
         => cancellationToken.IsCancellationRequested ? System.Threading.Tasks.Task.FromCanceled<string>(cancellationToken) : reader.ReadToEndAsync();
 #endif
 
-    private static IngestionDocument Map(MarkdownDocument markdownDocument, string documentMarkdown, string identifier)
+    private static ExtractionDocument Map(MarkdownDocument markdownDocument, string documentMarkdown, string identifier)
     {
-        IngestionDocumentSection rootSection = new(documentMarkdown);
-        IngestionDocument result = new(identifier)
+        ExtractionDocumentSection rootSection = new();
+        ExtractionDocument result = new(identifier)
         {
             Sections = { rootSection }
         };
@@ -74,49 +76,49 @@ internal static class MarkdownParser
     private static bool IsEmptyBlock(Block block) // Block with no text. Sample: QuoteBlock the next block is a quote.
         => block is LeafBlock emptyLeafBlock && (emptyLeafBlock.Inline is null || emptyLeafBlock.Inline.FirstChild is null);
 
-    private static IngestionDocumentElement MapBlock(string documentMarkdown, bool previousWasBreak, Block block)
+    private static ExtractionDocumentElement MapBlock(string documentMarkdown, bool previousWasBreak, Block block)
     {
         string elementMarkdown = documentMarkdown.Substring(block.Span.Start, block.Span.Length);
 
-        IngestionDocumentElement element = block switch
+        ExtractionDocumentElement element = block switch
         {
             LeafBlock leafBlock => MapLeafBlockToElement(leafBlock, previousWasBreak, elementMarkdown),
-            ListBlock listBlock => MapListBlock(listBlock, previousWasBreak, documentMarkdown, elementMarkdown),
-            QuoteBlock quoteBlock => MapQuoteBlock(quoteBlock, previousWasBreak, documentMarkdown, elementMarkdown),
-            Table table => new IngestionDocumentTable(elementMarkdown, GetCells(table, documentMarkdown)),
+            ListBlock listBlock => MapListBlock(listBlock, previousWasBreak, documentMarkdown),
+            QuoteBlock quoteBlock => MapQuoteBlock(quoteBlock, previousWasBreak, documentMarkdown),
+            Table table => MapTable(table, documentMarkdown),
             _ => throw new NotSupportedException($"Block type '{block.GetType().Name}' is not supported.")
         };
 
         return element;
     }
 
-    private static IngestionDocumentElement MapLeafBlockToElement(LeafBlock block, bool previousWasBreak, string elementMarkdown)
+    private static ExtractionDocumentElement MapLeafBlockToElement(LeafBlock block, bool previousWasBreak, string elementMarkdown)
         => block switch
         {
-            HeadingBlock heading => new IngestionDocumentHeader(elementMarkdown)
+            HeadingBlock heading => new ExtractionDocumentTextElement(new TextContent(elementMarkdown), role: "heading")
             {
                 Text = GetText(heading.Inline),
-                Level = heading.Level
+                HeadingLevel = heading.Level
             },
-            ParagraphBlock footer when previousWasBreak => new IngestionDocumentFooter(elementMarkdown)
+            ParagraphBlock footer when previousWasBreak => new ExtractionDocumentTextElement(new TextContent(elementMarkdown), role: "pageFooter")
             {
                 Text = GetText(footer.Inline),
             },
-            ParagraphBlock image when image.Inline!.Descendants<LinkInline>().FirstOrDefault() is LinkInline link && link.IsImage => MapImage(elementMarkdown, link),
-            ParagraphBlock paragraph => new IngestionDocumentParagraph(elementMarkdown)
+            ParagraphBlock image when image.Inline!.Descendants<LinkInline>().FirstOrDefault() is LinkInline link && link.IsImage => MapImage(link),
+            ParagraphBlock paragraph => new ExtractionDocumentTextElement(new TextContent(elementMarkdown))
             {
                 Text = GetText(paragraph.Inline),
             },
-            CodeBlock codeBlock => new IngestionDocumentParagraph(elementMarkdown)
+            CodeBlock codeBlock => new ExtractionDocumentTextElement(new TextContent(elementMarkdown))
             {
                 Text = GetText(codeBlock.Inline),
             },
             _ => throw new NotSupportedException($"Block type '{block.GetType().Name}' is not supported.")
         };
 
-    private static IngestionDocumentImage MapImage(string elementMarkdown, LinkInline link)
+    private static ExtractionDocumentImageElement MapImage(LinkInline link)
     {
-        IngestionDocumentImage result = new(elementMarkdown);
+        ExtractionDocumentImageElement result = new();
 
         // ![Alt text](data:image/type;base64,...)
         if (link.FirstChild is LiteralInline literal)
@@ -145,8 +147,7 @@ internal static class MarkdownParser
                         ReadOnlySpan<char> encoding = url.Slice(semicolonIndex + 1, commaIndex - semicolonIndex - 1);
                         if (encoding.SequenceEqual("base64".AsSpan()))
                         {
-                            result.Content = Convert.FromBase64String(url.Slice(commaIndex + 1).ToString());
-                            result.MediaType = mediaType.ToString();
+                            result.Content = new DataContent(Convert.FromBase64String(url.Slice(commaIndex + 1).ToString()), mediaType.ToString());
                         }
                     }
                 }
@@ -160,9 +161,9 @@ internal static class MarkdownParser
         return result;
     }
 
-    private static IngestionDocumentSection MapListBlock(ListBlock listBlock, bool previousWasBreak, string documentMarkdown, string listMarkdown)
+    private static ExtractionDocumentSection MapListBlock(ListBlock listBlock, bool previousWasBreak, string documentMarkdown)
     {
-        IngestionDocumentSection list = new(listMarkdown);
+        ExtractionDocumentSection list = new();
         foreach (Block? item in listBlock)
         {
             if (item is not ListItemBlock listItemBlock)
@@ -178,7 +179,7 @@ internal static class MarkdownParser
                 }
 
                 string childMarkdown = documentMarkdown.Substring(leafBlock.Span.Start, leafBlock.Span.Length);
-                IngestionDocumentElement element = MapLeafBlockToElement(leafBlock, previousWasBreak, childMarkdown);
+                ExtractionDocumentElement element = MapLeafBlockToElement(leafBlock, previousWasBreak, childMarkdown);
                 list.Elements.Add(element);
             }
         }
@@ -186,9 +187,9 @@ internal static class MarkdownParser
         return list;
     }
 
-    private static IngestionDocumentSection MapQuoteBlock(QuoteBlock quoteBlock, bool previousWasBreak, string documentMarkdown, string elementMarkdown)
+    private static ExtractionDocumentSection MapQuoteBlock(QuoteBlock quoteBlock, bool previousWasBreak, string documentMarkdown)
     {
-        IngestionDocumentSection quote = new(elementMarkdown);
+        ExtractionDocumentSection quote = new();
         foreach (Block child in quoteBlock)
         {
             if (IsEmptyBlock(child))
@@ -251,7 +252,7 @@ internal static class MarkdownParser
 
 #pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
 #pragma warning disable S3967 // Multidimensional arrays should not be used
-    private static IngestionDocumentElement?[,] GetCells(Table table, string outputContent)
+    private static ExtractionDocumentTableElement MapTable(Table table, string outputContent)
     {
         int firstRowIndex = SkipFirstRow(table, outputContent) ? 1 : 0;
 
@@ -259,7 +260,7 @@ internal static class MarkdownParser
         // table.ColumnDefinitions.Count can vary: for tables WITH trailing pipes it's (columns + 1),
         // but for tables WITHOUT trailing pipes it's equal to the actual column count.
         int columnCount = GetColumnCount(table, firstRowIndex);
-        var cells = new IngestionDocumentElement?[table.Count - firstRowIndex, columnCount];
+        var result = new ExtractionDocumentTableElement(null, table.Count - firstRowIndex, columnCount);
 
         for (int rowIndex = firstRowIndex; rowIndex < table.Count; rowIndex++)
         {
@@ -275,15 +276,18 @@ internal static class MarkdownParser
                     _ => throw new NotSupportedException($"Cells with {tableCell.Count} elements are not supported.")
                 };
 
-                for (int columnSpan = 0; columnSpan < tableCell.ColumnSpan; columnSpan++, columnIndex++)
+                if (content is not null || tableCell.ColumnSpan > 1)
                 {
-                    // tableCell.ColumnIndex defaults to -1, so it's not used here.
-                    cells[rowIndex - firstRowIndex, columnIndex] = content;
+                    result.Cells[rowIndex - firstRowIndex, columnIndex] = content is null
+                        ? new ExtractionDocumentTableCell(columnSpan: tableCell.ColumnSpan)
+                        : new ExtractionDocumentTableCell(content, columnSpan: tableCell.ColumnSpan, role: tableRow.IsHeader ? "columnHeader" : null);
                 }
+
+                columnIndex += tableCell.ColumnSpan;
             }
         }
 
-        return cells;
+        return result;
 
         static int GetColumnCount(Table table, int firstRowIndex)
         {
@@ -315,7 +319,7 @@ internal static class MarkdownParser
                 for (int cellIndex = 0; cellIndex < firstRow.Count; cellIndex++)
                 {
                     var tableCell = (TableCell)firstRow[cellIndex];
-                    if (!string.IsNullOrWhiteSpace(MapBlock(outputContent, previousWasBreak: false, tableCell[0]).Text))
+                    if (tableCell.Count > 0 && !string.IsNullOrWhiteSpace(MapBlock(outputContent, previousWasBreak: false, tableCell[0]).Text))
                     {
                         return false;
                     }

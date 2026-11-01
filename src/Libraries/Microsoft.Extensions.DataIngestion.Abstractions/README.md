@@ -4,7 +4,7 @@
 
 ## The packages
 
-The [Microsoft.Extensions.DataIngestion.Abstractions](https://www.nuget.org/packages/Microsoft.Extensions.DataIngestion.Abstractions) package provides the core exchange types, including [`IngestionDocument`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.ingestiondocument), [`IngestionChunker`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.ingestionchunker-1), [`IngestionChunkProcessor`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.ingestionchunkprocessor-1), and [`IngestionChunkWriter`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.ingestionchunkwriter-1). Any .NET library that provides document processing capabilities can implement these abstractions to enable seamless integration with consuming code.
+The [Microsoft.Extensions.DataIngestion.Abstractions](https://www.nuget.org/packages/Microsoft.Extensions.DataIngestion.Abstractions) package provides `IngestionDocumentReader`, `IngestionDocumentProcessor`, `IngestionChunker`, `IngestionChunkProcessor`, `IngestionChunkWriter`, and the non-generic `IngestionChunk`. Readers and document processors exchange the experimental `ExtractionDocument` family from `Microsoft.Extensions.Documents.Abstractions`, in the `Microsoft.Extensions.Documents` namespace. Ingestion does not define a separate document model or depend on an extraction client.
 
 The [Microsoft.Extensions.DataIngestion](https://www.nuget.org/packages/Microsoft.Extensions.DataIngestion) package has an implicit dependency on the `Microsoft.Extensions.DataIngestion.Abstractions` package. This package enables you to easily integrate components such as enrichment processors, vector storage writers, and telemetry into your applications using familiar dependency injection and pipeline patterns. For example, it provides processors for sentiment analysis, keyword extraction, and summarization that can be chained together in ingestion pipelines.
 
@@ -31,6 +31,12 @@ Or directly in the C# project file:
 ```
 
 ## Documentation
+
+Documents retain ordered nested sections, tables, addressable cells, and producer-supplied source references. Each document or element has an optional local `AIContent` payload; section and table payloads are not aggregate copies of their descendants. `TextContent` can contain plain text or producer-supplied formatted text without a mandatory Markdown convention.
+
+Chunks retain their originating `ExtractionDocument` and expose `SourceElements` for contributing content and context. Follow these elements, their table cells, and their `Sources` to inspect the original source graph. A source page's nullable positive `PageNumber` describes a physical source page, not a section index. Missing associations do not imply page one. Producer-local identifiers are not durable citation keys.
+
+Documents and detached content artifacts are data and require no disposal. Reader implementations must detach returned bytes before closing provider responses or temporary streams. Native objects exposed for explicit inspection remain borrowed; chunkers and writers must not automatically embed or persist raw provider output.
 
 Refer to the [Microsoft.Extensions.DataIngestion libraries documentation](https://learn.microsoft.com/dotnet/dataingestion/microsoft-extensions-dataingestion) for more information and API usage examples.
 

@@ -4,6 +4,8 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.TestUtilities;
 using Xunit;
 
@@ -17,7 +19,7 @@ public class MarkItDownReaderTests : DocumentReaderConformanceTests
         ? new MarkItDownReader(extractImages: extractImages)
         : throw new SkipTestException("MarkItDown is not installed");
 
-    protected override void SimpleAsserts(IngestionDocument document, string source, string expectedId)
+    protected override void SimpleAsserts(ExtractionDocument document, string source, string expectedId)
     {
         Assert.NotNull(document);
         Assert.Equal(expectedId, document.Identifier);
@@ -29,12 +31,26 @@ public class MarkItDownReaderTests : DocumentReaderConformanceTests
         if (!isPdf)
         {
             // MarkItDown does a bad job of recognizing Headers and Tables even for simple PDF files.
-            Assert.Contains(elements, element => element is IngestionDocumentHeader);
-            Assert.Contains(elements, element => element is IngestionDocumentTable);
+            Assert.Contains(elements, element => element is ExtractionDocumentTextElement { Role: "heading" });
+            Assert.Contains(elements, element => element is ExtractionDocumentTableElement);
         }
 
-        Assert.Contains(elements, element => element is IngestionDocumentParagraph);
-        Assert.All(elements, element => Assert.NotEmpty(element.GetMarkdown()));
+        Assert.Contains(elements, element => element is ExtractionDocumentTextElement { Role: null });
+        Assert.All(elements, element =>
+        {
+            if (element is ExtractionDocumentTableElement table)
+            {
+                Assert.Contains(table.Cells, cell => cell?.Content?.Content is TextContent { Text.Length: > 0 });
+            }
+            else if (element is ExtractionDocumentImageElement image)
+            {
+                Assert.True(image.Content is not null || image.Source is not null);
+            }
+            else
+            {
+                Assert.NotEmpty(Assert.IsType<TextContent>(element.Content).Text);
+            }
+        });
     }
 
     // The original purpose of the MarkItDown library was to support text-only LLMs.

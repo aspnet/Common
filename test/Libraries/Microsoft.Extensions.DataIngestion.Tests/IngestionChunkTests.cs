@@ -3,6 +3,7 @@
 
 using System;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Xunit;
 
 namespace Microsoft.Extensions.DataIngestion.Tests;
@@ -12,7 +13,7 @@ public class IngestionChunkTests
     [Fact]
     public void Constructor_SetsTokenCountProperty()
     {
-        IngestionDocument document = new("test");
+        ExtractionDocument document = new("test");
         IngestionChunk chunk = new(new TextContent("test content"), document, 42);
 
         Assert.Equal(42, chunk.TokenCount);
@@ -21,7 +22,7 @@ public class IngestionChunkTests
     [Fact]
     public void Constructor_ThrowsWhenTokenCountIsNegative()
     {
-        IngestionDocument document = new("test");
+        ExtractionDocument document = new("test");
 
         ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(
             () => new IngestionChunk(new TextContent("test content"), document, -1));
@@ -32,7 +33,7 @@ public class IngestionChunkTests
     [Fact]
     public void Constructor_ThrowsWhenTokenCountIsZero()
     {
-        IngestionDocument document = new("test");
+        ExtractionDocument document = new("test");
 
         ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(
             () => new IngestionChunk(new TextContent("test content"), document, 0));

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Documents;
 
 namespace Microsoft.Extensions.DataIngestion;
 
@@ -14,9 +15,9 @@ namespace Microsoft.Extensions.DataIngestion;
 public abstract class IngestionChunkWriter : IDisposable
 {
     /// <summary>
-    /// Writes chunks asynchronously. All chunks must belong to the same <see cref="IngestionDocument"/>.
+    /// Writes chunks asynchronously. All chunks must belong to the same <see cref="ExtractionDocument"/>.
     /// </summary>
-    /// <param name="chunks">The chunks to write. All chunks must originate from the same <see cref="IngestionDocument"/>.</param>
+    /// <param name="chunks">The chunks to write. All chunks must originate from the same <see cref="ExtractionDocument"/>.</param>
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
     /// <returns>A task representing the asynchronous write operation.</returns>
     /// <exception cref="InvalidOperationException">Thrown when chunks from multiple documents are passed.</exception>

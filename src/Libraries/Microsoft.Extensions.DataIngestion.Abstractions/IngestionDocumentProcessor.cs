@@ -3,11 +3,12 @@
 
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Documents;
 
 namespace Microsoft.Extensions.DataIngestion;
 
 /// <summary>
-/// Part of the document processing pipeline that takes a <see cref="IngestionDocument"/> as input and produces a (potentially modified) <see cref="IngestionDocument"/> as output.
+/// Part of the document processing pipeline that takes a <see cref="ExtractionDocument"/> as input and produces a (potentially modified) <see cref="ExtractionDocument"/> as output.
 /// </summary>
 public abstract class IngestionDocumentProcessor
 {
@@ -17,5 +18,5 @@ public abstract class IngestionDocumentProcessor
     /// <param name="document">The ingestion document to process.</param>
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
     /// <returns>A task representing the asynchronous processing operation, with the processed document as the result.</returns>
-    public abstract Task<IngestionDocument> ProcessAsync(IngestionDocument document, CancellationToken cancellationToken = default);
+    public abstract Task<ExtractionDocument> ProcessAsync(ExtractionDocument document, CancellationToken cancellationToken = default);
 }

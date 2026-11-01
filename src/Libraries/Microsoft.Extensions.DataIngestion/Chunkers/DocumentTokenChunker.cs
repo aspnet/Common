@@ -4,127 +4,107 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.ML.Tokenizers;
 using Microsoft.Shared.Diagnostics;
 
-namespace Microsoft.Extensions.DataIngestion.Chunkers
+namespace Microsoft.Extensions.DataIngestion.Chunkers;
+
+/// <summary>
+/// Processes a document by tokenizing its semantic content and dividing it into overlapping chunks.
+/// </summary>
+/// <remarks>Tables may be split mid-row. Token limits include separators between local payloads.</remarks>
+public sealed class DocumentTokenChunker : IngestionChunker
 {
-    /// <summary>
-    /// Processes a document by tokenizing its content and dividing it into overlapping chunks of tokens.
-    /// </summary>
-    /// <remarks>
-    /// <para>This class uses a tokenizer to convert the document's content into tokens and then splits the
-    /// tokens into chunks of a specified size, with a configurable overlap between consecutive chunks.</para>
-    /// <para>Note that tables may be split mid-row.</para>
-    /// </remarks>
-    public sealed class DocumentTokenChunker : IngestionChunker
+    private readonly Tokenizer _tokenizer;
+    private readonly int _maxTokensPerChunk;
+    private readonly int _chunkOverlap;
+
+    /// <summary>Initializes a new instance of the <see cref="DocumentTokenChunker"/> class.</summary>
+    /// <param name="options">The tokenizer, chunk size, and overlap options.</param>
+    public DocumentTokenChunker(IngestionChunkerOptions options)
     {
-        private readonly Tokenizer _tokenizer;
-        private readonly int _maxTokensPerChunk;
-        private readonly int _chunkOverlap;
+        _ = Throw.IfNull(options);
+        _tokenizer = options.Tokenizer;
+        _maxTokensPerChunk = options.MaxTokensPerChunk;
+        _chunkOverlap = options.OverlapTokens;
+    }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DocumentTokenChunker"/> class with the specified options.
-        /// </summary>
-        /// <param name="options">The options used to configure the chunker, including tokenizer and chunk sizes.</param>
-        public DocumentTokenChunker(IngestionChunkerOptions options)
+    /// <inheritdoc/>
+    public override async IAsyncEnumerable<IngestionChunk> ProcessAsync(
+        ExtractionDocument document, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        _ = Throw.IfNull(document);
+        StringBuilder text = new();
+        List<(int Start, int End, IReadOnlyList<ExtractionDocumentElement> Sources)> ranges = [];
+        foreach (var (_, content, sources) in IngestionDocumentElementExtensions.EnumerateSemanticContent(document))
         {
-            _ = Throw.IfNull(options);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrEmpty(content))
+            {
+                continue;
+            }
 
-            _tokenizer = options.Tokenizer;
-            _maxTokensPerChunk = options.MaxTokensPerChunk;
-            _chunkOverlap = options.OverlapTokens;
+            if (text.Length > 0)
+            {
+                _ = text.AppendLine();
+            }
+
+            int start = text.Length;
+            _ = text.Append(content);
+            ranges.Add((start, text.Length, sources));
         }
 
-        /// <inheritdoc/>
-        public override async IAsyncEnumerable<IngestionChunk> ProcessAsync(IngestionDocument document, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        string remaining = text.ToString();
+        int offset = 0;
+        while (remaining.Length > 0)
         {
-            _ = Throw.IfNull(document);
-
-            int stringBuilderTokenCount = 0;
-            StringBuilder stringBuilder = new();
-            foreach (IngestionDocumentElement element in document.EnumerateContent())
+            cancellationToken.ThrowIfCancellationRequested();
+            int index = _tokenizer.GetIndexByTokenCount(remaining, _maxTokensPerChunk, out _, out _, considerNormalization: false);
+            if (index <= 0)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                string? elementContent = element.GetSemanticContent();
-                if (string.IsNullOrEmpty(elementContent))
-                {
-                    continue;
-                }
-
-                int contentToProcessTokenCount = _tokenizer.CountTokens(elementContent!, considerNormalization: false);
-                ReadOnlyMemory<char> contentToProcess = elementContent.AsMemory();
-                while (stringBuilderTokenCount + contentToProcessTokenCount >= _maxTokensPerChunk)
-                {
-                    int index = _tokenizer.GetIndexByTokenCount(
-                        text: contentToProcess.Span,
-                        maxTokenCount: _maxTokensPerChunk - stringBuilderTokenCount,
-                        out string? _,
-                        out int addedTokenCount,
-                        considerNormalization: false);
-
-                    unsafe
-                    {
-                        fixed (char* ptr = &MemoryMarshal.GetReference(contentToProcess.Span))
-                        {
-                            _ = stringBuilder.Append(ptr, index);
-                        }
-                    }
-                    stringBuilderTokenCount += addedTokenCount;
-                    yield return FinalizeChunk();
-
-                    contentToProcess = contentToProcess.Slice(index);
-                    contentToProcessTokenCount = _tokenizer.CountTokens(contentToProcess.Span, considerNormalization: false);
-                }
-
-                _ = stringBuilder.Append(contentToProcess);
-                stringBuilderTokenCount += contentToProcessTokenCount;
+                throw new InvalidOperationException("The tokenizer could not fit any content within the chunk token limit.");
             }
 
-            if (stringBuilder.Length > 0)
+            string chunkText = remaining.Substring(0, index);
+            int tokenCount = _tokenizer.CountTokens(chunkText, considerNormalization: false);
+            List<ExtractionDocumentElement> sources = [];
+            foreach (var range in ranges)
             {
-                yield return FinalizeChunk();
-            }
-            yield break;
-
-            IngestionChunk FinalizeChunk()
-            {
-                TextContent chunkContent = new(stringBuilder.ToString());
-                IngestionChunk chunk = new IngestionChunk(
-                    content: chunkContent,
-                    document: document,
-                    tokenCount: stringBuilderTokenCount,
-                    context: string.Empty);
-                _ = stringBuilder.Clear();
-                stringBuilderTokenCount = 0;
-
-                if (_chunkOverlap > 0)
+                if (range.Start < offset + index && range.End > offset)
                 {
-                    string chunkText = chunkContent.Text;
-                    int index = _tokenizer.GetIndexByTokenCountFromEnd(
-                        text: chunkText,
-                        maxTokenCount: _chunkOverlap,
-                        out string? _,
-                        out stringBuilderTokenCount,
-                        considerNormalization: false);
-
-                    ReadOnlySpan<char> overlapContent = chunkText.AsSpan().Slice(index);
-                    unsafe
+                    foreach (var source in range.Sources)
                     {
-                        fixed (char* ptr = &MemoryMarshal.GetReference(overlapContent))
+                        if (!sources.Contains(source))
                         {
-                            _ = stringBuilder.Append(ptr, overlapContent.Length);
+                            sources.Add(source);
                         }
                     }
                 }
-
-                return chunk;
             }
-        }
 
+            yield return new(new TextContent(chunkText), document, tokenCount, string.Empty) { SourceElements = sources.ToArray() };
+            if (index == remaining.Length)
+            {
+                yield break;
+            }
+
+            int advance = index;
+            if (_chunkOverlap > 0)
+            {
+                advance = _tokenizer.GetIndexByTokenCountFromEnd(chunkText, _chunkOverlap, out _, out _, considerNormalization: false);
+            }
+
+            if (advance <= 0)
+            {
+                throw new InvalidOperationException("The tokenizer could not advance beyond the chunk overlap.");
+            }
+
+            offset += advance;
+            remaining = remaining.Substring(advance);
+        }
     }
 }

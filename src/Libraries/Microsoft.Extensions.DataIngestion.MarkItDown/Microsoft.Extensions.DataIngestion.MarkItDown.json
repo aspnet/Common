@@ -1,0 +1,41 @@
+{
+  "Name": "Microsoft.Extensions.DataIngestion.MarkItDown, Version=10.8.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+  "Types": [
+    {
+      "Type": "class Microsoft.Extensions.DataIngestion.MarkItDownMcpReader : Microsoft.Extensions.DataIngestion.IngestionDocumentReader",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.MarkItDownMcpReader.MarkItDownMcpReader(System.Uri mcpServerUri, ModelContextProtocol.Client.McpClientOptions? options = null);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DataIngestion.MarkItDownMcpReader.ReadAsync(System.IO.FileInfo source, string identifier, string? mediaType = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DataIngestion.MarkItDownMcpReader.ReadAsync(System.IO.Stream source, string identifier, string mediaType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "class Microsoft.Extensions.DataIngestion.MarkItDownReader : Microsoft.Extensions.DataIngestion.IngestionDocumentReader",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.MarkItDownReader.MarkItDownReader(System.IO.FileInfo? exePath = null, bool extractImages = false);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DataIngestion.MarkItDownReader.ReadAsync(System.IO.FileInfo source, string identifier, string? mediaType = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DataIngestion.MarkItDownReader.ReadAsync(System.IO.Stream source, string identifier, string mediaType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    }
+  ]
+}

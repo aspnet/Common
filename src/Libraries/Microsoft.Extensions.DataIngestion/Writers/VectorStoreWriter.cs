@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Documents;
 using Microsoft.Extensions.VectorData;
 using Microsoft.Shared.Diagnostics;
 
@@ -49,7 +50,7 @@ public class VectorStoreWriter<TRecord> : IngestionChunkWriter
         IReadOnlyList<Guid>? preExistingKeys = null;
         List<TRecord>? batch = null;
         long currentBatchTokenCount = 0;
-        IngestionDocument? document = null;
+        ExtractionDocument? document = null;
 
         await foreach (IngestionChunk chunk in chunks.WithCancellation(cancellationToken))
         {
@@ -73,12 +74,7 @@ public class VectorStoreWriter<TRecord> : IngestionChunkWriter
             // to avoid a situation where we delete the chunks and then fail to insert the new ones.
             preExistingKeys ??= await GetPreExistingChunksIdsAsync(document!, cancellationToken).ConfigureAwait(false);
 
-            TRecord record = new()
-            {
-                Content = chunk.Content,
-                Context = chunk.Context,
-                DocumentId = chunk.Document.Identifier,
-            };
+            TRecord record = CreateRecord(chunk);
 
             if (chunk.HasMetadata)
             {
@@ -117,6 +113,27 @@ public class VectorStoreWriter<TRecord> : IngestionChunkWriter
     }
 
     /// <summary>
+    /// Creates a record from a chunk, including application-defined durable source references.
+    /// </summary>
+    /// <param name="chunk">The chunk to persist.</param>
+    /// <returns>The record to insert.</returns>
+    /// <remarks>
+    /// The collection's auto-generated key schema assigns fresh keys when inserting default records.
+    /// Incremental ingestion inserts new records before deleting old keys.
+    /// Overrides must not reuse pre-existing keys, since those keys are deleted after all inserts succeed.
+    /// </remarks>
+    protected virtual TRecord CreateRecord(IngestionChunk chunk)
+    {
+        _ = Throw.IfNull(chunk);
+        return new()
+        {
+            Content = chunk.Content,
+            Context = chunk.Context,
+            DocumentId = chunk.Document.Identifier,
+        };
+    }
+
+    /// <summary>
     /// Sets a metadata value on the record.
     /// </summary>
     /// <param name="record">The record on which to set the metadata.</param>
@@ -131,7 +148,7 @@ public class VectorStoreWriter<TRecord> : IngestionChunkWriter
         throw new NotSupportedException($"Metadata key '{key}' is not supported. Override {nameof(SetMetadata)} in a derived class to handle metadata.");
     }
 
-    private async Task<IReadOnlyList<Guid>> GetPreExistingChunksIdsAsync(IngestionDocument document, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<Guid>> GetPreExistingChunksIdsAsync(ExtractionDocument document, CancellationToken cancellationToken)
     {
         if (!_options.IncrementalIngestion)
         {

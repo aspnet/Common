@@ -6,13 +6,14 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.Extensions.Logging;
 using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.DataIngestion;
 
 /// <summary>
-/// Enriches <see cref="IngestionDocumentImage"/> elements with alternative text using an AI service,
+/// Enriches <see cref="ExtractionDocumentImageElement"/> elements with alternative text using an AI service,
 /// so the generated embeddings can include the image content information.
 /// </summary>
 public sealed class ImageAlternativeTextEnricher : IngestionDocumentProcessor
@@ -33,43 +34,23 @@ public sealed class ImageAlternativeTextEnricher : IngestionDocumentProcessor
     }
 
     /// <inheritdoc/>
-    public override async Task<IngestionDocument> ProcessAsync(IngestionDocument document, CancellationToken cancellationToken = default)
+    public override async Task<ExtractionDocument> ProcessAsync(ExtractionDocument document, CancellationToken cancellationToken = default)
     {
         _ = Throw.IfNull(document);
 
-        List<IngestionDocumentImage>? batch = null;
+        List<ExtractionDocumentImageElement>? batch = null;
 
-        foreach (var element in document.EnumerateContent())
+        foreach (var image in EnumerateImages(document))
         {
-            if (element is IngestionDocumentImage image)
+            if (ShouldProcess(image))
             {
-                if (ShouldProcess(image))
-                {
-                    batch ??= new(_options.BatchSize);
-                    batch.Add(image);
+                batch ??= new(_options.BatchSize);
+                batch.Add(image);
 
-                    if (batch.Count == _options.BatchSize)
-                    {
-                        await ProcessAsync(batch, cancellationToken).ConfigureAwait(false);
-                        batch.Clear();
-                    }
-                }
-            }
-            else if (element is IngestionDocumentTable table)
-            {
-                foreach (var cell in table.Cells)
+                if (batch.Count == _options.BatchSize)
                 {
-                    if (cell is IngestionDocumentImage cellImage && ShouldProcess(cellImage))
-                    {
-                        batch ??= new(_options.BatchSize);
-                        batch.Add(cellImage);
-
-                        if (batch.Count == _options.BatchSize)
-                        {
-                            await ProcessAsync(batch, cancellationToken).ConfigureAwait(false);
-                            batch.Clear();
-                        }
-                    }
+                    await ProcessAsync(batch, cancellationToken).ConfigureAwait(false);
+                    batch.Clear();
                 }
             }
         }
@@ -82,15 +63,65 @@ public sealed class ImageAlternativeTextEnricher : IngestionDocumentProcessor
         return document;
     }
 
-    private static bool ShouldProcess(IngestionDocumentImage img) =>
-        img.Content.HasValue && !string.IsNullOrEmpty(img.MediaType) && string.IsNullOrEmpty(img.AlternativeText);
+    private static IEnumerable<ExtractionDocumentImageElement> EnumerateImages(ExtractionDocument document)
+    {
+        HashSet<ExtractionDocumentImageElement> images = [];
+        HashSet<ExtractionDocumentTableElement> path = [];
+        foreach (var element in document.EnumerateContent())
+        {
+            foreach (var image in EnumerateImages(element, path))
+            {
+                if (images.Add(image))
+                {
+                    yield return image;
+                }
+            }
+        }
+    }
 
-    private async Task ProcessAsync(List<IngestionDocumentImage> batch, CancellationToken cancellationToken)
+    private static IEnumerable<ExtractionDocumentImageElement> EnumerateImages(
+        ExtractionDocumentElement element, HashSet<ExtractionDocumentTableElement> path)
+    {
+        if (element is ExtractionDocumentImageElement image)
+        {
+            yield return image;
+        }
+        else if (element is ExtractionDocumentTableElement table)
+        {
+            if (!path.Add(table))
+            {
+                throw new InvalidOperationException("Cyclic table relationships are not supported.");
+            }
+
+            try
+            {
+                foreach (var cell in table.Cells)
+                {
+                    if (cell?.Content is { } content)
+                    {
+                        foreach (var cellImage in EnumerateImages(content, path))
+                        {
+                            yield return cellImage;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                _ = path.Remove(table);
+            }
+        }
+    }
+
+    private static bool ShouldProcess(ExtractionDocumentImageElement img) =>
+        img.Content is DataContent && string.IsNullOrEmpty(img.AlternativeText);
+
+    private async Task ProcessAsync(List<ExtractionDocumentImageElement> batch, CancellationToken cancellationToken)
     {
         List<AIContent> contents = new(batch.Count);
         foreach (var image in batch)
         {
-            contents.Add(new DataContent(image.Content!.Value, image.MediaType!));
+            contents.Add(image.Content!);
         }
 
         try

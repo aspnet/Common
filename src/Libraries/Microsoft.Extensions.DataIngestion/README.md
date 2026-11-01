@@ -4,7 +4,7 @@
 
 ## The packages
 
-The [Microsoft.Extensions.DataIngestion.Abstractions](https://www.nuget.org/packages/Microsoft.Extensions.DataIngestion.Abstractions) package provides the core exchange types, including [`IngestionDocument`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.ingestiondocument), [`IngestionChunker`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.ingestionchunker-1), [`IngestionChunkProcessor`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.ingestionchunkprocessor-1), and [`IngestionChunkWriter`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.ingestionchunkwriter-1). Any .NET library that provides document processing capabilities can implement these abstractions to enable seamless integration with consuming code.
+The [Microsoft.Extensions.DataIngestion.Abstractions](https://www.nuget.org/packages/Microsoft.Extensions.DataIngestion.Abstractions) package provides readers, document processors, chunkers, chunk processors, writers, and non-generic `AIContent` chunks. Document stages exchange the experimental `ExtractionDocument` family from `Microsoft.Extensions.Documents.Abstractions`, in the `Microsoft.Extensions.Documents` namespace. Any .NET library can produce these documents without referencing `Microsoft.Extensions.DocumentExtraction`.
 
 The [Microsoft.Extensions.DataIngestion](https://www.nuget.org/packages/Microsoft.Extensions.DataIngestion) package has an implicit dependency on the `Microsoft.Extensions.DataIngestion.Abstractions` package. This package enables you to easily integrate components such as enrichment processors, vector storage writers, and telemetry into your applications using familiar dependency injection and pipeline patterns. For example, it provides the [`SentimentEnricher`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.sentimentenricher), [`KeywordEnricher`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.keywordenricher), and [`SummaryEnricher`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.summaryenricher) processors that can be chained together in ingestion pipelines.
 
@@ -30,6 +30,33 @@ Or directly in the C# project file:
 ```
 
 ## Writing chunks to a vector store
+
+### Ingesting a shared document directly
+
+```csharp
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DataIngestion;
+using Microsoft.Extensions.DataIngestion.Chunkers;
+using Microsoft.Extensions.Documents;
+
+ExtractionDocument document = new("manual-document");
+document.Sections.Add(new ExtractionDocumentSection
+{
+    Elements = { new ExtractionDocumentTextElement(new TextContent("Plain text to ingest.")) }
+});
+
+using IngestionPipeline pipeline = new(
+    new DocumentTokenChunker(new(tokenizer)),
+    new VectorStoreWriter<IngestionChunkVectorRecord>(collection));
+
+ExtractionDocument processed = await pipeline.ProcessAsync(document);
+```
+
+The readerless constructor supports manually assembled documents; the existing constructor accepting an `IngestionDocumentReader` also supports file ingestion. Document processors can return the original document or a replacement. Documents and detached content artifacts require no disposal; direct ingestion propagates failures and cancellation.
+
+Chunkers consume each document, section, and element's local text payload once. Producer-supplied text is preserved without forcing Markdown. Structural tables use tab-separated semantic row text, with repeated column headers only when the producer explicitly identifies them. This is embedding/chunk content, not a display renderer. Images prefer `AlternativeText`, falling back to OCR `Text`; an available image `Source` remains in the semantic image reference. Token limits include context and separators.
+
+`IngestionChunk.SourceElements` retains the contributing elements and their source graph, including heading context and nested sections. Source frame identifiers and physical page numbers are not assembly positions or durable citations. Raw native results and response artifacts are excluded from semantic chunk text.
 
 ### Configuring the vector store
 
@@ -90,6 +117,12 @@ public class MetadataWriter : VectorStoreWriter<ChunkWithMetadata>
     }
 }
 ```
+
+### Persisting durable source references
+
+Override `VectorStoreWriter<TRecord>.CreateRecord(IngestionChunk)` to map application-defined source identifiers into a typed record. Inspect `chunk.SourceElements`, their `Sources`, and table cells without serializing the complete document or raw provider output. Call `base.CreateRecord(chunk)` to preserve `AIContent`, context, and document identity. The collection's auto-generated key schema assigns a fresh `Guid` when inserting each record.
+
+`TRecord` is the stored record type, not the key type or chunk content type. `WriteAsync` accepts chunks from one document instance. Incremental ingestion inserts all new records before deleting previous keys, so overrides must not reuse those previous keys.
 
 ### Custom collection schema
 

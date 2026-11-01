@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.VectorData.InMemory;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.Extensions.VectorData;
 using Microsoft.ML.Tokenizers;
 using OpenTelemetry;
@@ -199,17 +200,13 @@ public sealed class IngestionPipelineTests : IDisposable
         using VectorStoreWriter<IngestionChunkVectorRecord> vectorStoreWriter = new(collection);
 
         // Create a document that explicitly has both text and image elements
-        IngestionDocument document = new("multi-content-doc");
-        document.Sections.Add(new IngestionDocumentSection
+        ExtractionDocument document = new("multi-content-doc");
+        document.Sections.Add(new ExtractionDocumentSection
         {
             Elements =
             {
-                new IngestionDocumentParagraph("This is textual content for embedding."),
-                new IngestionDocumentImage("![image](data:image/png;base64,iVBOR)")
-                {
-                    Content = new ReadOnlyMemory<byte>(new byte[] { 0x89, 0x50, 0x4E, 0x47 }),
-                    MediaType = "image/png"
-                },
+                new ExtractionDocumentTextElement(new TextContent("This is textual content for embedding.")),
+                new ExtractionDocumentImageElement(new DataContent(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, "image/png")),
             }
         });
 
@@ -219,6 +216,10 @@ public sealed class IngestionPipelineTests : IDisposable
         // Verify the chunker produces both content types
         Assert.Contains(chunks, c => c.Content is TextContent);
         Assert.Contains(chunks, c => c.Content is DataContent);
+        Assert.Equal(2, chunks.Count);
+        Assert.All(chunks, chunk => Assert.Same(document, chunk.Document));
+        Assert.Same(document.Sections[0].Elements[0].Content, Assert.Single(chunks, chunk => chunk.Content is TextContent).Content);
+        Assert.Same(document.Sections[0].Elements[1].Content, Assert.Single(chunks, chunk => chunk.Content is DataContent).Content);
 
         // Write to vector store and verify serialized content
         await vectorStoreWriter.WriteAsync(chunks.ToAsyncEnumerable());
@@ -233,6 +234,13 @@ public sealed class IngestionPipelineTests : IDisposable
         // Verify we got both text and data content types serialized
         Assert.Contains(retrieved, r => r.SerializedContent?.Contains("\"$type\": \"text\"", StringComparison.Ordinal) == true);
         Assert.Contains(retrieved, r => r.SerializedContent?.Contains("\"$type\": \"data\"", StringComparison.Ordinal) == true);
+        Assert.Equal(2, retrieved.Count);
+        Assert.All(retrieved, record => Assert.NotEqual(Guid.Empty, record.Key));
+        Assert.Equal("This is textual content for embedding.",
+            Assert.IsType<TextContent>(Assert.Single(retrieved, record => record.Content is TextContent).Content).Text);
+        DataContent storedImage = Assert.IsType<DataContent>(Assert.Single(retrieved, record => record.Content is DataContent).Content);
+        Assert.Equal("image/png", storedImage.MediaType);
+        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, storedImage.Data.ToArray());
     }
 
     /// <summary>
@@ -264,11 +272,12 @@ public sealed class IngestionPipelineTests : IDisposable
 
     internal class ImageChunker : IngestionChunker
     {
-        public override IAsyncEnumerable<IngestionChunk> ProcessAsync(IngestionDocument document, CancellationToken cancellationToken = default)
+        public override IAsyncEnumerable<IngestionChunk> ProcessAsync(ExtractionDocument document, CancellationToken cancellationToken = default)
             => document.EnumerateContent()
-                    .OfType<IngestionDocumentImage>()
+                    .OfType<ExtractionDocumentImageElement>()
+                    .Where(image => image.Content is DataContent)
                     .Select(image => new IngestionChunk(
-                        content: new DataContent(image.Content.GetValueOrDefault(), image.MediaType!),
+                        content: image.Content!,
                         document: document,
                         tokenCount: 123)) // made up number as we currently don't have the ability to easily count exact tokens
                     .ToAsyncEnumerable();
@@ -276,26 +285,25 @@ public sealed class IngestionPipelineTests : IDisposable
 
     internal sealed class MultiContentTypeChunker : IngestionChunker
     {
-        public override IAsyncEnumerable<IngestionChunk> ProcessAsync(IngestionDocument document, CancellationToken cancellationToken = default)
+        public override IAsyncEnumerable<IngestionChunk> ProcessAsync(ExtractionDocument document, CancellationToken cancellationToken = default)
         {
             List<IngestionChunk> chunks = [];
 
-            foreach (IngestionDocumentElement element in document.EnumerateContent())
+            foreach (ExtractionDocumentElement element in document.EnumerateContent())
             {
-                if (element is IngestionDocumentImage image && image.Content.HasValue)
+                if (element is ExtractionDocumentImageElement image && image.Content is DataContent)
                 {
                     chunks.Add(new IngestionChunk(
-                        content: new DataContent(image.Content.GetValueOrDefault(), image.MediaType!),
+                        content: image.Content,
                         document: document,
                         tokenCount: 100));
                 }
                 else
                 {
-                    string? markdown = element.GetMarkdown();
-                    if (!string.IsNullOrEmpty(markdown))
+                    if (element.Content is TextContent { Text.Length: > 0 } text)
                     {
                         chunks.Add(new IngestionChunk(
-                            content: new TextContent(markdown),
+                            content: text,
                             document: document,
                             tokenCount: 50));
                     }
@@ -313,7 +321,7 @@ public sealed class IngestionPipelineTests : IDisposable
         MarkdownReader workingReader = new();
         TestReader failingForFirstReader = new(
             (source, identifier, mediaType, cancellationToken) => failed++ == 0
-                    ? Task.FromException<IngestionDocument>(new ExpectedException())
+                    ? Task.FromException<ExtractionDocument>(new ExpectedException())
                     : workingReader.ReadAsync(source, identifier, mediaType, cancellationToken));
 
         List<Activity> activities = [];

@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.ML.Tokenizers;
 using Xunit;
 
@@ -27,12 +29,12 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
             int chunkOverlap = 1;
 
             var chunker = new DocumentTokenChunker(new(tokenizer) { MaxTokensPerChunk = chunkSize, OverlapTokens = chunkOverlap });
-            IngestionDocument doc = new IngestionDocument("overlapExample");
-            doc.Sections.Add(new IngestionDocumentSection
+            ExtractionDocument doc = new ExtractionDocument("overlapExample");
+            doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
                 {
-                    new IngestionDocumentParagraph(text)
+                    new ExtractionDocumentTextElement(new TextContent(text))
                 }
             });
 

@@ -8,6 +8,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Documents;
 using Microsoft.Extensions.Logging;
 using Microsoft.Shared.Diagnostics;
 using static Microsoft.Extensions.DataIngestion.DiagnosticsConstants;
@@ -23,7 +24,7 @@ namespace Microsoft.Extensions.DataIngestion;
 /// </summary>
 public sealed class IngestionPipeline : IDisposable
 {
-    private readonly IngestionDocumentReader _reader;
+    private readonly IngestionDocumentReader? _reader;
     private readonly IngestionChunker _chunker;
     private readonly IngestionChunkWriter _writer;
     private readonly ActivitySource _activitySource;
@@ -43,8 +44,25 @@ public sealed class IngestionPipeline : IDisposable
         IngestionChunkWriter writer,
         IngestionPipelineOptions? options = default,
         ILoggerFactory? loggerFactory = default)
+        : this(chunker, writer, options, loggerFactory)
     {
         _reader = Throw.IfNull(reader);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="IngestionPipeline"/> class for processing shared documents directly.
+    /// </summary>
+    /// <param name="chunker">The chunker to split documents into chunks.</param>
+    /// <param name="writer">The writer for processing chunks.</param>
+    /// <param name="options">The options for the ingestion pipeline.</param>
+    /// <param name="loggerFactory">The logger factory for creating loggers.</param>
+    /// <remarks>File ingestion requires the constructor that accepts an <see cref="IngestionDocumentReader"/>.</remarks>
+    public IngestionPipeline(
+        IngestionChunker chunker,
+        IngestionChunkWriter writer,
+        IngestionPipelineOptions? options = default,
+        ILoggerFactory? loggerFactory = default)
+    {
         _chunker = Throw.IfNull(chunker);
         _writer = Throw.IfNull(writer);
         _activitySource = new((options ?? new()).ActivitySourceName);
@@ -67,6 +85,34 @@ public sealed class IngestionPipeline : IDisposable
     /// Gets the chunk processors in the pipeline.
     /// </summary>
     public IList<IngestionChunkProcessor> ChunkProcessors { get; } = [];
+
+    /// <summary>
+    /// Processes a document through the document processors, chunker, chunk processors, and writer.
+    /// </summary>
+    /// <param name="document">The document to process.</param>
+    /// <param name="cancellationToken">The cancellation token for the operation.</param>
+    /// <returns>The processed document, which may be replaced by a document processor.</returns>
+    /// <remarks>Failures and cancellation propagate to the caller.</remarks>
+    public async Task<ExtractionDocument> ProcessAsync(ExtractionDocument document, CancellationToken cancellationToken = default)
+    {
+        Throw.IfNull(document);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using (Activity? activity = _activitySource.StartActivity(ProcessSource.ActivityName))
+        {
+            activity?.SetTag(ProcessSource.DocumentIdTagName, document.Identifier);
+            try
+            {
+                return await IngestAsync(document, activity, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                TraceException(activity, ex);
+                _logger?.IngestingFailed(ex, document.Identifier);
+                throw;
+            }
+        }
+    }
 
     /// <summary>
     /// Processes all files in the specified directory that match the given search pattern and option.
@@ -127,6 +173,11 @@ public sealed class IngestionPipeline : IDisposable
     private async IAsyncEnumerable<IngestionResult> ProcessAsync(IEnumerable<FileInfo> files, Activity? rootActivity,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        if (_reader is null)
+        {
+            throw new InvalidOperationException("File ingestion requires a pipeline constructed with a document reader.");
+        }
+
 #if NET
         if (System.Linq.Enumerable.TryGetNonEnumeratedCount(files, out int count))
 #else
@@ -144,7 +195,7 @@ public sealed class IngestionPipeline : IDisposable
                 processFileActivity?.SetTag(ProcessFile.FilePathTagName, fileInfo.FullName);
                 _logger?.ReadingFile(fileInfo.FullName, GetShortName(_reader));
 
-                IngestionDocument? document = null;
+                ExtractionDocument? document = null;
                 Exception? failure = null;
                 try
                 {
@@ -169,7 +220,7 @@ public sealed class IngestionPipeline : IDisposable
         }
     }
 
-    private async Task<IngestionDocument> IngestAsync(IngestionDocument document, Activity? parentActivity, CancellationToken cancellationToken)
+    private async Task<ExtractionDocument> IngestAsync(ExtractionDocument document, Activity? parentActivity, CancellationToken cancellationToken)
     {
         foreach (IngestionDocumentProcessor processor in DocumentProcessors)
         {
