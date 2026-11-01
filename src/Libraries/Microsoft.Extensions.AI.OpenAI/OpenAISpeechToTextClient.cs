@@ -238,6 +238,13 @@ internal sealed class OpenAISpeechToTextClient : ISpeechToTextClient
             return "m4a";
         }
 
+        // Ogg: "OggS" at offset 0 (RFC 3533).
+        if (header.Length >= 4 &&
+            header.Slice(0, 4).SequenceEqual("OggS"u8))
+        {
+            return "ogg";
+        }
+
         // MP3: ID3v2 tag at offset 0.
         if (header.Length >= 3 &&
             header.Slice(0, 3).SequenceEqual("ID3"u8))
