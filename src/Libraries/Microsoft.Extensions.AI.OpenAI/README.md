@@ -279,7 +279,7 @@ var app = builder.Build();
 app.MapPost("/chat", async (IChatClient client, string message) =>
 {
     var response = await client.GetResponseAsync(message);
-    return response.Message;
+    return response.Text;
 });
 
 app.MapPost("/embedding", async (IEmbeddingGenerator<string, Embedding<float>> client, string message) =>
