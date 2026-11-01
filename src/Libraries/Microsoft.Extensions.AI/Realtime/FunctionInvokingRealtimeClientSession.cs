@@ -408,6 +408,11 @@ internal sealed class FunctionInvokingRealtimeClientSession : IRealtimeClientSes
     {
         _ = Throw.IfNull(context);
 
+        if (context.CallContent.Exception is not null)
+        {
+            return new(Task.FromException<object?>(context.CallContent.Exception));
+        }
+
         return FunctionInvoker is { } invoker ?
             invoker(context, cancellationToken) :
             context.Function.InvokeAsync(context.Arguments, cancellationToken);
