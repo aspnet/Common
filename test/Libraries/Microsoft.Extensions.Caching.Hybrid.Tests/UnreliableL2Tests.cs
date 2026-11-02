@@ -108,6 +108,70 @@ public class UnreliableL2Tests(ITestOutputHelper testLog) : IClassFixture<TestEv
         }
     }
 
+    [Fact]
+    public async Task OfflineL2_WithFrozenClock_RetainsSetEntries()
+    {
+        var fixedTime = new DateTimeOffset(2026, 5, 20, 0, 0, 0, TimeSpan.Zero);
+        var clock = new FrozenTime(fixedTime);
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IDistributedCache, ThrowingDistributedCache>();
+        services.AddSingleton<TimeProvider>(clock);
+        services.AddHybridCache();
+
+        using var provider = services.BuildServiceProvider();
+        var cache = provider.GetRequiredService<HybridCache>();
+
+        // Wait briefly for the background wildcard invalidation read task to complete
+        await Task.Delay(100);
+
+        await cache.SetAsync("discovery_123", 200);
+
+        int result = await cache.GetOrCreateAsync("discovery_123", static _ => ValueTask.FromResult(404));
+
+        Assert.Equal(200, result);
+    }
+
+    [Fact]
+    public async Task OfflineL2_WithFrozenClock_RetainsTaggedSetEntries()
+    {
+        var fixedTime = new DateTimeOffset(2026, 5, 20, 0, 0, 0, TimeSpan.Zero);
+        var clock = new FrozenTime(fixedTime);
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IDistributedCache, ThrowingDistributedCache>();
+        services.AddSingleton<TimeProvider>(clock);
+        services.AddHybridCache();
+
+        using var provider = services.BuildServiceProvider();
+        var cache = provider.GetRequiredService<HybridCache>();
+
+        await Task.Delay(100);
+
+        await cache.SetAsync("tagged_key", 300, tags: ["tag1"]);
+
+        int result = await cache.GetOrCreateAsync("tagged_key", static _ => ValueTask.FromResult(404), tags: ["tag1"]);
+
+        Assert.Equal(300, result);
+    }
+
+    private sealed class FrozenTime(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private sealed class ThrowingDistributedCache : IDistributedCache
+    {
+        public byte[]? Get(string key) => throw new IOException("Offline");
+        public Task<byte[]?> GetAsync(string key, CancellationToken token = default) => Task.FromException<byte[]?>(new IOException("Offline"));
+        public void Refresh(string key) => throw new IOException("Offline");
+        public Task RefreshAsync(string key, CancellationToken token = default) => Task.FromException(new IOException("Offline"));
+        public void Remove(string key) => throw new IOException("Offline");
+        public Task RemoveAsync(string key, CancellationToken token = default) => Task.FromException(new IOException("Offline"));
+        public void Set(string key, byte[] value, DistributedCacheEntryOptions options) => throw new IOException("Offline");
+        public Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default) => Task.FromException(new IOException("Offline"));
+    }
+
     private static HybridCacheEntryOptions NoL2Write { get; } = new HybridCacheEntryOptions { Flags = HybridCacheEntryFlags.DisableDistributedCacheWrite };
 
     public enum BreakType

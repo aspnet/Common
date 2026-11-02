@@ -153,7 +153,7 @@ internal partial class DefaultHybridCache
                 else
                 {
                     // not what we expected! assume invalid
-                    timestamp = CurrentTimestamp();
+                    timestamp = Math.Max(0L, CurrentTimestamp() - 1);
                 }
 
                 buffer.RecycleIfAppropriate();
@@ -172,7 +172,7 @@ internal partial class DefaultHybridCache
             Debug.WriteLine(ex.Message);
 
             // if anything goes wrong reading tag invalidations; we have to assume the tag is invalid
-            return CurrentTimestamp();
+            return Math.Max(0L, CurrentTimestamp() - 1);
         }
     }
 
