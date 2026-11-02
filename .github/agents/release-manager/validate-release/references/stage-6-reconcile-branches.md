@@ -1,16 +1,17 @@
 # Stage 6 - Reconcile Branches
 
-After Stage 5 verifies the published symbols, reconcile the branches: merge the internal release branch back out to the public release branch, then merge the public release branch into `main`. This is the final release activity.
+After recording Stage 5's consumer/msdl metadata results, publish cleaned source history to the public release branch so full Source Link URL/checksum verification can run. Then reconcile the actual public release PR merge into `main`. Follow [the canonical dependencies](../../references/workflow.md); do not block source publication on URLs that cannot exist until this step.
 
 This stage is designed for the **monthly release**. For servicing releases prepared directly on public `release/<major>.<minor>`, Stage 6 is usually skipped unless the user explicitly asks for additional branch-flow reconciliation.
 
-Like the publish-release stages, this stage is operational: it stages merges and creates commits on throwaway `merge/*` branches, but it does **not** push or complete pull requests on its own. The agent stages each merge, applies the required file "doctoring", commits, and shows the diff for review; **pushing and completing the PRs (which need JIT elevation / admin settings) are user-directed**, and each merge PR must land as a merge commit (never squashed).
+The agent stages merges on owned `merge/*` branches, applies cleanup and shows the diff **before** requesting commit approval. Commit, report SHA, then wait for separate push instructions. PR completion is separately human-gated; use authorized merge-commit permissions/elevation, never change repository settings or bypass rules. Each merge PR lands as a merge commit, never squashed.
 
 Run each sub-stage only when the user instructs it. Sub-stage 2 depends on Sub-stage 1's PR having already merged into the public release branch.
 
 ## Prerequisites
 
 - Stage 4 complete: packages published and the release is public.
+- The original public baseline/remote release ref captured in Stage 0 is verified. Do not create the release branch from today's `main`. Pin the official shipped SHA, not later internal HEAD.
 - A clone with the public GitHub remote (referred to here as `dotnet`) and up-to-date `internal/release/<major>.<minor>`, `release/<major>.<minor>`, and `main` branches. Fetch all three first.
 
 ## Sub-stage 1 - Merge internal release branch into the public release branch
@@ -27,16 +28,12 @@ Carry the version bumps and internal product changes out to the public `release/
 2. Stage the merge without committing:
 
    ```
-   git merge --no-ff --no-commit internal/release/<major>.<minor>
+   git merge --no-ff --no-commit <official-build-source-sha>
    ```
 
-3. Discard the internal-only infrastructure changes so they do not reach the public branch -- restore these to the public release-branch version:
+3. Derive the **complete** internal-only file/hunk list from actual prep commits and captured baseline blobs, then review it. It can include `RestoreAndBuild.yml`, not only `BuildAndTest.yml`. Restore only internal infrastructure/auth/private-feed hunks to the original public baseline; preserve approved product/dependency/version changes in shared files. A hardcoded restore list or "keep everything else" is insufficient. Preserve unrelated user edits.
 
-   ```
-   git checkout HEAD -- Directory.Build.props NuGet.config azure-pipelines.yml eng/pipelines/templates/BuildAndTest.yml
-   ```
-
-4. Keep everything else staged, in particular the versioning changes (`eng/Version.Details.xml`, `eng/Versions.props`) and any internal-only product changes / backports.
+4. Compare the **whole public tree** to the shipped source tree and captured public baseline. Account for every difference: only reviewed infrastructure exclusions and intended product/dependency/version content may remain. Scan for private feeds/auth/infra leakage. Public history preserves the shipped SHA via merge; this cleaned tree's merge SHA is **not** the release tag target.
 
 5. Compare against the last five releases to check for anomalies vs. consistency. Look at the corresponding merge PRs from the previous five monthly releases (their titles vary -- e.g. "Merge published release into release/X.Y", "Merging internal changes into the release/X.Y branch", "Merge internal changes from X.Y"). Find them and list their changed files with `gh`:
 
@@ -47,7 +44,7 @@ Carry the version bumps and internal product changes out to the public `release/
 
    Compare this merge's staged file set (`git diff --cached --stat`) against them and flag anomalies to the user before committing:
    - `eng/Version.Details.xml` and `eng/Versions.props` appear in every release and must be here too (including the stabilization flip).
-   - The internal-only infrastructure files (`Directory.Build.props`, `NuGet.config`, `azure-pipelines.yml`, `eng/pipelines/templates/BuildAndTest.yml`) are absent in every recent release and must be absent here too.
+   - Internal-only infrastructure/auth hunks must be absent, including whichever pipeline templates were actually edited. Whole-file exclusions must not erase approved dependency/feed cleanup.
    - Tooling files such as `.github/agents/**` and `.github/skills/**` are excluded by recent releases -- flag if present.
    - The remaining files should be version bumps plus intentional product/test backports. Flag anything unexpected: an unusually large or empty change set, missing versioning, leaked infrastructure, or files no prior release touched.
 
@@ -57,11 +54,15 @@ Carry the version bumps and internal product changes out to the public `release/
    git commit -m "Merge published release into release/<major>.<minor>"
    ```
 
-7. Pushing (user-directed) to `dotnet` and opening the PR into `release/<major>.<minor>` -- title "Merge published release into release/<major>.<minor>", label `DO-NOT-SQUASH`, description "Merge using a merge commit. Do not squash." Do not enable auto-merge (squash). Completing the PR (JIT elevation, allow merge commits) is done by the user.
+7. Pushing (user-directed) to the URL-resolved public remote and opening the PR into `release/<major>.<minor>` -- title "Merge published release into release/<major>.<minor>", label `DO-NOT-SQUASH`, description "Merge using a merge commit. Do not squash." Do not enable auto-merge (squash). The human completes it using authorized elevation/permissions.
+
+Before handoff, name owning session/worktree/path, branch, SHA, destination URL/ref and PR base; perform the workflow's prepush identity checks in that exact worktree. After merge, verify the official build source commit is publicly reachable and resume Stage 5b's full URL/checksum check.
 
 ## Sub-stage 2 - Merge the public release branch into main
 
 Do this only after Sub-stage 1's PR has merged into `release/<major>.<minor>`. It reverts the stable-versioning flip so `main` does not produce stable/release versions.
+
+Speculative preparation is allowed, but fetch and rebuild/refresh against the **actual release PR merge commit** before committing. Never substitute a local speculative merge SHA or later unshipped branch HEAD for that merge.
 
 1. Fetch, then from `main` create the merge branch:
 
@@ -73,7 +74,7 @@ Do this only after Sub-stage 1's PR has merged into `release/<major>.<minor>`. I
 2. Stage the merge without committing:
 
    ```
-   git merge --no-ff --no-commit release/<major>.<minor>
+   git merge --no-ff --no-commit <actual-release-pr-merge-sha>
    ```
 
 3. In `eng/Versions.props`, revert only the package-stabilization change (keep all version numbers and all `eng/Version.Details.xml` changes):

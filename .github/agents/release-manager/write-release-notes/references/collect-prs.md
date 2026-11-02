@@ -5,7 +5,7 @@ Gather all merged PRs between the previous release tag and the target for this r
 ## Determine the commit range
 
 1. **Previous release tag**: Use `gh release list --repo dotnet/extensions --exclude-drafts --limit 10` to find the most recent published release. If the user specifies a particular previous version, use that instead.
-2. **Target**: The user provides a target (commit SHA, branch, or tag). If none is specified, use the `HEAD` of the default branch (`main`).
+2. **Target**: Resolve the official build source SHA and verify it against every selected nuspec repository commit. Never default to `main`/HEAD or a reconciliation merge; a branch/tag input must resolve to that same source identity.
 3. Verify both refs exist: `git rev-parse <previous-tag>` and `git rev-parse <target>`.
 
 ## Servicing override for backports
@@ -143,20 +143,20 @@ Before deduplication, ensure the relevant release branches are available locally
 For each candidate PR, check whether it was already included in any prior release — even if the prior release notes didn't mention it:
 
 1. **Check against the prior release tag**: `git merge-base --is-ancestor <pr-merge-commit> <previous-tag>`. If the PR's merge commit is an ancestor of the previous release tag, it shipped in that release — exclude it.
-2. **Check against the prior release branch HEAD**: The release branch may have advanced beyond the release tag (e.g. `release/10.3` may contain commits merged after `v10.3.0` was tagged but before `v10.3.1` or the branch was abandoned). Check: `git merge-base --is-ancestor <pr-merge-commit> <remote>/release/10.3`. If reachable, the PR was part of that release branch's content — exclude it.
+2. **Check shipped servicing tags/build sources**, not an advancing release branch HEAD. A commit on a branch after its last shipped tag did not necessarily ship. Check ancestry against each relevant published servicing source and compare patch equivalence (`git patch-id --stable`, or equivalent `git cherry` evidence) for cherry-picks with different SHAs. Limit matches to the package scope actually shipped by those builds.
 3. **Check the prior release notes body**: Fetch the GitHub release for the previous tag and check if the PR number appears in the release notes body. This catches PRs that were explicitly covered.
 4. **Harvest `main`-PR references from every PR merged into the prior release branch**: Backport PRs name the `main` PR number(s) they carry -- in the PR **title** (a trailing `(#NNNN)`) and/or **body** (`Backport of #NNNN`, or a checklist/list of numbers). This is the reliable signal, and it handles both shapes of backport:
    - **Single-PR backport**: `[release/10.7] Fix ToolJson.AdditionalProperties to accept sub-schema objects` (#7547) references its `main` twin #7546 in the body.
    - **Aggregate backport**: `Stage an MEAI 10.4.1 release` (#7402) references **thirteen** `main` PRs in its body (`#7285, #7340, #7369, #7373, #7379, #7381, #7382, #7387, #7389, #7394, #7398, #7399, #7400`) and has **no `[release/...]` title twin at all**. Title-matching would miss every one of them.
 
-   Build a "shipped-via-backport" set: list every PR merged into the prior release branch (`gh pr list --repo dotnet/extensions --base release/<prev>.<minor> --state merged --limit 200 --json number,title,body`), then extract every `#NNNN` reference from each PR's **title and body**. Exclude any candidate whose PR number appears in that set. These are `main` PRs whose changes shipped in the prior release even though the `main` PR's own merge commit is new to the current release's lineage, so the ancestry checks in 1-2 miss them.
-5. **Fallback -- title equivalence**: For the rare backport that omits the `(#NNNN)` reference, fall back to matching titles. Normalize each candidate's title (strip any leading `[release/x.y] ` prefix and any trailing `(#NNNN)`), then look for a PR merged into the prior release branch with a matching normalized title (`gh pr list --repo dotnet/extensions --base release/<prev>.<minor> --state merged --search "<normalized title> in:title"`), or a title match against the prior release notes body. Treat a match as an exclusion.
+   Build a "shipped-via-backport" set from prior prep/backport PRs whose changes are verified in a **published** source. Extract actual source/backport PR references from title/body, not every issue/reference number indiscriminately; verify each against shipped graph/patch evidence. Use prior release notes to corroborate, not to assume unshipped branch work was released.
+5. **Fallback -- title equivalence**: Normalize titles to discover potential pairs when references are missing, then verify shipped diff/patch equivalence. A title match alone is not exclusion evidence. Keep an uncertainty row if equivalence cannot be established.
 
 > **Why this matters:** A change already shipped in the prior release can reappear in the next release's date-range search in two ways:
 > - A PR merged directly into a `release/` branch ships in that release but may never appear in its notes; when the branch later merges into `main` it surfaces in the next release's search. The ancestry checks (1-2) catch this.
 > - A change is **backported**: it merges into `main` as its own PR (new to the next release's lineage, so ancestry misses it) and separately ships in the prior release via a backport PR merged into that release branch. The backport PR names the `main` PR number(s) it carries -- **one** number for a single-PR backport, **many** for an aggregate backport -- so harvesting those references (4) is what excludes the `main` half. The notes-body number check (3) and title fallback (5) are backups for the rare backport that doesn't cite its source PR numbers.
 
-Steps 1-5 are critical and must **all** run before marking PRs as candidates. The ancestry checks (1-2) alone will let the `main` half of a backport slip through -- e.g. #7546 when its backport #7547 already shipped in 10.7, or any of the thirteen `main` PRs carried by an aggregate backport like #7402. Harvesting `main`-PR references (4) is the primary defense; the notes-body (3) and title (5) checks are fallbacks for backports that don't cite their source PR numbers.
+Run all applicable evidence checks before marking candidates. Date searches only discover PRs: ground inclusion in the shipped commit graph/diffs and patch equivalence, and exclude already shipped servicing changes even when their source PR merge SHA is not an ancestor. Store the prior tag/source/package and exclusion evidence per PR.
 
 ## Exclusion filters
 
