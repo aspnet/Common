@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using Polly;
 using Polly.Timeout;
 using Xunit;
@@ -39,6 +40,41 @@ public class HttpClientResiliencePredicatesTests
         isTransientHttpException = HttpClientResiliencePredicates.IsTransient(Outcome.FromException<HttpResponseMessage>(ex));
         Assert.Equal(expectedCondition, isTransientHttpException);
     }
+
+#pragma warning disable EXTEXP0001
+    [Theory]
+    [InlineData("System.Private.CoreLib", true, true)]
+    [InlineData("<unknown>", true, true)]
+    [InlineData(null, true, true)]
+    [InlineData("CustomAssembly", true, true)]
+    [InlineData("<unknown>", false, false)]
+    public void IsTransient_WithCancellationToken_HandlesConnectionTimeout(string? source, bool notCanceled, bool expected)
+    {
+        var ex = new OperationCanceledException("Connection timed out", new TimeoutException())
+        {
+            Source = source
+        };
+        var outcome = Outcome.FromException<HttpResponseMessage>(ex);
+        using var cts = new CancellationTokenSource();
+        if (!notCanceled)
+        {
+            cts.Cancel();
+        }
+
+        var result = HttpClientResiliencePredicates.IsTransient(outcome, cts.Token);
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void IsTransient_WithCancellationToken_NonTimeoutInnerException_ReturnsFalse()
+    {
+        var ex = new OperationCanceledException("Canceled", new InvalidOperationException());
+        var outcome = Outcome.FromException<HttpResponseMessage>(ex);
+
+        var result = HttpClientResiliencePredicates.IsTransient(outcome, CancellationToken.None);
+        Assert.False(result);
+    }
+#pragma warning restore EXTEXP0001
 
     public class HttpResponseMessageExtensionsTests
     {
