@@ -14,7 +14,7 @@ public class DocumentTableElementTests
     [Fact]
     public void NestedTables_PreserveHierarchyAndLiteralText()
     {
-        ExtractionDocumentTextElement leaf = new(new TextContent("L|R"), "L and R");
+        ExtractionDocumentTextElement leaf = new(new TextContent("L|R"));
         ExtractionDocumentTableElement inner = new(null, 1, 1);
         ExtractionDocumentTableElement middle = new(null, 1, 1);
         ExtractionDocumentTableElement outer = new(null, 1, 1);
@@ -25,7 +25,6 @@ public class DocumentTableElementTests
         Assert.Same(leaf, inner.Cells[0, 0]!.Content);
         Assert.Same(inner, middle.Cells[0, 0]!.Content);
         Assert.Same(middle, outer.Cells[0, 0]!.Content);
-        Assert.Equal("L and R", leaf.Text);
         Assert.Equal("L|R", Assert.IsType<TextContent>(leaf.Content).Text);
     }
 
@@ -233,7 +232,7 @@ public class DocumentTableElementTests
         ExtractionDocumentTableElement table = new(null, 1, 1);
 
         // Header text is not permission to invent a table-cell role or repair recognition.
-        ExtractionDocumentTextElement text = new(new TextContent(" INV0ICE  1O0? <&| "), " INV0ICE  1O0? <&| ", role: "heading");
+        ExtractionDocumentTextElement text = new(new TextContent(" INV0ICE  1O0? <&| "), role: "heading");
         ExtractionDocumentTableCell cell = new(text, role: role);
         table.Cells[0, 0] = cell;
         section.Elements.Add(table);
@@ -242,7 +241,7 @@ public class DocumentTableElementTests
         Assert.Null(table.Content);
         Assert.Null(document.Content);
         Assert.Equal(" INV0ICE  1O0? <&| ", Assert.IsType<TextContent>(text.Content).Text);
-        Assert.Equal(" INV0ICE  1O0? <&| ", text.Text);
+        Assert.Equal(" INV0ICE  1O0? <&| ", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Equal(role, cell.Role);
         Assert.Same(cell, table.Cells.GetCoveringCell(0, 0));
         Assert.False(table.Cells.IsCovered(0, 0));
@@ -257,7 +256,7 @@ public class DocumentTableElementTests
         ExtractionDocumentSection section = new(null);
         ExtractionDocumentTableElement table = new(null, 3, 4);
         ExtractionDocumentTableCell empty = new();
-        ExtractionDocumentTextElement text = new(new TextContent("A|<"), "A|<");
+        ExtractionDocumentTextElement text = new(new TextContent("A|<"));
         ExtractionDocumentTableCell anchor = new(text, rowSpan, columnSpan);
         table.Cells[0, 0] = empty;
         table.Cells[1, 1] = anchor;
@@ -270,7 +269,7 @@ public class DocumentTableElementTests
         Assert.Equal(1, anchor.ColumnIndex);
         Assert.Equal(rowSpan, anchor.RowSpan);
         Assert.Equal(columnSpan, anchor.ColumnSpan);
-        Assert.Equal("A|<", text.Text);
+        Assert.Equal("A|<", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Null(anchor.Role);
         Assert.Equal(
             new ExtractionDocumentTableCell?[] { empty, null, null, null, null, anchor, null, null, null, null, null, null },
@@ -303,9 +302,9 @@ public class DocumentTableElementTests
         ExtractionDocumentTableElement table = new(null, 1, 3);
         ExtractionDocumentTableCell empty = new();
         ExtractionDocumentSourcePage frame = DocumentAnnotationTestData.PdfPage();
-        document.AddSourcePage(frame);
+        document.SourcePages.Add(frame);
         empty.Sources.Add(new ExtractionDocumentSourceReference(frame, DocumentAnnotationTestData.Polygon(), "NATIVE_ONLY"));
-        ExtractionDocumentTextElement text = new(new TextContent("INV0ICE  1O0?"), "INV0ICE  1O0?");
+        ExtractionDocumentTextElement text = new(new TextContent("INV0ICE  1O0?"));
         table.Cells[0, 1] = empty;
         table.Cells[0, 2] = new ExtractionDocumentTableCell(text);
         section.Elements.Add(table);
@@ -321,7 +320,7 @@ public class DocumentTableElementTests
         Assert.Same(frame, Assert.Single(document.SourcePages));
         Assert.Equal(DocumentAnnotationTestData.Polygon(), empty.Sources[0].Polygon);
         Assert.Equal("NATIVE_ONLY", empty.Sources[0].GetRawRepresentation());
-        Assert.Equal("INV0ICE  1O0?", text.Text);
+        Assert.Equal("INV0ICE  1O0?", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Null(table.Content);
         Assert.Null(document.Content);
 
@@ -340,8 +339,7 @@ public class DocumentTableElementTests
         ExtractionDocument document = new("unstructured-table");
         ExtractionDocumentSection section = new(null);
         ExtractionDocumentTableElement table = new(null, 2, 2);
-        ExtractionDocumentSourceOutput output = new("provider-table", rawRepresentation: providerMarkdown);
-        table.Sources.Add(new ExtractionDocumentSourceReference(new ExtractionDocumentSourcePage("provider-page", 1, sourceOutput: output)));
+        table.Sources.Add(new ExtractionDocumentSourceReference(new ExtractionDocumentSourcePage("provider-page", 1), rawRepresentation: providerMarkdown));
         section.Elements.Add(table);
         document.Sections.Add(section);
 
@@ -352,7 +350,7 @@ public class DocumentTableElementTests
         Assert.False(table.Cells.IsCovered(0, 0));
         Assert.Same(table, Assert.Single(document.EnumerateContent()));
         Assert.Null(table.Content);
-        Assert.Same(providerMarkdown, output.GetRawRepresentation());
+        Assert.Same(providerMarkdown, table.Sources[0].GetRawRepresentation());
         Assert.Null(document.Content);
         Assert.Equal(new ExtractionDocumentTableCell?[] { null, null, null, null }, table.Cells.ToArray());
     }
@@ -364,15 +362,14 @@ public class DocumentTableElementTests
         ExtractionDocument document = new("explicit-empty-table");
         ExtractionDocumentSection section = new(null);
         ExtractionDocumentTableElement table = new(null, 2, 2);
-        ExtractionDocumentSourceOutput output = new("provider-table", rawRepresentation: providerMarkdown);
-        table.Sources.Add(new ExtractionDocumentSourceReference(new ExtractionDocumentSourcePage("provider-page", 1, sourceOutput: output)));
+        table.Sources.Add(new ExtractionDocumentSourceReference(new ExtractionDocumentSourcePage("provider-page", 1), rawRepresentation: providerMarkdown));
         ExtractionDocumentTableCell empty = new();
         table.Cells[1, 1] = empty;
         section.Elements.Add(table);
         document.Sections.Add(section);
 
         Assert.Null(table.Content);
-        Assert.Same(providerMarkdown, output.GetRawRepresentation());
+        Assert.Same(providerMarkdown, table.Sources[0].GetRawRepresentation());
         Assert.Null(document.Content);
         Assert.Equal(new ExtractionDocumentTableCell?[] { null, null, null, empty }, table.Cells.ToArray());
         Assert.Null(empty.Content);
@@ -388,9 +385,8 @@ public class DocumentTableElementTests
         ExtractionDocument document = new("cleared-table");
         ExtractionDocumentSection section = new(null);
         ExtractionDocumentTableElement table = new(null, 2, 2);
-        ExtractionDocumentSourceOutput output = new("provider-table", rawRepresentation: providerMarkdown);
-        table.Sources.Add(new ExtractionDocumentSourceReference(new ExtractionDocumentSourcePage("provider-page", 1, sourceOutput: output)));
-        ExtractionDocumentTextElement text = new(new TextContent("mapped A"), "mapped A");
+        table.Sources.Add(new ExtractionDocumentSourceReference(new ExtractionDocumentSourcePage("provider-page", 1), rawRepresentation: providerMarkdown));
+        ExtractionDocumentTextElement text = new(new TextContent("mapped A"));
         ExtractionDocumentTableCell populated = new(text);
         ExtractionDocumentTableCell empty = new();
         table.Cells[0, 0] = populated;
@@ -399,7 +395,7 @@ public class DocumentTableElementTests
         document.Sections.Add(section);
 
         Assert.Null(table.Content);
-        Assert.Same(providerMarkdown, output.GetRawRepresentation());
+        Assert.Same(providerMarkdown, table.Sources[0].GetRawRepresentation());
 
         table.Cells[0, 0] = null;
 
@@ -411,7 +407,7 @@ public class DocumentTableElementTests
         Assert.Equal(new ExtractionDocumentTableCell?[] { null, null, null, null }, table.Cells.ToArray());
         Assert.Equal(2, table.Cells.RowCount);
         Assert.Equal(2, table.Cells.ColumnCount);
-        Assert.Equal("mapped A", text.Text);
+        Assert.Equal("mapped A", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Equal("mapped A", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Same(table, Assert.Single(document.EnumerateContent()));
         for (int row = 0; row < 2; row++)
@@ -422,6 +418,5 @@ public class DocumentTableElementTests
                 Assert.False(table.Cells.IsCovered(row, column));
             }
         }
-
     }
 }

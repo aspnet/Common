@@ -225,8 +225,7 @@ public class DocumentTableCellCollectionTests
         ExtractionDocumentTableElement table = new(null, 3, 3);
         ExtractionDocumentTextElement text = new(new TextContent("MERGED_A"));
         using DocumentAnnotationTestData.CountingStream stream = new(new byte[] { 1, 2, 3 });
-        ExtractionDocumentArtifact artifact = new("application/octet-stream", stream.ToArray());
-        text.Sources.Add(new(new("merged-page", 1, sourceOutput: new("merged-operation", rawContent: artifact))));
+        text.Sources.Add(new(new("merged-page", 1), rawRepresentation: stream));
         ExtractionDocumentTableCell anchor = new(text, 2, 2);
         table.Cells[0, 0] = anchor;
         section.Elements.Add(table);
@@ -250,7 +249,6 @@ public class DocumentTableCellCollectionTests
         Assert.False(table.Cells.IsCovered(1, 1));
         Assert.Null(table.Cells.GetCoveringCell(1, 1));
         Assert.Equal(0, stream.DisposeCount);
-        Assert.Equal(new byte[] { 1, 2, 3 }, artifact.Content.ToArray());
     }
 
     [Theory]
@@ -276,15 +274,14 @@ public class DocumentTableCellCollectionTests
         ExtractionDocument document = new("covered-slot-overlap");
         ExtractionDocumentSection section = new(null);
         ExtractionDocumentTableElement table = new(null, 3, 3);
-        ExtractionDocumentTextElement anchorText = new(new TextContent("MERGED_A"), "merged anchor");
+        ExtractionDocumentTextElement anchorText = new(new TextContent("MERGED_A"));
         ExtractionDocumentTableCell anchor = new(anchorText, 2, 2);
         table.Cells[1, 1] = anchor;
         section.Elements.Add(table);
         document.Sections.Add(section);
         using DocumentAnnotationTestData.CountingStream stream = new(new byte[] { 61, 62, 63 });
-        ExtractionDocumentArtifact artifact = new("application/octet-stream", stream.ToArray());
-        ExtractionDocumentTextElement candidateText = new(new TextContent("candidate **value**"), "candidate value");
-        candidateText.Sources.Add(new(new("candidate-page", 1, sourceOutput: new("candidate-operation", rawContent: artifact))));
+        ExtractionDocumentTextElement candidateText = new(new TextContent("candidate **value**"));
+        candidateText.Sources.Add(new(new("candidate-page", 1), rawRepresentation: stream));
         ExtractionDocumentTableCell candidate = new(candidateText, 2, 1);
         ExtractionDocumentTableCell?[] before = table.Cells.ToArray();
 
@@ -311,7 +308,6 @@ public class DocumentTableCellCollectionTests
 
         Assert.Same(anchor, table.Cells[1, 1]);
         Assert.Empty(document.SourcePages);
-        Assert.Empty(document.SourceOutputs);
         Assert.Equal(new byte[] { 61, 62, 63 }, stream.ToArray());
         Assert.Equal(0, stream.DisposeCount);
 
@@ -322,13 +318,12 @@ public class DocumentTableCellCollectionTests
         otherSection.Elements.Add(otherTable);
         other.Sections.Add(otherSection);
         otherTable.Cells[0, 0] = candidate;
-        other.AddSourcePage(candidateText.Sources[0].Page);
+        other.SourcePages.Add(candidateText.Sources[0].Page);
         Assert.Same(candidate, otherTable.Cells[0, 0]);
         Assert.Same(candidate, otherTable.Cells.GetCoveringCell(1, 0));
         Assert.True(otherTable.Cells.IsCovered(1, 0));
-        Assert.Same(artifact, Assert.Single(other.SourceOutputs).GetRawContent());
         Assert.Same(candidateText.Sources[0].Page, Assert.Single(other.SourcePages));
-        Assert.Equal("candidate value", candidateText.Text);
+        Assert.Equal("candidate **value**", Assert.IsType<TextContent>(candidateText.Content).Text);
         Assert.Equal(before, table.Cells.ToArray());
 
         Assert.Equal(0, stream.DisposeCount);
@@ -336,7 +331,6 @@ public class DocumentTableCellCollectionTests
         Assert.Equal(0, stream.DisposeCount);
         stream.Dispose();
         Assert.False(stream.CanRead);
-        Assert.Equal(new byte[] { 61, 62, 63 }, artifact.Content.ToArray());
     }
 
     [Fact]
@@ -344,12 +338,11 @@ public class DocumentTableCellCollectionTests
     {
         ExtractionDocument document = new("replacement-lifetime");
         using DocumentAnnotationTestData.CountingStream stream = new(DocumentAnnotationTestData.OriginalBytes());
-        ExtractionDocumentArtifact artifact = new("application/json", stream.ToArray());
         using DocumentAnnotationTestData.BorrowedNative native = new();
-        ExtractionDocumentSourceOutput output = new("operation-A", native, artifact);
-        ExtractionDocumentSourcePage frame = DocumentAnnotationTestData.PdfPage(output);
-        document.AddSourcePage(frame);
-        ExtractionDocumentTextElement oldText = new(new TextContent("lO0? &"), "lO0? &");
+        document.RawRepresentation = native;
+        ExtractionDocumentSourcePage frame = DocumentAnnotationTestData.PdfPage();
+        document.SourcePages.Add(frame);
+        ExtractionDocumentTextElement oldText = new(new TextContent("lO0? &"));
         ExtractionDocumentTableCell oldAnchor = new(oldText, 2, 2, "rowHeader");
         oldAnchor.Sources.Add(new ExtractionDocumentSourceReference(frame, DocumentAnnotationTestData.Polygon()));
         ExtractionDocumentTableElement table = new(null, 4, 4);
@@ -360,7 +353,7 @@ public class DocumentTableCellCollectionTests
         Assert.Same(oldAnchor, table.Cells.GetCoveringCell(1, 1));
         Assert.True(table.Cells.IsCovered(1, 1));
 
-        ExtractionDocumentTextElement replacementText = new(new TextContent("replacement?"), "replacement?");
+        ExtractionDocumentTextElement replacementText = new(new TextContent("replacement?"));
         ExtractionDocumentTableCell replacement = new(replacementText);
         table.Cells[0, 0] = replacement;
 
@@ -373,10 +366,8 @@ public class DocumentTableCellCollectionTests
         }
 
         Assert.Same(frame, Assert.Single(document.SourcePages));
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
         Assert.Equal(0, stream.DisposeCount);
         Assert.True(stream.CanRead);
-        Assert.Equal(123, output.GetRawContent()!.Content.Span[0]);
         Assert.Equal(DocumentAnnotationTestData.OriginalBytes(), stream.ToArray());
 
         ExtractionDocumentTableCell empty = new();
@@ -392,8 +383,8 @@ public class DocumentTableCellCollectionTests
         Assert.Equal(2, oldAnchor.RowSpan);
         Assert.Equal(2, oldAnchor.ColumnSpan);
         Assert.Equal("rowHeader", oldAnchor.Role);
-        Assert.Equal("lO0? &", oldText.Text);
-        Assert.Equal("replacement?", replacementText.Text);
+        Assert.Equal("lO0? &", Assert.IsType<TextContent>(oldText.Content).Text);
+        Assert.Equal("replacement?", Assert.IsType<TextContent>(replacementText.Content).Text);
         Assert.Null(empty.Content);
         for (int row = 0; row < 4; row++)
         {
@@ -429,19 +420,15 @@ public class DocumentTableCellCollectionTests
         Assert.Same(frame, Assert.Single(document.SourcePages));
         Assert.Same(frame, oldAnchor.Sources[0].Page);
         Assert.Equal(DocumentAnnotationTestData.Polygon(), oldAnchor.Sources[0].Polygon);
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
-        Assert.Same(artifact, output.GetRawContent());
-        Assert.Same(native, output.GetRawRepresentation());
+        Assert.Same(native, document.RawRepresentation);
         Assert.Equal(0, stream.DisposeCount);
         Assert.Equal(0, native.DisposeCount);
         Assert.True(stream.CanRead);
-        Assert.Equal(34, output.GetRawContent()!.Content.Span[1]);
         Assert.Equal(DocumentAnnotationTestData.OriginalBytes(), stream.ToArray());
 
         stream.Dispose();
         Assert.Equal(1, stream.DisposeCount);
         Assert.False(stream.CanRead);
-        Assert.Equal(DocumentAnnotationTestData.OriginalBytes(), artifact.Content.ToArray());
         Assert.Equal(0, native.DisposeCount);
     }
 }

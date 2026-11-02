@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.AI;
 using Microsoft.Shared.Diagnostics;
 
@@ -13,9 +14,6 @@ namespace Microsoft.Extensions.Documents;
 /// </summary>
 public sealed class ExtractionDocument
 {
-    private readonly List<ExtractionDocumentSourceOutput> _sourceOutputs = [];
-    private readonly List<ExtractionDocumentSourcePage> _sourcePages = [];
-
     /// <summary>
     /// Initializes a new instance of the <see cref="ExtractionDocument"/> class.
     /// </summary>
@@ -25,8 +23,6 @@ public sealed class ExtractionDocument
     {
         Identifier = Throw.IfNullOrEmpty(identifier);
         Content = content;
-        SourceOutputs = _sourceOutputs.AsReadOnly();
-        SourcePages = _sourcePages.AsReadOnly();
     }
 
     /// <summary>Gets the document identifier.</summary>
@@ -42,43 +38,17 @@ public sealed class ExtractionDocument
     /// <summary>Gets the metadata associated with the document.</summary>
     public Dictionary<string, object?> Metadata { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>Gets registered source operations, with explicit break-glass access.</summary>
-    public IReadOnlyList<ExtractionDocumentSourceOutput> SourceOutputs { get; }
+    /// <summary>Gets source frames, independently of assembled section order.</summary>
+    /// <remarks>Producers explicitly add frames, including blank frames with no content elements.</remarks>
+    public List<ExtractionDocumentSourcePage> SourcePages { get; } = [];
 
-    /// <summary>Gets registered source frames, independently of assembled section order.</summary>
-    public IReadOnlyList<ExtractionDocumentSourcePage> SourcePages { get; }
-
-    /// <summary>Registers a source operation without taking ownership of borrowed native objects.</summary>
-    public void AddSourceOutput(ExtractionDocumentSourceOutput sourceOutput)
-    {
-        ValidateSourceOutput(Throw.IfNull(sourceOutput));
-        if (!_sourceOutputs.Contains(sourceOutput))
-        {
-            _sourceOutputs.Add(sourceOutput);
-        }
-    }
-
-    /// <summary>Registers a source frame and its source operation, when supplied.</summary>
-    /// <remarks>Providers register frames explicitly, including frames with no extracted content.</remarks>
-    public void AddSourcePage(ExtractionDocumentSourcePage page)
-    {
-        _ = Throw.IfNull(page);
-        if (_sourcePages.Exists(item => item.Identifier == page.Identifier &&
-            item.SourceOutput?.Identifier == page.SourceOutput?.Identifier && !ReferenceEquals(item, page)))
-        {
-            throw new InvalidOperationException("A source frame identifier must identify one frame instance within its operation.");
-        }
-
-        if (page.SourceOutput is { } output)
-        {
-            AddSourceOutput(output);
-        }
-
-        if (!_sourcePages.Contains(page))
-        {
-            _sourcePages.Add(page);
-        }
-    }
+    /// <summary>Gets or sets the optional borrowed native document result.</summary>
+    /// <remarks>
+    /// Native data is not implicitly disposed, deep-cloned, logged or serialized.
+    /// This does not guarantee original response bytes or durable serialization.
+    /// </remarks>
+    [JsonIgnore]
+    public object? RawRepresentation { get; set; }
 
     /// <summary>Enumerates non-section content in depth-first document order.</summary>
     /// <remarks>
@@ -132,14 +102,6 @@ public sealed class ExtractionDocument
         finally
         {
             _ = path.Remove(section);
-        }
-    }
-
-    private void ValidateSourceOutput(ExtractionDocumentSourceOutput source)
-    {
-        if (_sourceOutputs.Exists(item => item.Identifier == source.Identifier && !ReferenceEquals(item, source)))
-        {
-            throw new InvalidOperationException("A source operation identifier must identify one output instance.");
         }
     }
 }

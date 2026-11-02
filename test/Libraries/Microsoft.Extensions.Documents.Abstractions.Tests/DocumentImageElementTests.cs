@@ -83,43 +83,38 @@ public class DocumentImageElementTests
     }
 
     [Fact]
-    public void ImageOnlyContent_PreservesBytesSourceDescriptionAndDetachedArtifact()
+    public void ImageOnlyContent_PreservesBytesSourceDescriptionAndBorrowedNativePayload()
     {
         ExtractionDocument document = new("image-only", null);
         byte[] bytes = [0x89, 0x50, 0x4E, 0x47, 0x01, 0x02];
         using DocumentAnnotationTestData.CountingStream stream = new(bytes);
         Uri source = new("urn:image:page7");
-        ExtractionDocumentArtifact artifact = new("image/png", stream.ToArray(), source);
-        DataContent payload = new(bytes, "image/png");
+        DataContent payload = new(bytes, "image/png") { RawRepresentation = stream };
         ExtractionDocumentImageElement image = new(payload)
         {
             Source = source,
             AlternativeText = "diagram only"
         };
-        ExtractionDocumentSourceOutput output = new("image-operation", rawContent: artifact);
-        ExtractionDocumentSourcePage page = DocumentAnnotationTestData.PdfPage(output);
-        document.AddSourcePage(page);
+        ExtractionDocumentSourcePage page = DocumentAnnotationTestData.PdfPage();
+        document.SourcePages.Add(page);
         image.Sources.Add(new ExtractionDocumentSourceReference(page, DocumentAnnotationTestData.Polygon()));
         ExtractionDocumentSection section = new(null);
         section.Elements.Add(image);
         document.Sections.Add(section);
 
         Assert.Same(payload, image.Content);
+        Assert.Same(stream, payload.RawRepresentation);
         Assert.Equal(bytes, Assert.IsType<DataContent>(image.Content).Data.ToArray());
         Assert.Equal(bytes, stream.ToArray());
         Assert.Equal("image/png", payload.MediaType);
         Assert.Same(source, image.Source);
-        Assert.Same(source, artifact.Source);
         Assert.Equal("diagram only", image.AlternativeText);
         Assert.Null(image.Text);
         Assert.Null(document.Content);
         Assert.Same(image, Assert.Single(document.EnumerateContent()));
         Assert.Same(page, Assert.Single(document.SourcePages));
-        Assert.Same(artifact, Assert.Single(document.SourceOutputs).GetRawContent());
         Assert.Equal(0, stream.DisposeCount);
         stream.Dispose();
-        Assert.Equal(bytes, artifact.Content.ToArray());
         Assert.Equal(bytes, Assert.IsType<DataContent>(image.Content).Data.ToArray());
     }
-
 }

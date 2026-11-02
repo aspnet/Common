@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.IO;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Documents;
 using Xunit;
@@ -30,9 +29,6 @@ public class DocumentReferencesTests
 
         Assert.Null(typeof(ExtractionDocument).GetProperty("Sources"));
         Assert.Null(typeof(ExtractionDocument).GetProperty("Artifacts"));
-        Assert.Null(typeof(ExtractionDocumentArtifact).GetProperty("IsDisposed"));
-        Assert.Null(typeof(ExtractionDocumentArtifact).GetProperty("IsDocumentOwned"));
-        Assert.Null(typeof(ExtractionDocumentSourceOutput).GetProperty("NativeStatus"));
         foreach (Type type in new[] { typeof(ExtractionDocumentElement), typeof(ExtractionDocumentTableCell) })
         {
             var property = type.GetProperty("Sources")!;
@@ -43,7 +39,6 @@ public class DocumentReferencesTests
         Assert.False(typeof(ExtractionDocumentSourceReference).GetProperty("Page")!.CanWrite);
         Assert.False(typeof(ExtractionDocumentSourceReference).GetProperty("Polygon")!.CanWrite);
         Assert.False(typeof(ExtractionDocument).GetProperty("SourcePages")!.CanWrite);
-        Assert.False(typeof(ExtractionDocument).GetProperty("SourceOutputs")!.CanWrite);
         foreach (string name in new[] { "SetContent", "GetCoveringCell", "IsCovered" })
         {
             Assert.Null(typeof(ExtractionDocumentTableCellCollection).GetMethod(name));
@@ -123,31 +118,6 @@ public class DocumentReferencesTests
     public void SourceIdentifiers_NullOrEmptyValue_Throws(string? value)
     {
         Assert.ThrowsAny<ArgumentException>(() => new ExtractionDocumentSourcePage(value!, 1));
-        Assert.ThrowsAny<ArgumentException>(() => new ExtractionDocumentSourceOutput(value!));
-    }
-
-    [Fact]
-    public void DocumentArtifact_PreservesMediaTypeContentAndSource()
-    {
-        using MemoryStream content = new(new byte[] { 1, 2, 3 });
-        Uri source = new("urn:document-artifact:opaque");
-
-        ExtractionDocumentArtifact artifact = new("application/octet-stream", content.ToArray(), source);
-
-        Assert.Equal("application/octet-stream", artifact.MediaType);
-        Assert.Equal(content.ToArray(), artifact.Content.ToArray());
-        Assert.Same(source, artifact.Source);
-        Assert.Equal(3, artifact.Content.Length);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    public void DocumentArtifact_NullOrEmptyMediaType_Throws(string? mediaType)
-    {
-        using MemoryStream content = new();
-
-        Assert.ThrowsAny<ArgumentException>(() => new ExtractionDocumentArtifact(mediaType!, content.ToArray()));
     }
 
     [Fact]
@@ -163,7 +133,7 @@ public class DocumentReferencesTests
         ExtractionDocumentSection section = new(null);
         section.Elements.Add(text);
         document.Sections.Add(section);
-        document.AddSourcePage(page);
+        document.SourcePages.Add(page);
 
         Assert.Equal(DocumentAnnotationTestData.Polygon(), region.Polygon);
         Assert.Same(page, region.Page);
@@ -259,120 +229,6 @@ public class DocumentReferencesTests
         cell.Sources.Add(null!);
         Assert.Null(Assert.Single(text.Sources));
         Assert.Null(Assert.Single(cell.Sources));
-    }
-
-    [Fact]
-    public void RawOutput_PreservesOriginalBytesAndBorrowedNativeIdentity()
-    {
-        ExtractionDocument document = new("raw");
-        using DocumentAnnotationTestData.BorrowedNative native = new();
-        using DocumentAnnotationTestData.CountingStream stream = new(DocumentAnnotationTestData.OriginalBytes());
-        ExtractionDocumentArtifact artifact = new("application/json", stream.ToArray());
-        ExtractionDocumentSourceOutput output = new("operation-A", native, artifact, providerName: "synthetic", modelId: "model:v1");
-        document.AddSourceOutput(output);
-
-        Assert.Equal(ExtractionDocumentRawContentStatus.Retained, output.ContentStatus);
-        Assert.Same(native, output.GetRawRepresentation());
-        Assert.Same(artifact, output.GetRawContent());
-        Assert.Equal(DocumentAnnotationTestData.OriginalBytes(), stream.ToArray());
-        Assert.Equal("synthetic", output.ProviderName);
-        Assert.Equal("model:v1", output.ModelId);
-        Assert.Equal(0, native.DisposeCount);
-        Assert.Equal(0, stream.DisposeCount);
-    }
-
-    [Fact]
-    public void RawOutput_DetachedContentSurvivesTransportAndTemporaryStreamDisposal()
-    {
-        ExtractionDocument document = new("detached");
-        DocumentAnnotationTestData.CountingStream transport = new(DocumentAnnotationTestData.OriginalBytes());
-        using DocumentAnnotationTestData.CountingStream detached = new(transport.ToArray());
-        using DocumentAnnotationTestData.BorrowedNative native = new();
-        ExtractionDocumentArtifact artifact = new("application/json", detached.ToArray());
-        ExtractionDocumentSourceOutput output = new("operation", native, artifact);
-        transport.Dispose();
-        detached.Dispose();
-        document.AddSourcePage(DocumentAnnotationTestData.PdfPage(output));
-
-        Assert.Equal(DocumentAnnotationTestData.OriginalBytes(), output.GetRawContent()!.Content.ToArray());
-        Assert.Equal(1, transport.DisposeCount);
-        Assert.Equal(1, detached.DisposeCount);
-        Assert.Equal(0, native.DisposeCount);
-        Assert.Equal(1, detached.DisposeCount);
-        Assert.Equal(0, native.DisposeCount);
-        Assert.Equal(DocumentAnnotationTestData.OriginalBytes(), output.GetRawContent()!.Content.ToArray());
-    }
-
-    [Fact]
-    public void RawOutput_ContentCaptureDisabledUnavailableAndPartialRetentionRemainDistinct()
-    {
-        ExtractionDocumentSourceOutput unavailable = new("unavailable");
-        ExtractionDocumentSourceOutput disabled = new("disabled", contentCaptureDisabled: true);
-        using DocumentAnnotationTestData.BorrowedNative native = new();
-        ExtractionDocumentSourceOutput nativeOnly = new("native-only", native);
-        ExtractionDocumentArtifact content = new("application/json", DocumentAnnotationTestData.OriginalBytes());
-        ExtractionDocumentSourceOutput contentOnly = new("content-only", rawContent: content);
-
-        Assert.Equal(ExtractionDocumentRawContentStatus.Unavailable, unavailable.ContentStatus);
-        Assert.Null(unavailable.GetRawRepresentation());
-        Assert.Null(unavailable.GetRawContent());
-        Assert.Equal(ExtractionDocumentRawContentStatus.Disabled, disabled.ContentStatus);
-        Assert.Null(disabled.GetRawRepresentation());
-        Assert.Null(disabled.GetRawContent());
-        Assert.Same(native, nativeOnly.GetRawRepresentation());
-        Assert.Equal(ExtractionDocumentRawContentStatus.Unavailable, nativeOnly.ContentStatus);
-        Assert.Null(contentOnly.GetRawRepresentation());
-        Assert.Same(content, contentOnly.GetRawContent());
-        Assert.Equal(ExtractionDocumentRawContentStatus.Retained, contentOnly.ContentStatus);
-        Assert.Throws<ArgumentException>("contentCaptureDisabled", () => new ExtractionDocumentSourceOutput("bad", rawContent: content, contentCaptureDisabled: true));
-        Assert.Same(content, new ExtractionDocumentSourceOutput("shared", rawContent: content).GetRawContent());
-        Assert.Equal(0, native.DisposeCount);
-    }
-
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public void RawOutput_NativeAvailability_IsIndependentOfContentCapture(bool contentCaptureDisabled, bool hasNative)
-    {
-        using DocumentAnnotationTestData.BorrowedNative native = new();
-        object? representation = hasNative ? native : null;
-        ExtractionDocumentSourceOutput output = new("operation", representation, contentCaptureDisabled: contentCaptureDisabled);
-
-        Assert.Same(representation, output.GetRawRepresentation());
-        Assert.Equal(contentCaptureDisabled ? ExtractionDocumentRawContentStatus.Disabled : ExtractionDocumentRawContentStatus.Unavailable, output.ContentStatus);
-        Assert.Null(output.GetRawContent());
-        Assert.Equal(0, native.DisposeCount);
-    }
-
-    [Fact]
-    public void RawOutput_ContentCaptureDisabled_PreservesBorrowedNative()
-    {
-        ExtractionDocument document = new("native-only");
-        using DocumentAnnotationTestData.BorrowedNative native = new();
-        ExtractionDocumentSourceOutput output = new("operation", native, contentCaptureDisabled: true);
-        document.AddSourcePage(DocumentAnnotationTestData.PdfPage(output));
-
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
-        Assert.Same(native, output.GetRawRepresentation());
-        Assert.Equal(ExtractionDocumentRawContentStatus.Disabled, output.ContentStatus);
-        Assert.Same(native, output.GetRawRepresentation());
-        Assert.Equal(0, native.DisposeCount);
-    }
-
-    [Fact]
-    public void RawOutput_ContentCaptureDisabled_RejectsContentWithoutDisposingBorrowedResources()
-    {
-        using DocumentAnnotationTestData.CountingStream stream = new(DocumentAnnotationTestData.OriginalBytes());
-        ExtractionDocumentArtifact content = new("application/json", stream.ToArray());
-        using DocumentAnnotationTestData.BorrowedNative native = new();
-
-        Assert.Throws<ArgumentException>("contentCaptureDisabled",
-            () => new ExtractionDocumentSourceOutput("operation", native, content, contentCaptureDisabled: true));
-        Assert.Equal(0, stream.DisposeCount);
-        Assert.Equal(0, native.DisposeCount);
-        Assert.Equal(DocumentAnnotationTestData.OriginalBytes(), content.Content.ToArray());
     }
 
     // Consumer-owned oracle for these two known fixtures only; not a production conversion API.

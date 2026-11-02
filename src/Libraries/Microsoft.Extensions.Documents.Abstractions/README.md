@@ -9,24 +9,23 @@ The model contains an ordered section hierarchy. Sections contain ordered `Extra
 ## Intentional API boundaries
 
 - `ExtractionDocumentElement.Content` and `ExtractionDocument.Content` hold optional **local** `AIContent` payloads. Use `TextContent` for text, `DataContent` for bytes with MIME, and `UriContent` for references with MIME. Structural containers can have null content. Do not populate ancestors with aggregate copies of their descendants.
-- `TextContent` does not itself specify a textual format. Plain text and producer-supplied formatted text are preserved without conversion or a required Markdown convention. The independent `Text` property can retain meaningful producer-supplied plain/OCR text. It is not automatically generated or synchronized.
-- `ExtractionDocumentImageElement.Content` is inherited from `ExtractionDocumentElement`, not a second byte-valued slot. MIME is supplied by `DataContent` or `UriContent`; there is no separate mutable `MediaType` to disagree with it. `Source` remains an independent original image reference, which can coexist with bytes. `AlternativeText` remains separate semantic information. No URI is fetched.
-- `ExtractionDocumentTextElement.Role` is optional: unspecified text needs no classification. Common roles are `heading`, `pageHeader` and `pageFooter`; custom values are retained verbatim. Consumers should compare recognized roles case-insensitively and treat unrecognized roles as ordinary text. Repeated page headers are not document headings. Optional `HeadingLevel` is between 1 and 10; an absent level does not imply a hierarchy level.
+- `TextContent.Text` is the sole authoritative text for text elements. Plain text and producer-supplied formatted text are preserved without conversion or a required Markdown convention. There is no duplicate general plain-text property.
+- `ExtractionDocumentImageElement.Content` is inherited from `ExtractionDocumentElement`, not a second byte-valued slot. MIME is supplied by `DataContent` or `UriContent`; there is no separate mutable `MediaType` to disagree with it. `Source` is the original asset reference, independent of any `UriContent` payload URI, and can coexist with bytes. Image `Text` retains OCR/transcription independently of payload and `AlternativeText`. Captions and descriptions belong in `AlternativeText`, not duplicated into OCR. No URI is fetched or fabricated.
+- `ExtractionDocumentTextElement.Role` is optional: unspecified text needs no classification. Common roles are `heading`, `pageHeader` and `pageFooter`; custom values are retained verbatim. Consumers should compare recognized roles case-insensitively and treat unrecognized roles as ordinary text. Repeated page headers are not document headings. Optional `HeadingLevel` is positive when supplied; an absent level does not imply a hierarchy level.
 - `Metadata` is an application-property bag on the document, not on every element. For example, an application can retain the original file's hash for citation identity. Provider-specific confidence, detections and transforms are not standardized by this model; native observations remain available through source references.
 - `Sources` on an element or table cell contains `ExtractionDocumentSourceReference` instances: a typed source page, an optional polygon and explicit borrowed native-observation access. A page-only reference has no polygon. References preserve order and duplicates; they do not verify content or establish durable citation identity.
 - `ExtractionDocumentSourcePage` identifies an originating page and coordinate frame separately from assembly order. `PageNumber` is nullable and positive when supplied; named or unnumbered frames keep their identity without fabricating a number. Dimensions, coordinate unit and origin are optional: unknown values stay unknown. Geometry uses explicit readonly value structs with coordinate-based equality. A source reference copies every supplied polygon vertex in order; it does not reduce rotated regions to rectangles.
 - Table cells are constructed through the row/column indexer and can contain any non-section element, including images, or retain an empty anchor with sources. Positive row/column spans describe merged cells; covered positions do not contain a second anchor. Optional `Role` describes a cell classification such as `columnHeader` or `rowHeader`, not the content's CLR type. The grid rejects overlapping/out-of-bounds spans and reuse of a cell instance at multiple addresses. This is a constructible exchange model, not a document editor.
 - Mutable collections use ordinary `List<T>` and `Dictionary<TKey, TValue>` properties. Composition does not attach elements to a parent, register sources, or track mutation versions. Elements can be shared. Structural traversal rejects null entries and cyclic section paths while returning every occurrence of shared acyclic content. It does not recurse into table cells; the typed grid validates its own cell coordinates and spans. Consumers performing additional recursive traversal must validate their active paths.
-- `ExtractionDocumentArtifact` copies original response bytes into managed memory and retains their media type and optional source URI. The document and artifact are non-disposable data. Elements do not expose an additional artifact collection. The package does not fetch or interpret artifacts.
 - Applications supply their own durable identifiers and revisions; the model has no editing-framework ownership, address, mutation-version or disposal bookkeeping.
 
-## Source output and lifetime
+## Native inspection and lifetime
 
-`ExtractionDocumentSourceOutput` represents one source operation. Call `AddSourceOutput` or `AddSourcePage` explicitly; registering a page also registers its supplied output, but adding an element or source reference does not register either. Multiple pages may reference the same output instance. Operation identifiers identify one output instance within the document, and frame identifiers identify one frame instance within their operation. `SourcePages` and `SourceOutputs` inventory registered frames and operations, including blank pages with no content elements.
+`SourcePages` is an ordinary mutable list. Producers explicitly add frames with `document.SourcePages.Add(frame)`, including blank frames with no content elements. Adding elements or source references does not populate the list. Assembly order and physical page numbering remain independent; duplicate entries are not deduplicated and identifiers are not registered or made unique.
 
-`GetRawRepresentation()` exposes a borrowed native result when supplied, or null, independently of response-content capture. Disabling content capture never disables native inspection and is not redaction of the native object. `GetRawContent()` exposes an artifact containing a detached managed copy of the exact original response bytes when available, **not** a reserialization of mapped SDK objects. `ContentStatus` distinguishes retained, unavailable and explicitly disabled content capture; retained empty bytes are distinct from unavailable output. `ExtractionDocumentSourceOutput` accepts native output even when `contentCaptureDisabled` is true, but rejects a response-content artifact in that case. Artifacts can be shared across results, including results with zero sections. Providers clean up their own parser, response, stream and temporary resources before returning data, including on failure or cancellation. Borrowed native objects, caller streams and metadata values are not implicitly disposed.
+`ExtractionDocument.RawRepresentation` exposes an optional borrowed native document result, including when there are zero sections and no local payload. It is excluded from default System.Text.Json serialization. Standard `AIContent.RawRepresentation` and source-reference `GetRawRepresentation()` remain available for payload and region observations. These objects are not implicitly disposed or deep-cloned. The shared contract does not guarantee original HTTP bytes, detachment, response-content status or durable serialization. Producers remain responsible for their owned parser, response, stream and temporary-resource cleanup, including on failure or cancellation; caller streams and borrowed native objects remain borrowed.
 
-Source references, metadata and raw outputs do not enter `Text` or local payloads automatically. There is no automatic logging, embedding, persistence or document wire serialization contract. Consumers must deliberately select which supporting data to inspect or persist and protect sensitive response content. Null content is distinct from an explicitly empty `TextContent`; neither fabricates a text payload for a structural container.
+Native representations, source references and metadata do not enter text or local payloads automatically. There is no automatic logging, embedding, persistence or document wire serialization contract. Consumers must deliberately select which supporting data to inspect or persist and protect sensitive native data. Null structural content is distinct from an explicitly empty `TextContent`; neither fabricates a text payload for a structural container.
 
 ## Payload ownership and memory
 
@@ -34,7 +33,7 @@ Wrapping an existing string in `TextContent` reuses that string, but allocates a
 
 Payloads remain mutable. Replacing `Content`, changing `TextContent.Text` or editing collections does not notify the document. A consumer that retains an independently serialized snapshot must refresh it explicitly after mutation.
 
-The `ExtractionDocumentTextElement` constructor requires `TextContent`, but its inherited mutable `Content` property remains `AIContent?`; the constructor does not establish a permanent text-only invariant. Text-only consumers must validate the current payload kind rather than cast based on the element's constructor. The document does not freeze or dispose its borrowed payload objects.
+`ExtractionDocumentTextElement` requires nonnull `TextContent`, including subsequent assignment through the inherited `Content` property or a base reference. Invalid assignments fail before replacing the existing payload. Other elements and custom subclasses retain flexible nullable `AIContent`. The document does not freeze or dispose its borrowed payload objects.
 
 The memory improvement comes from not storing repeated descendant aggregates. Explicitly serializing `DataContent` can create and retain a base64 data URI alongside its original bytes. Text-only consumers should deliberately select semantic text or reject media; they must not obtain embeddings by converting binary payloads to strings.
 
@@ -52,15 +51,15 @@ using Microsoft.Extensions.AI;
 
 ExtractionDocument document = new("invoice-42");
 ExtractionDocumentSection section = new();
-section.Elements.Add(new ExtractionDocumentTextElement(new TextContent("# Invoice"), "Invoice", role: "heading") { HeadingLevel = 1 });
-section.Elements.Add(new ExtractionDocumentTextElement(new TextContent("Total: $10"), "Total: $10"));
+section.Elements.Add(new ExtractionDocumentTextElement(new TextContent("# Invoice"), role: "heading") { HeadingLevel = 1 });
+section.Elements.Add(new ExtractionDocumentTextElement(new TextContent("Total: $10")));
 document.Sections.Add(section);
 
 foreach (ExtractionDocumentElement element in document.EnumerateContent())
 {
     if (element is ExtractionDocumentTextElement text)
     {
-        Console.WriteLine(text.Text);
+        Console.WriteLine(((TextContent)text.Content!).Text);
     }
 }
 ```

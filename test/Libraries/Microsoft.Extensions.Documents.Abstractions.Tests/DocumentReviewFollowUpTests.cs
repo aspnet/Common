@@ -22,7 +22,7 @@ public class DocumentReviewFollowUpTests
         Assert.IsType<List<ExtractionDocumentElement>>(section.Elements);
         Assert.IsType<List<ExtractionDocumentSourceReference>>(section.Sources);
         Assert.IsType<List<ExtractionDocumentSourceReference>>(new ExtractionDocumentTableCell().Sources);
-        foreach (Type type in new[] { typeof(ExtractionDocument), typeof(ExtractionDocumentArtifact), typeof(ExtractionDocumentElement) })
+        foreach (Type type in new[] { typeof(ExtractionDocument), typeof(ExtractionDocumentElement) })
         {
             Assert.False(typeof(IDisposable).IsAssignableFrom(type));
             Assert.Null(type.GetMethod("Dispose"));
@@ -30,7 +30,6 @@ public class DocumentReviewFollowUpTests
             {
                 Assert.Null(type.GetProperty(name));
             }
-
         }
 
         foreach (Type type in typeof(ExtractionDocument).Assembly.GetExportedTypes())
@@ -148,8 +147,7 @@ public class DocumentReviewFollowUpTests
         ExtractionDocumentTextElement text = new(new TextContent("visible"));
         ExtractionDocumentTableElement table = new(null, 1, 1);
         ExtractionDocumentTableCell cell = new(text);
-        ExtractionDocumentSourceOutput output = new("operation");
-        ExtractionDocumentSourcePage page = new("named-frame", null, sourceOutput: output);
+        ExtractionDocumentSourcePage page = new("named-frame", null);
         ExtractionDocumentSourceReference reference = new(page);
         if (composeFirst)
         {
@@ -169,35 +167,13 @@ public class DocumentReviewFollowUpTests
         }
 
         Assert.Empty(document.SourcePages);
-        Assert.Empty(document.SourceOutputs);
-        document.AddSourcePage(page);
+        document.SourcePages.Add(page);
         Assert.Same(page, Assert.Single(document.SourcePages));
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
         cell.Sources.Clear();
         section.Elements.Clear();
         Assert.Same(page, Assert.Single(document.SourcePages));
         Assert.Same(reference, Assert.Single(text.Sources));
         Assert.Null(page.PageNumber);
-    }
-
-    [Fact]
-    public void ExplicitRegistration_ConflictsAreAtomicAndFramesAreScopedToOperations()
-    {
-        ExtractionDocument document = new("identity");
-        ExtractionDocumentSourceOutput first = new("first");
-        ExtractionDocumentSourceOutput second = new("second");
-        ExtractionDocumentSourcePage firstFrame = new("same-name", null, sourceOutput: first);
-        ExtractionDocumentSourcePage secondFrame = new("same-name", 7, sourceOutput: second);
-        document.AddSourcePage(firstFrame);
-        document.AddSourcePage(secondFrame);
-        document.AddSourcePage(firstFrame);
-        Assert.Throws<InvalidOperationException>(() => document.AddSourceOutput(new("first")));
-        Assert.Throws<InvalidOperationException>(() => document.AddSourcePage(new("new-frame", 2, sourceOutput: new("first"))));
-        Assert.Throws<InvalidOperationException>(() => document.AddSourcePage(new("same-name", 2, sourceOutput: first)));
-        Assert.Equal(new[] { firstFrame, secondFrame }, document.SourcePages);
-        Assert.Equal(new[] { first, second }, document.SourceOutputs);
-        Assert.Throws<ArgumentNullException>(() => document.AddSourcePage(null!));
-        Assert.Throws<ArgumentNullException>(() => document.AddSourceOutput(null!));
     }
 
     [Fact]
@@ -207,9 +183,9 @@ public class DocumentReviewFollowUpTests
         ExtractionDocumentSourcePage named = new("OneNote:Ideas", null);
         ExtractionDocumentSourcePage seven = new("pdf:7", 7);
         ExtractionDocumentSourcePage two = new("pdf:2", 2);
-        document.AddSourcePage(named);
-        document.AddSourcePage(seven);
-        document.AddSourcePage(two);
+        document.SourcePages.Add(named);
+        document.SourcePages.Add(seven);
+        document.SourcePages.Add(two);
         ExtractionDocumentSection section = new();
         ExtractionDocumentTextElement text = new(new TextContent("named page"));
         text.Sources.Add(new(named));
@@ -257,41 +233,5 @@ public class DocumentReviewFollowUpTests
         Assert.Equal(size.GetHashCode(), equalSize.GetHashCode());
         Assert.Throws<ArgumentOutOfRangeException>("dimensions",
             () => new ExtractionDocumentSourcePage("frame", null, default(ExtractionDocumentPageDimensions)));
-    }
-
-    [Fact]
-    public void RawArtifact_CopiesBytesAndCanBeSharedAcrossZeroSectionResults()
-    {
-        byte[] buffer = DocumentAnnotationTestData.OriginalBytes();
-        byte[] expected = buffer.ToArray();
-        Uri source = new("urn:response:opaque");
-        ExtractionDocumentArtifact artifact = new("application/json", buffer, source);
-        buffer[0] = 0;
-        using DocumentAnnotationTestData.BorrowedNative native = new();
-        ExtractionDocumentSourceOutput output = new("operation", native, artifact);
-        ExtractionDocument first = new("first");
-        ExtractionDocument second = new("second");
-        first.AddSourceOutput(output);
-        second.AddSourceOutput(output);
-        Assert.Empty(first.Sections);
-        Assert.Empty(second.Sections);
-        Assert.Equal(expected, artifact.Content.ToArray());
-        Assert.Equal("application/json", artifact.MediaType);
-        Assert.Same(source, artifact.Source);
-        Assert.Same(artifact, Assert.Single(first.SourceOutputs).GetRawContent());
-        Assert.Same(output, Assert.Single(second.SourceOutputs));
-        Assert.Same(native, output.GetRawRepresentation());
-        Assert.Equal(0, native.DisposeCount);
-        Assert.Equal(ExtractionDocumentRawContentStatus.Retained, output.ContentStatus);
-    }
-
-    [Fact]
-    public void RawArtifact_EmptyBytesAreRetainedRatherThanUnavailable()
-    {
-        ExtractionDocumentArtifact artifact = new("application/json", ReadOnlyMemory<byte>.Empty);
-        ExtractionDocumentSourceOutput output = new("empty", rawContent: artifact);
-        Assert.Empty(artifact.Content.ToArray());
-        Assert.Equal(ExtractionDocumentRawContentStatus.Retained, output.ContentStatus);
-        Assert.Same(artifact, output.GetRawContent());
     }
 }
