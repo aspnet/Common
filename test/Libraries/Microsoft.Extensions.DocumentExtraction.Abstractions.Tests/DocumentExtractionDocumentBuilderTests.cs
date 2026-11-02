@@ -54,21 +54,20 @@ public sealed class DocumentExtractionDocumentBuilderTests
     {
         using MemoryStream input = new([42]);
         ExtractionDocument expected = new("canonical", new TextContent("provider root"));
-        ExtractionDocumentSourceOutput output = new("operation", providerName: "synthetic", modelId: "actual:model");
-        ExtractionDocumentSourcePage frame = Frame(output);
+        ExtractionDocumentSourcePage frame = Frame();
         ExtractionDocumentSourceReference reference = new(frame, Polygon());
         ExtractionDocumentSection root = new(new TextContent("supplied section"));
         ExtractionDocumentSection nested = new(new TextContent("supplied nested"));
         ExtractionDocumentTableElement table = new(new TextContent("supplied table"), 1, 1);
-        ExtractionDocumentTextElement content = new(new TextContent("**cell**"), "plain cell", "Vendor.Custom") { HeadingLevel = 10 };
+        ExtractionDocumentTextElement content = new(new TextContent("**cell**"), role: "Vendor.Custom") { HeadingLevel = 10 };
         content.Sources.Add(reference);
         content.Sources.Add(reference);
         table.Cells[0, 0] = new ExtractionDocumentTableCell(content);
         nested.Elements.Add(table);
         root.Elements.Add(nested);
         expected.Sections.Add(root);
-        expected.AddSourcePage(frame);
-        expected.AddSourcePage(new ExtractionDocumentSourcePage("blank", 2));
+        expected.SourcePages.Add(frame);
+        expected.SourcePages.Add(new ExtractionDocumentSourcePage("blank", 2));
         using DirectAdapter adapter = new((_, _, _, _, _) => Task.FromResult(expected));
 
         ExtractionDocument actual = await adapter.ExtractAsync(input, "canonical", "application/pdf");
@@ -82,7 +81,6 @@ public sealed class DocumentExtractionDocumentBuilderTests
         Assert.Equal(new[] { frame.Identifier, "blank" }, actual.SourcePages.Select(static page => page.Identifier));
         Assert.Equal(new int?[] { 7, 2 }, actual.SourcePages.Select(static page => page.PageNumber));
         Assert.Same(frame, actual.SourcePages[0]);
-        Assert.Same(output, Assert.Single(actual.SourceOutputs));
         Assert.Same(table, Assert.Single(actual.EnumerateContent()));
         Assert.Same(content, table.Cells[0, 0]!.Content);
         Assert.Equal("**cell**", Assert.IsType<TextContent>(content.Content).Text);
@@ -95,49 +93,13 @@ public sealed class DocumentExtractionDocumentBuilderTests
         Assert.Empty(actual.Metadata);
         content.Content = new TextContent("changed");
         Assert.Equal("changed", Assert.IsType<TextContent>(table.Cells[0, 0]!.Content!.Content).Text);
-        Assert.Equal("plain cell", content.Text);
-        table.Cells[0, 0] = new ExtractionDocumentTableCell(new ExtractionDocumentTextElement(new TextContent("replacement"), "replacement plain"));
+        Assert.Equal("changed", Assert.IsType<TextContent>(content.Content).Text);
+        table.Cells[0, 0] = new ExtractionDocumentTableCell(new ExtractionDocumentTextElement(new TextContent("replacement")));
         Assert.Equal("replacement", Assert.IsType<TextContent>(table.Cells[0, 0]!.Content!.Content).Text);
-        Assert.Equal("replacement plain", table.Cells[0, 0]!.Content!.Text);
         Assert.Equal("supplied table", Assert.IsType<TextContent>(table.Content).Text);
         Assert.Equal("supplied nested", Assert.IsType<TextContent>(nested.Content).Text);
         Assert.Equal("provider root", Assert.IsType<TextContent>(actual.Content).Text);
-        Assert.Equal("plain cell", content.Text);
-        Assert.Equal(42, input.ReadByte());
-    }
-
-    [Fact]
-    public async Task ExtractAsync_OriginalBytesSurviveProviderResourceCleanup()
-    {
-        using MemoryStream input = new([42]);
-        using NativeObservation native = new();
-        byte[] bytes = OriginalBytes();
-        using CountingStream stream = new(bytes);
-        ExtractionDocumentArtifact artifact = new("application/json", stream.ToArray());
-        ExtractionDocumentSourceOutput output = new("operation", native, artifact);
-        ExtractionDocument expected = new("body-owner");
-        expected.AddSourceOutput(output);
-        expected.AddSourcePage(Frame(output));
-        using DirectAdapter adapter = new((_, _, _, _, _) => Task.FromResult(expected));
-        ExtractionDocument actual = await adapter.ExtractAsync(input, "body-owner", "application/pdf",
-            new DocumentExtractionOptions { CaptureRawContent = true });
-
-        Assert.Same(expected, actual);
-        Assert.Same(output, Assert.Single(actual.SourceOutputs));
-        Assert.Same(artifact, output.GetRawContent());
-        Assert.Equal(ExtractionDocumentRawContentStatus.Retained, output.ContentStatus);
-        Assert.Equal(bytes, stream.ToArray());
-        Assert.Same(native, output.GetRawRepresentation());
-        adapter.Dispose();
-        Assert.Equal(0, stream.DisposeCount);
-        Assert.True(stream.CanRead);
-        Assert.Equal(32, stream.ReadByte());
-        stream.Dispose();
-        Assert.Equal(1, stream.DisposeCount);
-        Assert.Throws<ObjectDisposedException>(() => stream.ReadByte());
-        Assert.Equal(bytes, output.GetRawContent()!.Content.ToArray());
-        Assert.Equal(0, native.DisposeCount);
-        Assert.Equal(0, native.ToStringCount);
+        Assert.Equal("changed", Assert.IsType<TextContent>(content.Content).Text);
         Assert.Equal(42, input.ReadByte());
     }
 
@@ -145,33 +107,31 @@ public sealed class DocumentExtractionDocumentBuilderTests
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
-    public async Task ExtractAsync_DefaultAndDisabledCapturePreserveSpecializedBorrowedNative(int optionKind)
+    public async Task ExtractAsync_AbsentAndExplicitOptionsPreserveSpecializedBorrowedNative(int optionKind)
     {
         using MemoryStream input = new([42]);
         using NativeObservation native = new();
-        ExtractionDocumentSourceOutput output = new("operation", native, contentCaptureDisabled: true, modelId: "actual:model");
-        ExtractionDocumentSourcePage frame = Frame(output);
+        ExtractionDocumentSourcePage frame = Frame();
         ExtractionDocumentPoint[] vertices = Polygon();
         ExtractionDocumentSourceReference reference = new(frame, vertices, native);
         vertices[0] = new(999, 999);
-        ExtractionDocument expected = new("native");
+        ExtractionDocument expected = new("native") { RawRepresentation = native };
         ExtractionDocumentSection section = new();
         ExtractionDocumentImageElement image = new(new TextContent("visible"), "plain visible");
         image.Sources.Add(reference);
         section.Elements.Add(image);
         expected.Sections.Add(section);
-        expected.AddSourcePage(frame);
+        expected.SourcePages.Add(frame);
         using DirectAdapter adapter = new((_, _, _, _, _) => Task.FromResult(expected));
-        DocumentExtractionOptions? options = optionKind switch { 1 => new(), 2 => new() { CaptureRawContent = false }, _ => null };
+        DocumentExtractionOptions? options = optionKind switch { 1 => new(), 2 => new() { ExtractorName = "opaque:selector" }, _ => null };
 
         ExtractionDocument actual = await adapter.ExtractAsync(input, "native", "application/pdf", options);
 
         Assert.Same(expected, actual);
-        Assert.Same(output, Assert.Single(actual.SourceOutputs));
         Assert.Same(frame, Assert.Single(actual.SourcePages));
         Assert.Same(reference, Assert.Single(image.Sources));
         Assert.Same(native, reference.GetRawRepresentation());
-        Assert.Same(native, output.GetRawRepresentation());
+        Assert.Same(native, actual.RawRepresentation);
         Assert.Equal("sdk text", native.Text);
         Assert.Equal(0.875, native.Confidence);
         Assert.Equal(new[] { 3, 8, 13 }, native.WordOffsets);
@@ -180,38 +140,43 @@ public sealed class DocumentExtractionDocumentBuilderTests
         Assert.Equal(ExtractionDocumentCoordinateUnit.Point, frame.CoordinateUnit);
         Assert.Equal(ExtractionDocumentCoordinateOrigin.BottomLeft, frame.CoordinateOrigin);
         Assert.Equal(7, frame.PageNumber);
-        Assert.Equal("actual:model", output.ModelId);
-        Assert.Null(output.GetRawContent());
-        Assert.Equal(ExtractionDocumentRawContentStatus.Disabled, output.ContentStatus);
         Assert.Equal(0, native.DisposeCount);
         Assert.Equal(0, native.ToStringCount);
         Assert.Equal(42, input.ReadByte());
     }
 
-    [Fact]
-    public async Task ExtractAsync_RequestedCaptureWithoutOriginalBytesRemainsUnavailable()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExtractAsync_SuccessCleansOwnedProviderStreamButKeepsBorrowedRootAndInput(bool hasSection)
     {
         using MemoryStream input = new([42]);
         using NativeObservation native = new();
-        ExtractionDocument expected = new("unavailable");
-        ExtractionDocumentSourceOutput output = new("operation", native);
-        expected.AddSourceOutput(output);
-        using DirectAdapter adapter = new((_, _, _, options, _) =>
+        MemoryStream? owned = null;
+        using DirectAdapter adapter = new((_, identifier, _, _, _) =>
         {
-            Assert.True(options!.CaptureRawContent);
-            return Task.FromResult(expected);
+            using MemoryStream response = new([17, 23]);
+            owned = response;
+            ExtractionDocument result = new(identifier) { RawRepresentation = native };
+            if (hasSection)
+            {
+                result.Sections.Add(new());
+            }
+
+            return Task.FromResult(result);
         });
 
-        ExtractionDocument actual = await adapter.ExtractAsync(input, "unavailable", "application/pdf",
-            new DocumentExtractionOptions { CaptureRawContent = true });
+        ExtractionDocument actual = await adapter.ExtractAsync(input, "success", "application/pdf");
 
-        Assert.Same(expected, actual);
-        Assert.Same(output, Assert.Single(actual.SourceOutputs));
-        Assert.Equal(ExtractionDocumentRawContentStatus.Unavailable, output.ContentStatus);
-        Assert.Null(output.GetRawContent());
-        Assert.Same(native, output.GetRawRepresentation());
-        Assert.Equal(0, native.ToStringCount);
+        Assert.NotNull(owned);
+        Assert.False(owned.CanRead);
+        Assert.Same(native, actual.RawRepresentation);
+        Assert.Equal(hasSection ? 1 : 0, actual.Sections.Count);
+        Assert.Null(actual.Content);
+        Assert.Empty(actual.EnumerateContent());
+        adapter.Dispose();
         Assert.Equal(0, native.DisposeCount);
+        Assert.Equal(0, native.ToStringCount);
         Assert.Equal(42, input.ReadByte());
     }
 
@@ -235,21 +200,18 @@ public sealed class DocumentExtractionDocumentBuilderTests
             tokens.Add(token);
             return identifier == "A" ? gateA.Task : gateB.Task;
         });
-        DocumentExtractionOptions options = new() { ExtractorName = "model:A", CaptureRawContent = true };
+        DocumentExtractionOptions options = new() { ExtractorName = "model:A" };
         options.AdditionalProperties.Add("setting", borrowed);
         Task<ExtractionDocument> first = adapter.ExtractAsync(inputA, "A", "application/pdf", options, cancellationA.Token);
         options.ExtractorName = "model:B";
-        options.CaptureRawContent = false;
         options.AdditionalProperties["setting"] = "B";
         Task<ExtractionDocument> second = adapter.ExtractAsync(inputB, "B", "image/png", options, cancellationB.Token);
         options.AdditionalProperties.Clear();
         Assert.NotSame(options, snapshots[0]);
         Assert.NotSame(snapshots[0], snapshots[1]);
         Assert.Equal("model:A", snapshots[0].ExtractorName);
-        Assert.True(snapshots[0].CaptureRawContent);
         Assert.Same(borrowed, snapshots[0].AdditionalProperties["setting"]);
         Assert.Equal("model:B", snapshots[1].ExtractorName);
-        Assert.False(snapshots[1].CaptureRawContent);
         Assert.Equal("B", snapshots[1].AdditionalProperties["setting"]);
         snapshots[0].AdditionalProperties.Clear();
         Assert.Equal("B", snapshots[1].AdditionalProperties["setting"]);
@@ -266,10 +228,8 @@ public sealed class DocumentExtractionDocumentBuilderTests
     }
 
     private static ExtractionDocumentPoint[] Polygon() => [new(10.25, 20.5), new(40.75, 18.25), new(44.5, 60.125), new(12.875, 58.75), new(8.5, 35.25)];
-    private static ExtractionDocumentSourcePage Frame(ExtractionDocumentSourceOutput output) =>
-        new("pdf-frame", 7, new ExtractionDocumentPageDimensions(200, 100), ExtractionDocumentCoordinateUnit.Point, ExtractionDocumentCoordinateOrigin.BottomLeft, output);
-    private static byte[] OriginalBytes() => System.Text.Encoding.UTF8.GetBytes(
-        " {\r\n \"unknown\" : { \"z\" : [3, 1] }, \"pages\" : [7,2], \"marker\":\"RAW_BODY_ONLY_91\" \r\n}\n");
+    private static ExtractionDocumentSourcePage Frame() =>
+        new("pdf-frame", 7, new ExtractionDocumentPageDimensions(200, 100), ExtractionDocumentCoordinateUnit.Point, ExtractionDocumentCoordinateOrigin.BottomLeft);
 
     // Direct implementations snapshot at their own public boundary; no core finalizer is involved.
     private sealed class DirectAdapter(Func<Stream, string, string, DocumentExtractionOptions?, CancellationToken, Task<ExtractionDocument>> extract)
@@ -297,20 +257,6 @@ public sealed class DocumentExtractionDocumentBuilderTests
         {
             ToStringCount++;
             return "NATIVE_ONLY_92";
-        }
-    }
-
-    private sealed class CountingStream(byte[] bytes) : MemoryStream(bytes)
-    {
-        internal int DisposeCount { get; private set; }
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                DisposeCount++;
-            }
-
-            base.Dispose(disposing);
         }
     }
 }

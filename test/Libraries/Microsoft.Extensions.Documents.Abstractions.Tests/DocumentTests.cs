@@ -156,9 +156,8 @@ public partial class DocumentTests
     public void DocumentTraversal_PreservesOriginIdentityAcrossHierarchyChanges()
     {
         ExtractionDocument document = new("origin");
-        ExtractionDocumentSourceOutput output = new("operation-A");
-        ExtractionDocumentSourcePage page7 = DocumentAnnotationTestData.PdfPage(output);
-        ExtractionDocumentSourcePage page2 = new("urn:frame:page2", 2, sourceOutput: output);
+        ExtractionDocumentSourcePage page7 = DocumentAnnotationTestData.PdfPage();
+        ExtractionDocumentSourcePage page2 = new("urn:frame:page2", 2);
         ExtractionDocumentTextElement text7 = new(new TextContent("same text"));
         ExtractionDocumentTextElement text2 = new(new TextContent("same text"));
         ExtractionDocumentSourceReference region = new(page7, DocumentAnnotationTestData.Polygon());
@@ -170,8 +169,8 @@ public partial class DocumentTests
         second.Elements.Add(text2);
         document.Sections.Add(first);
         document.Sections.Add(second);
-        document.AddSourcePage(page7);
-        document.AddSourcePage(page2);
+        document.SourcePages.Add(page7);
+        document.SourcePages.Add(page2);
         Assert.Equal(new[] { page7, page2 }, document.SourcePages);
 
         first.Elements.Remove(text7);
@@ -182,17 +181,15 @@ public partial class DocumentTests
         Assert.Same(page7, text7.Sources[0].Page);
         Assert.Equal("urn:frame:pdf-A", region.Page.Identifier);
         Assert.Equal(DocumentAnnotationTestData.Polygon(), region.Polygon);
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
     }
 
     [Fact]
     public void BlankPage_PreservesSourceFrameWithoutFabricatedSemanticContent()
     {
         ExtractionDocument document = new("blank");
-        ExtractionDocumentSourceOutput output = new("blank-operation");
         ExtractionDocumentSourcePage page = new("urn:frame:blank-page2", 2, new ExtractionDocumentPageDimensions(200, 100),
-            ExtractionDocumentCoordinateUnit.Point, ExtractionDocumentCoordinateOrigin.BottomLeft, output);
-        document.AddSourcePage(page);
+            ExtractionDocumentCoordinateUnit.Point, ExtractionDocumentCoordinateOrigin.BottomLeft);
+        document.SourcePages.Add(page);
         document.Sections.Add(new ExtractionDocumentSection());
 
         Assert.Null(document.Content);
@@ -203,30 +200,23 @@ public partial class DocumentTests
         Assert.Equal(new ExtractionDocumentPageDimensions(200, 100), page.Dimensions);
         Assert.Equal(ExtractionDocumentCoordinateUnit.Point, page.CoordinateUnit);
         Assert.Equal(ExtractionDocumentCoordinateOrigin.BottomLeft, page.CoordinateOrigin);
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
-        Assert.Equal(ExtractionDocumentRawContentStatus.Unavailable, output.ContentStatus);
     }
 
     [Fact]
-    public void DocumentRawOutput_MultiplePagesShareOneBodyWithoutSemanticLeakage()
+    public void DocumentNativeResult_PageInventoryPreservesDuplicatesWithoutSemanticLeakage()
     {
         ExtractionDocument document = new("shared-body", new TextContent("visible"));
         using DocumentAnnotationTestData.CountingStream stream = new(DocumentAnnotationTestData.OriginalBytes());
         using DocumentAnnotationTestData.BorrowedNative native = new();
-        ExtractionDocumentArtifact artifact = new("application/json", stream.ToArray());
-        ExtractionDocumentSourceOutput output = new("operation-A", native, artifact);
-        ExtractionDocumentSourcePage page7 = DocumentAnnotationTestData.PdfPage(output);
-        ExtractionDocumentSourcePage page2 = new("frame-2", 2, sourceOutput: output);
-        document.AddSourcePage(page7);
-        document.AddSourcePage(page2);
-        document.AddSourcePage(page7);
-        document.AddSourceOutput(output);
+        document.RawRepresentation = native;
+        ExtractionDocumentSourcePage page7 = DocumentAnnotationTestData.PdfPage();
+        ExtractionDocumentSourcePage page2 = new("frame-2", 2);
+        document.SourcePages.Add(page7);
+        document.SourcePages.Add(page2);
+        document.SourcePages.Add(page7);
 
-        Assert.Equal(new[] { page7, page2 }, document.SourcePages);
-        Assert.Same(output, page7.SourceOutput);
-        Assert.Same(page7.SourceOutput, page2.SourceOutput);
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
-        Assert.Equal(stream.ToArray(), page2.SourceOutput!.GetRawContent()!.Content.ToArray());
+        Assert.Equal(new[] { page7, page2, page7 }, document.SourcePages);
+        Assert.Same(native, document.RawRepresentation);
         Assert.Equal(DocumentAnnotationTestData.OriginalBytes(), stream.ToArray());
         Assert.Equal("visible", Assert.IsType<TextContent>(document.Content).Text);
         Assert.Empty(document.EnumerateContent());
@@ -239,13 +229,12 @@ public partial class DocumentTests
     {
         ExtractionDocument document = new("shared-annotations");
         ExtractionDocumentSection section = new(null);
-        ExtractionDocumentTextElement text = new(new TextContent("visible **text**"), "visible text");
+        ExtractionDocumentTextElement text = new(new TextContent("visible **text**"));
         section.Elements.Add(text);
         document.Sections.Add(section);
         var payload = new { target = text, nested = new { unknown = new object[] { 3, "x" } }, vendorFlag = "kept" };
-        ExtractionDocumentSourceOutput output = new("operation", providerName: "synthetic", modelId: "engine:v1");
-        ExtractionDocumentSourcePage page = DocumentAnnotationTestData.PdfPage(output);
-        document.AddSourcePage(page);
+        ExtractionDocumentSourcePage page = DocumentAnnotationTestData.PdfPage();
+        document.SourcePages.Add(page);
         document.Metadata["vendor-extra"] = payload;
         text.Sources.Add(new ExtractionDocumentSourceReference(page, DocumentAnnotationTestData.Polygon()));
 
@@ -254,34 +243,7 @@ public partial class DocumentTests
         Assert.Equal(new object[] { 3, "x" }, payload.nested.unknown);
         Assert.Equal("kept", payload.vendorFlag);
         Assert.Same(page, Assert.Single(document.SourcePages));
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
-        Assert.Equal("engine:v1", page.SourceOutput!.ModelId);
         Assert.Same(text, Assert.Single(document.EnumerateContent()));
-        Assert.Equal("visible text", text.Text);
+        Assert.Equal("visible **text**", Assert.IsType<TextContent>(text.Content).Text);
     }
-
-    [Fact]
-    public void SourceRegistries_RejectIdentityConflictsAndAllowFrameNamesAcrossOperations()
-    {
-        ExtractionDocument document = new("identities");
-        ExtractionDocumentSourceOutput first = new("operation-A");
-        ExtractionDocumentSourceOutput second = new("operation-B");
-        ExtractionDocumentSourcePage firstPage = new("same-frame", 7, sourceOutput: first);
-        ExtractionDocumentSourcePage secondPage = new("same-frame", 7, sourceOutput: second);
-        document.AddSourcePage(firstPage);
-        document.AddSourcePage(secondPage);
-        Assert.Throws<InvalidOperationException>(() => document.AddSourceOutput(new ExtractionDocumentSourceOutput("operation-A")));
-        Assert.Throws<InvalidOperationException>(() => document.AddSourcePage(new ExtractionDocumentSourcePage("same-frame", 2, sourceOutput: first)));
-        ExtractionDocumentSourceReference conflicting = new(new ExtractionDocumentSourcePage("same-frame", 7, sourceOutput: first), DocumentAnnotationTestData.Polygon());
-        ExtractionDocumentSection section = new(null);
-        document.Sections.Add(section);
-        section.Sources.Add(conflicting);
-        Assert.Same(conflicting, Assert.Single(section.Sources));
-        Assert.Throws<InvalidOperationException>(() => document.AddSourcePage(conflicting.Page));
-        Assert.Equal(new[] { first, second }, document.SourceOutputs);
-        Assert.Equal(new[] { firstPage, secondPage }, document.SourcePages);
-        Assert.Throws<NotSupportedException>(() => ((System.Collections.Generic.IList<ExtractionDocumentSourcePage>)document.SourcePages).Clear());
-        Assert.Throws<NotSupportedException>(() => ((System.Collections.Generic.IList<ExtractionDocumentSourceOutput>)document.SourceOutputs).Clear());
-    }
-
 }

@@ -125,8 +125,7 @@ public sealed class ExtractionDocumentSourcePage
         int? pageNumber,
         ExtractionDocumentPageDimensions? dimensions = null,
         ExtractionDocumentCoordinateUnit? coordinateUnit = null,
-        ExtractionDocumentCoordinateOrigin? coordinateOrigin = null,
-        ExtractionDocumentSourceOutput? sourceOutput = null)
+        ExtractionDocumentCoordinateOrigin? coordinateOrigin = null)
     {
         Identifier = Throw.IfNullOrEmpty(identifier);
         PageNumber = pageNumber is { } number ? Throw.IfLessThanOrEqual(number, 0, nameof(pageNumber)) : null;
@@ -148,10 +147,9 @@ public sealed class ExtractionDocumentSourcePage
         Dimensions = dimensions;
         CoordinateUnit = coordinateUnit;
         CoordinateOrigin = coordinateOrigin;
-        SourceOutput = sourceOutput;
     }
 
-    /// <summary>Gets the producer's frame identifier, scoped to its source operation.</summary>
+    /// <summary>Gets the producer's frame identifier.</summary>
     public string Identifier { get; }
 
     /// <summary>Gets the one-based originating page number, or <see langword="null"/> for an unnumbered source frame.</summary>
@@ -166,79 +164,6 @@ public sealed class ExtractionDocumentSourcePage
 
     /// <summary>Gets the reported origin, or <see langword="null"/> when unknown.</summary>
     public ExtractionDocumentCoordinateOrigin? CoordinateOrigin { get; }
-
-    /// <summary>Gets the source operation, when available.</summary>
-    public ExtractionDocumentSourceOutput? SourceOutput { get; }
-}
-
-/// <summary>Describes the availability of retained provider output.</summary>
-public enum ExtractionDocumentRawContentStatus
-{
-    /// <summary>The provider did not supply this representation.</summary>
-    Unavailable,
-
-    /// <summary>The original representation is retained.</summary>
-    Retained,
-
-    /// <summary>Original response-content capture was explicitly disabled.</summary>
-    Disabled
-}
-
-/// <summary>Provides explicit break-glass access to one operation's output, outside semantic content.</summary>
-/// <remarks>
-/// Native objects are borrowed and are never implicitly disposed. Original content must be a detached
-/// response body, not serialization of a mapped object. Content artifacts contain detached managed bytes.
-/// Inspection is explicit; projections must not log, embed, or persist these representations automatically.
-/// </remarks>
-public sealed class ExtractionDocumentSourceOutput
-{
-    private readonly object? _rawRepresentation;
-    private readonly ExtractionDocumentArtifact? _rawContent;
-
-    /// <summary>Initializes a new instance of the <see cref="ExtractionDocumentSourceOutput"/> class.</summary>
-    public ExtractionDocumentSourceOutput(
-        string identifier,
-        object? rawRepresentation = null,
-        ExtractionDocumentArtifact? rawContent = null,
-        bool contentCaptureDisabled = false,
-        string? providerName = null,
-        string? modelId = null)
-    {
-        Identifier = Throw.IfNullOrEmpty(identifier);
-        if (contentCaptureDisabled && rawContent is not null)
-        {
-            Throw.ArgumentException(nameof(contentCaptureDisabled), "Disabled content capture cannot contain original response content.");
-        }
-
-        _rawRepresentation = rawRepresentation;
-        _rawContent = rawContent;
-        ContentStatus = contentCaptureDisabled ? ExtractionDocumentRawContentStatus.Disabled :
-            rawContent is null ? ExtractionDocumentRawContentStatus.Unavailable : ExtractionDocumentRawContentStatus.Retained;
-        ProviderName = providerName;
-        ModelId = modelId;
-    }
-
-    /// <summary>Gets the producer-local source operation identifier, not a durable document key.</summary>
-    public string Identifier { get; }
-
-    /// <summary>Gets the optional provider name.</summary>
-    public string? ProviderName { get; }
-
-    /// <summary>Gets the actual source model identifier, when reported.</summary>
-    public string? ModelId { get; }
-
-    /// <summary>Gets original response content availability.</summary>
-    public ExtractionDocumentRawContentStatus ContentStatus { get; }
-
-    /// <summary>Gets the borrowed native result for explicit inspection, when supplied.</summary>
-    /// <returns>The borrowed native result, or <see langword="null"/>.</returns>
-    [SuppressMessage("Design", "CA1024:Use properties where appropriate", Justification = "Raw inspection is explicit and excluded from automatic property serialization.")]
-    public object? GetRawRepresentation() => _rawRepresentation;
-
-    /// <summary>Gets detached original response content, independent of provider resource lifetimes.</summary>
-    /// <returns>The original content bytes and metadata, or <see langword="null"/>.</returns>
-    [SuppressMessage("Design", "CA1024:Use properties where appropriate", Justification = "Raw inspection is explicit and excluded from automatic property serialization.")]
-    public ExtractionDocumentArtifact? GetRawContent() => _rawContent;
 }
 
 /// <summary>Associates content with an originating page and an optional source polygon.</summary>

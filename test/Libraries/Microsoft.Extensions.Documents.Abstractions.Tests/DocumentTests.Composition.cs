@@ -52,32 +52,28 @@ public partial class DocumentTests
         }
 
         using DocumentAnnotationTestData.CountingStream stream = new(new byte[] { 31, 32 });
-        ExtractionDocumentArtifact artifact = new("application/json", stream.ToArray());
         using DocumentAnnotationTestData.BorrowedNative native = new();
-        ExtractionDocumentSourceOutput output = new("operation", native, artifact);
-        ExtractionDocumentSourcePage page = new("frame", 4, sourceOutput: output);
+        document.RawRepresentation = native;
+        ExtractionDocumentSourcePage page = new("frame", 4);
         ExtractionDocumentSourceReference reference = new(page, rawRepresentation: native);
         sources.Add(reference);
         if (!attachFirst)
         {
             Assert.Empty(document.SourcePages);
-            Assert.Empty(document.SourceOutputs);
             document.Sections.Add(section);
         }
 
         Assert.Empty(document.SourcePages);
-        document.AddSourcePage(page);
+        document.SourcePages.Add(page);
         Assert.Same(reference, Assert.Single(sources));
         Assert.Same(page, Assert.Single(document.SourcePages));
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
         Assert.Equal(new byte[] { 31, 32 }, stream.ToArray());
         sources.Clear();
         Assert.Same(page, Assert.Single(document.SourcePages));
         Assert.Equal(0, stream.DisposeCount);
         stream.Dispose();
-        Assert.Equal(new byte[] { 31, 32 }, artifact.Content.ToArray());
         Assert.Same(native, reference.GetRawRepresentation());
-        Assert.Same(native, output.GetRawRepresentation());
+        Assert.Same(native, document.RawRepresentation);
         Assert.Equal(0, native.DisposeCount);
     }
 
@@ -87,11 +83,11 @@ public partial class DocumentTests
         ExtractionDocument document = new("application", null);
         ExtractionDocumentSection section = new(null);
         ExtractionDocumentSection nested = new(null);
-        ExtractionDocumentTextElement text = new(new TextContent("**local**"), "local");
+        ExtractionDocumentTextElement text = new(new TextContent("**local**"));
         ExtractionDocumentImageElement image = new(new TextContent("")) { Source = new Uri("urn:local:image"), AlternativeText = "local diagram" };
         ExtractionDocumentTextElement extension = new(new TextContent("extension"), role: "application-extra");
         ExtractionDocumentTableElement table = new(null, 1, 2);
-        ExtractionDocumentTextElement cellText = new(new TextContent("cell|value"), "cell value");
+        ExtractionDocumentTextElement cellText = new(new TextContent("cell|value"));
         table.Cells[0, 0] = new ExtractionDocumentTableCell(cellText);
         table.Cells[0, 1] = new ExtractionDocumentTableCell();
         image.Content = new DataContent(new byte[] { 7, 8 }, "image/png");
@@ -103,30 +99,14 @@ public partial class DocumentTests
         document.Sections.Add(section);
 
         Assert.Null(document.Content);
-        Assert.Equal("local", text.Text);
-        Assert.Equal("cell value", cellText.Text);
+        Assert.Equal("**local**", Assert.IsType<TextContent>(text.Content).Text);
+        Assert.Equal("cell|value", Assert.IsType<TextContent>(cellText.Content).Text);
         Assert.Equal("application-extra", extension.Role);
         Assert.Equal(new byte[] { 7, 8 }, Assert.IsType<DataContent>(image.Content).Data.ToArray());
         Assert.Equal(new ExtractionDocumentElement[] { text, table, image, extension }, document.EnumerateContent());
         Assert.All(new ExtractionDocumentElement[] { section, nested, text, table, cellText, image, extension }, element => Assert.Empty(element.Sources));
         Assert.All(table.Cells, cell => Assert.Empty(cell!.Sources));
         Assert.Empty(document.SourcePages);
-        Assert.Empty(document.SourceOutputs);
         Assert.Equal(new byte[] { 7, 8 }, Assert.IsType<DataContent>(image.Content).Data.ToArray());
     }
-
-    [Fact]
-    public void SourceRegistries_NoOperationFramesRejectDuplicateIdsWithoutMutation()
-    {
-        ExtractionDocument document = new("unscoped");
-        ExtractionDocumentSourcePage first = new("frame", 1);
-        document.AddSourcePage(first);
-        document.AddSourcePage(first);
-        Assert.Throws<InvalidOperationException>(() => document.AddSourcePage(new("frame", 2)));
-        Assert.Throws<ArgumentNullException>(() => document.AddSourcePage(null!));
-        Assert.Throws<ArgumentNullException>(() => document.AddSourceOutput(null!));
-        Assert.Same(first, Assert.Single(document.SourcePages));
-        Assert.Empty(document.SourceOutputs);
-    }
-
 }

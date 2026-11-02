@@ -19,9 +19,9 @@ internal static class DocumentAnnotationTestData
         new(12.875, 58.75), new(8.5, 35.25)
     ];
 
-    internal static ExtractionDocumentSourcePage PdfPage(ExtractionDocumentSourceOutput? output = null) =>
+    internal static ExtractionDocumentSourcePage PdfPage() =>
         new("urn:frame:pdf-A", 7, new ExtractionDocumentPageDimensions(200, 100),
-            ExtractionDocumentCoordinateUnit.Point, ExtractionDocumentCoordinateOrigin.BottomLeft, output);
+            ExtractionDocumentCoordinateUnit.Point, ExtractionDocumentCoordinateOrigin.BottomLeft);
 
     internal sealed class CountingStream(byte[] bytes) : MemoryStream(bytes)
     {

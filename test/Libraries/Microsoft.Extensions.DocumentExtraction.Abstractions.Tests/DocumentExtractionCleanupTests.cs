@@ -38,7 +38,7 @@ public sealed class DocumentExtractionCleanupTests
         Exception actual = await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
             Task<ExtractionDocument> pending = adapter.ExtractAsync(input, "partial", "application/pdf",
-                new DocumentExtractionOptions { CaptureRawContent = true }, cancellation.Token);
+                new DocumentExtractionOptions { }, cancellation.Token);
             await acquired.WaitAsync();
             Assert.False(pending.IsCompleted);
             Assert.Equal(3, adapter.AcquireCount);
@@ -124,17 +124,17 @@ public sealed class DocumentExtractionCleanupTests
         {
             Token = cancellationToken;
             cancellationToken.ThrowIfCancellationRequested();
-            ExtractionDocument partial = new(identifier);
+            ExtractionDocument partial = new(identifier) { RawRepresentation = native };
             try
             {
                 foreach (CleanupStream body in bodies)
                 {
-                    ExtractionDocumentArtifact artifact = new("application/json", body.ToArray());
-                    partial.AddSourceOutput(new ExtractionDocumentSourceOutput("response:" + AcquireCount, native, artifact));
                     AcquireCount++;
                 }
 
                 acquired.Release();
+                Assert.Same(native, partial.RawRepresentation);
+                Assert.Empty(partial.Sections);
 
                 // Cancellation is observed explicitly after the deterministic acquisition gate.
                 await release.WaitAsync(CancellationToken.None).ConfigureAwait(false);

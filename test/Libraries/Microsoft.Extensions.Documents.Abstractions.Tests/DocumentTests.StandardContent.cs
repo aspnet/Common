@@ -107,7 +107,7 @@ public partial class DocumentTests
     {
         ExtractionDocumentSection section = new();
         section.Elements.Add(new ExtractionDocumentTextElement(new TextContent("first")));
-        section.Elements.Add(new ExtractionDocumentTextElement(new TextContent("second")) { Content = new AIContent() });
+        section.Elements.Add(new CustomElement(new AIContent()));
         ExtractionDocument document = new("unsupported-flat");
         document.Sections.Add(section);
 
@@ -140,13 +140,13 @@ public partial class DocumentTests
     }
 
     [Fact]
-    public void StandardTextContent_PreservesSharedStringPayloadAndIndependentSemanticText()
+    public void StandardTextContent_PreservesSharedAuthoritativeStringPayload()
     {
         string markdown = new(['*', '*', 'O', 'C', 'R', '*', '*']);
         TextContent payload = new(markdown);
         ExtractionDocument document = new("shared-text", payload);
         ExtractionDocumentSection section = new(payload);
-        ExtractionDocumentTextElement text = new(payload, "OCR", "heading") { HeadingLevel = 2 };
+        ExtractionDocumentTextElement text = new(payload, role: "heading") { HeadingLevel = 2 };
         section.Elements.Add(text);
         document.Sections.Add(section);
 
@@ -154,7 +154,7 @@ public partial class DocumentTests
         Assert.Same(payload, section.Content);
         Assert.Same(payload, text.Content);
         Assert.Same(markdown, payload.Text);
-        Assert.Equal("OCR", text.Text);
+        Assert.Equal("**OCR**", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Equal("heading", text.Role);
         Assert.Equal(2, text.HeadingLevel);
     }
@@ -166,7 +166,7 @@ public partial class DocumentTests
         ExtractionDocumentSection section = new(new TextContent("section introduction"));
         ExtractionDocumentSection transparent = new();
         ExtractionDocumentTableElement table = new(new TextContent("table caption"), 1, 1);
-        ExtractionDocumentTextElement cellText = new(new TextContent("leaf|value"), "leaf value");
+        ExtractionDocumentTextElement cellText = new(new TextContent("leaf|value"));
         table.Cells[0, 0] = new ExtractionDocumentTableCell(cellText);
         transparent.Elements.Add(table);
         section.Elements.Add(transparent);
@@ -177,11 +177,11 @@ public partial class DocumentTests
         Assert.Null(transparent.Content);
         Assert.Same(table, Assert.Single(document.EnumerateContent()));
         Assert.Same(cellText, table.Cells[0, 0]!.Content);
-        Assert.Equal("leaf value", cellText.Text);
+        Assert.Equal("leaf|value", Assert.IsType<TextContent>(cellText.Content).Text);
 
         cellText.Content = new TextContent("edited");
         Assert.Equal("edited", Assert.IsType<TextContent>(table.Cells[0, 0]!.Content!.Content).Text);
-        Assert.Equal("leaf value", cellText.Text);
+        Assert.Equal("edited", Assert.IsType<TextContent>(cellText.Content).Text);
         Assert.Equal("table caption", Assert.IsType<TextContent>(table.Content).Text);
     }
 
@@ -228,16 +228,15 @@ public partial class DocumentTests
         };
         Assert.Same(payload, selected);
         Assert.Same(text, table.Cells[0, 0]!.Content);
-        Assert.Empty(document.SourceOutputs);
     }
 
     [Fact]
-    public void BorrowedPayloadMutation_IsVisibleWithoutChangingSemanticText()
+    public void BorrowedPayloadMutation_IsAuthoritativeAndVisible()
     {
         TextContent payload = new("first");
         ExtractionDocument document = new("mutable");
         ExtractionDocumentSection section = new();
-        ExtractionDocumentTextElement text = new(payload, "stable semantic");
+        ExtractionDocumentTextElement text = new(payload);
         section.Elements.Add(text);
         document.Sections.Add(section);
 
@@ -245,7 +244,6 @@ public partial class DocumentTests
 
         Assert.Equal("second", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Same(payload, text.Content);
-        Assert.Equal("stable semantic", text.Text);
         text.Content = new TextContent("second");
         Assert.NotSame(payload, text.Content);
         Assert.Equal("second", Assert.IsType<TextContent>(text.Content).Text);
@@ -322,7 +320,7 @@ public partial class DocumentTests
     [InlineData("root")]
     [InlineData("section")]
     [InlineData("table")]
-    [InlineData("text")]
+    [InlineData("custom")]
     [InlineData("image")]
     public void ArbitraryStandardPayload_RemainsInspectableAtEachOwner(string owner)
     {
@@ -333,7 +331,7 @@ public partial class DocumentTests
             "section" => new ExtractionDocumentSection(payload),
             "table" => new ExtractionDocumentTableElement(payload, 1, 1),
             "image" => new ExtractionDocumentImageElement(payload) { Source = new Uri("urn:must-not-mask-unsupported") },
-            _ => new ExtractionDocumentTextElement(new TextContent("initial")) { Content = payload }
+            _ => new CustomElement(payload)
         };
         if (owner != "root")
         {
@@ -352,7 +350,6 @@ public partial class DocumentTests
         }
 
         Assert.Same(payload, owner == "root" ? document.Content : element.Content);
-        Assert.Empty(document.SourceOutputs);
     }
 
     [Theory]
@@ -391,11 +388,10 @@ public partial class DocumentTests
         ExtractionDocumentSection section = new();
         ExtractionDocumentTableElement table = new(null, 1, 2);
         TextContent shared = new("same|payload");
-        ExtractionDocumentTextElement first = new(shared, "first semantic");
-        ExtractionDocumentTextElement second = new(shared, "second semantic");
-        ExtractionDocumentSourceOutput output = new("provider");
-        ExtractionDocumentSourcePage page = new("page", 1, sourceOutput: output);
-        document.AddSourcePage(page);
+        ExtractionDocumentTextElement first = new(shared);
+        ExtractionDocumentTextElement second = new(shared);
+        ExtractionDocumentSourcePage page = new("page", 1);
+        document.SourcePages.Add(page);
         ExtractionDocumentSourceReference reference = new(page);
         first.Sources.Add(reference);
         first.Sources.Add(reference);
@@ -418,15 +414,15 @@ public partial class DocumentTests
         Assert.Same(reference, Assert.Single(firstCell.Sources));
         Assert.Same(reference, Assert.Single(table.Sources));
         Assert.Same(page, Assert.Single(document.SourcePages));
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
-        Assert.Equal("first semantic", first.Text);
-        Assert.Equal("second semantic", second.Text);
+        shared.Text = "changed";
+        Assert.Equal("changed", Assert.IsType<TextContent>(first.Content).Text);
+        Assert.Equal("changed", Assert.IsType<TextContent>(second.Content).Text);
     }
 
     [Fact]
     public void ActualMeaiSerializationAndTextSelection_ConsumeDocumentPayloadsWithoutDocumentWireContract()
     {
-        ExtractionDocumentTextElement text = new(new TextContent("**literal markdown**"), "plain OCR");
+        ExtractionDocumentTextElement text = new(new TextContent("**literal markdown**"));
         ExtractionDocumentImageElement image = new(new DataContent(new byte[] { 1, 2, 3 }, "image/png"), "diagram OCR")
         {
             AlternativeText = "diagram alternative",
@@ -449,9 +445,9 @@ public partial class DocumentTests
         Assert.Same(image.Content, message.Contents[1]);
         Assert.Same(uriPayload, message.Contents[2]);
 
-        // A text-only consumer must select semantic text explicitly; this is not MEDI ingestion acceptance.
-        ChatMessage semantic = new(ChatRole.User, [new TextContent(text.Text!), new TextContent(image.Text!)]);
-        Assert.Equal("plain OCRdiagram OCR", semantic.Text);
+        // Image OCR is independently selected; text payloads need no alternate plain-text view.
+        ChatMessage semantic = new(ChatRole.User, [text.Content!, new TextContent(image.Text!)]);
+        Assert.Equal("**literal markdown**diagram OCR", semantic.Text);
         Assert.DoesNotContain("AQID", semantic.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("urn:", semantic.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("diagram alternative", semantic.Text, StringComparison.Ordinal);

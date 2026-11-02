@@ -21,10 +21,9 @@ public sealed class DelegatingDocumentExtractionClientTests
         using Native opaque = new();
         DocumentExtractionOptions options = new();
         Assert.Null(options.ExtractorName);
-        Assert.False(options.CaptureRawContent);
+        Assert.Null(typeof(DocumentExtractionOptions).GetProperty("CaptureRawContent"));
         Assert.Empty(options.AdditionalProperties);
         options.ExtractorName = "model:A";
-        options.CaptureRawContent = true;
         options.AdditionalProperties.Add("setting", opaque);
         options.AdditionalProperties.Add("Setting", null);
 
@@ -32,7 +31,6 @@ public sealed class DelegatingDocumentExtractionClientTests
         Assert.NotSame(options, copy);
         Assert.NotSame(options.AdditionalProperties, copy.AdditionalProperties);
         Assert.Equal("model:A", copy.ExtractorName);
-        Assert.True(copy.CaptureRawContent);
         Assert.Same(opaque, copy.AdditionalProperties["setting"]);
         Assert.True(copy.AdditionalProperties.TryGetValue("Setting", out object? presentNull));
         Assert.Null(presentNull);
@@ -40,10 +38,8 @@ public sealed class DelegatingDocumentExtractionClientTests
         Assert.False(copy.AdditionalProperties.ContainsKey("SETTING"));
         options.AdditionalProperties.Clear();
         options.ExtractorName = null;
-        options.CaptureRawContent = false;
         Assert.Equal(2, copy.AdditionalProperties.Count);
         Assert.Equal("model:A", copy.ExtractorName);
-        Assert.True(copy.CaptureRawContent);
         copy.AdditionalProperties["setting"] = "replacement";
         Assert.Empty(options.AdditionalProperties);
         Assert.Equal(0, opaque.DisposeCount);
@@ -55,10 +51,9 @@ public sealed class DelegatingDocumentExtractionClientTests
     [InlineData("\t")]
     public void Options_InvalidExtractorDoesNotReplacePriorValue(string invalid)
     {
-        DocumentExtractionOptions options = new() { ExtractorName = "model:A", CaptureRawContent = true };
+        DocumentExtractionOptions options = new() { ExtractorName = "model:A" };
         Assert.Throws<ArgumentException>("value", () => options.ExtractorName = invalid);
         Assert.Equal("model:A", options.ExtractorName);
-        Assert.True(options.CaptureRawContent);
         options.ExtractorName = null;
         Assert.Null(options.ExtractorName);
     }
@@ -70,7 +65,7 @@ public sealed class DelegatingDocumentExtractionClientTests
         using CancellationTokenSource cancellation = new();
         ExtractionDocument expected = new("urn:document");
         ExtractionDocumentSection section = new();
-        section.Elements.Add(new ExtractionDocumentTextElement(new TextContent("**body**"), "plain body", "heading") { HeadingLevel = 3 });
+        section.Elements.Add(new ExtractionDocumentTextElement(new TextContent("**body**"), role: "heading") { HeadingLevel = 3 });
         expected.Sections.Add(section);
         using Client inner = new((_, _, _, _, _) => Task.FromResult(expected));
         using Delegating wrapper = new(inner);
@@ -108,16 +103,14 @@ public sealed class DelegatingDocumentExtractionClientTests
         Assert.True(input.CanRead);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task DelegatingClient_SnapshotsOptionsSynchronouslyWithoutMutatingEitherContainer(bool capture)
+    [Fact]
+    public async Task DelegatingClient_SnapshotsOptionsSynchronouslyWithoutMutatingEitherContainer()
     {
         using MemoryStream input = new([42]);
         using Native opaque = new();
         ExtractionDocument expected = new("document");
         using SemaphoreSlim completion = new(0, 1);
-        DocumentExtractionOptions options = new() { ExtractorName = "model:A", CaptureRawContent = capture };
+        DocumentExtractionOptions options = new() { ExtractorName = "model:A" };
         options.AdditionalProperties.Add("setting", opaque);
         options.AdditionalProperties.Add("Setting", null);
         using Client inner = new(async (_, _, _, _, _) =>
@@ -132,23 +125,18 @@ public sealed class DelegatingDocumentExtractionClientTests
         Assert.NotSame(options, forwarded);
         Assert.NotSame(options.AdditionalProperties, forwarded.AdditionalProperties);
         Assert.Equal("model:A", forwarded.ExtractorName);
-        Assert.Equal(capture, forwarded.CaptureRawContent);
         Assert.Same(opaque, forwarded.AdditionalProperties["setting"]);
         Assert.Null(forwarded.AdditionalProperties["Setting"]);
         Assert.False(forwarded.AdditionalProperties.ContainsKey("SETTING"));
         Assert.False(pending.IsCompleted);
 
         options.ExtractorName = "caller:B";
-        options.CaptureRawContent = !capture;
         options.AdditionalProperties.Clear();
         Assert.Equal("model:A", forwarded.ExtractorName);
-        Assert.Equal(capture, forwarded.CaptureRawContent);
         Assert.Equal(2, forwarded.AdditionalProperties.Count);
         forwarded.ExtractorName = "provider:C";
-        forwarded.CaptureRawContent = !capture;
         forwarded.AdditionalProperties.Clear();
         Assert.Equal("caller:B", options.ExtractorName);
-        Assert.Equal(!capture, options.CaptureRawContent);
         Assert.Empty(options.AdditionalProperties);
         completion.Release();
         Assert.Same(expected, await pending);

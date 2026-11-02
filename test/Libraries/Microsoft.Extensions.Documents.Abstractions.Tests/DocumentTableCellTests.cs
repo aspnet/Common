@@ -75,7 +75,7 @@ public class DocumentTableCellTests
         ExtractionDocument document = new("cell-roles", null);
         ExtractionDocumentSection section = new(null);
         ExtractionDocumentTableElement table = new(null, 1, 2);
-        ExtractionDocumentTextElement text = new(new TextContent("cell"), "plain cell");
+        ExtractionDocumentTextElement text = new(new TextContent("cell"));
         ExtractionDocumentTableCell content = new(text, role: role);
         ExtractionDocumentTableCell empty = new(role: role);
         table.Cells[0, 0] = content;
@@ -90,7 +90,7 @@ public class DocumentTableCellTests
         Assert.Same(text, content.Content);
         Assert.Null(empty.Content);
         Assert.Equal(new ExtractionDocumentTableCell?[] { content, empty }, table.Cells);
-        Assert.Equal("plain cell", text.Text);
+        Assert.Equal("cell", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Equal("cell", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Null(table.Content);
         Assert.Null(document.Content);
@@ -102,11 +102,11 @@ public class DocumentTableCellTests
     [InlineData("\t\r\n")]
     public void Constructors_RejectWhitespaceRolesWithoutAttachingContent(string role)
     {
-        ExtractionDocumentTextElement text = new(new TextContent("cell"), "plain cell");
+        ExtractionDocumentTextElement text = new(new TextContent("cell"));
 
         Assert.Throws<ArgumentException>(nameof(role), () => new ExtractionDocumentTableCell(text, role: role));
         Assert.Throws<ArgumentException>(nameof(role), () => new ExtractionDocumentTableCell(role: role));
-        Assert.Equal("plain cell", text.Text);
+        Assert.Equal("cell", Assert.IsType<TextContent>(text.Content).Text);
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public class DocumentTableCellTests
         ExtractionDocumentTableElement table = new(null, 3, 3);
         ExtractionDocumentTableCell empty = new();
         ExtractionDocumentSourcePage page = DocumentAnnotationTestData.PdfPage();
-        document.AddSourcePage(page);
+        document.SourcePages.Add(page);
         empty.Sources.Add(new ExtractionDocumentSourceReference(page, DocumentAnnotationTestData.Polygon()));
         table.Cells[2, 2] = empty;
         section.Elements.Add(table);
@@ -153,12 +153,11 @@ public class DocumentTableCellTests
     public void CellFrames_ResolveMultipleCoordinateSystemsAfterTableReparenting()
     {
         ExtractionDocument document = new("multi-frame-cell");
-        ExtractionDocumentSourceOutput output = new("operation-A");
-        ExtractionDocumentSourcePage pdf = DocumentAnnotationTestData.PdfPage(output);
+        ExtractionDocumentSourcePage pdf = DocumentAnnotationTestData.PdfPage();
         ExtractionDocumentSourcePage raster = new("raster-frame", 7, new ExtractionDocumentPageDimensions(400, 200),
-            ExtractionDocumentCoordinateUnit.Pixel, ExtractionDocumentCoordinateOrigin.TopLeft, output);
-        document.AddSourcePage(pdf);
-        document.AddSourcePage(raster);
+            ExtractionDocumentCoordinateUnit.Pixel, ExtractionDocumentCoordinateOrigin.TopLeft);
+        document.SourcePages.Add(pdf);
+        document.SourcePages.Add(raster);
         ExtractionDocumentPoint[] rasterPolygon =
         [
             new(20.5, 159), new(81.5, 163.5), new(89, 79.75), new(25.75, 82.5), new(17, 129.5)
@@ -166,7 +165,7 @@ public class DocumentTableCellTests
         ExtractionDocumentTableCell empty = new();
         empty.Sources.Add(new ExtractionDocumentSourceReference(pdf, DocumentAnnotationTestData.Polygon()));
         empty.Sources.Add(new ExtractionDocumentSourceReference(raster, rasterPolygon));
-        ExtractionDocumentTextElement text = new(new TextContent("lO0  ??"), "lO0  ??");
+        ExtractionDocumentTextElement text = new(new TextContent("lO0  ??"));
         ExtractionDocumentTableCell ordinary = new(text);
         document.Metadata["vendor unknown margin"] = -12.5;
         ExtractionDocumentTableElement table = new(null, 1, 3);
@@ -181,7 +180,6 @@ public class DocumentTableCellTests
         document.Sections.Add(second);
 
         Assert.Equal(new[] { pdf, raster }, document.SourcePages);
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
 
         Assert.True(first.Elements.Remove(table));
         Assert.Equal(new[] { pdf, raster }, document.SourcePages);
@@ -206,12 +204,8 @@ public class DocumentTableCellTests
         Assert.Equal(ExtractionDocumentCoordinateOrigin.BottomLeft, sources[0].Page.CoordinateOrigin);
         Assert.Equal(ExtractionDocumentCoordinateUnit.Pixel, sources[1].Page.CoordinateUnit);
         Assert.Equal(ExtractionDocumentCoordinateOrigin.TopLeft, sources[1].Page.CoordinateOrigin);
-        Assert.Same(output, sources[0].Page.SourceOutput);
-        Assert.Same(output, sources[1].Page.SourceOutput);
-        Assert.Same(output, Assert.Single(document.SourceOutputs));
         Assert.Empty(table.Cells.GetCoveringCell(0, 2)!.Content!.Sources);
         Assert.Equal(-12.5, document.Metadata["vendor unknown margin"]);
-        Assert.Equal("lO0  ??", text.Text);
         Assert.Equal("lO0  ??", Assert.IsType<TextContent>(text.Content).Text);
         Assert.Null(table.Content);
     }

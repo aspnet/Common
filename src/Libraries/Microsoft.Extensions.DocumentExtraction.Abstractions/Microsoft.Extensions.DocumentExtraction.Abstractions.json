@@ -52,10 +52,6 @@
           "Stage": "Experimental"
         },
         {
-          "Member": "bool Microsoft.Extensions.DocumentExtraction.DocumentExtractionOptions.CaptureRawContent { get; set; }",
-          "Stage": "Experimental"
-        },
-        {
           "Member": "string? Microsoft.Extensions.DocumentExtraction.DocumentExtractionOptions.ExtractorName { get; set; }",
           "Stage": "Experimental"
         }

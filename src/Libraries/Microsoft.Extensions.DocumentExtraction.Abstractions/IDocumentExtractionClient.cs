@@ -16,13 +16,10 @@ namespace Microsoft.Extensions.DocumentExtraction;
 /// Implementations do not own or dispose the source stream. They must snapshot per-call options before
 /// asynchronous work, honor cancellation, and release provider resources
 /// on failure or cancellation. Cleanup failures must not replace the primary error.
-/// The returned document is data and requires no disposal. Retained original response content must be
-/// detached into managed bytes before provider responses, parsers, and temporary streams are released.
-/// Providers register source frames and operations explicitly, including operations producing no sections.
-/// Native result and source-reference objects are borrowed and may be exposed regardless of content capture.
-/// Original response content is retained only when <see cref="DocumentExtractionOptions.CaptureRawContent"/> is enabled.
-/// Providers must document unsupported explicit settings separately from response content that is legitimately
-/// unavailable. Enabling capture must not synthesize response bytes by serializing mapped objects.
+/// The returned document is data and requires no disposal. Providers explicitly populate source frames,
+/// including blank frames. Optional native document, payload and source-reference objects remain borrowed;
+/// they are not implicitly disposed or deep-cloned. The shared contract does not guarantee original HTTP
+/// bytes, response-content retention or durable serialization.
 /// </remarks>
 public interface IDocumentExtractionClient : IDisposable
 {

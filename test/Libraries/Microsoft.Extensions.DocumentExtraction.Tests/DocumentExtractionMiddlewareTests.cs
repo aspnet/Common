@@ -246,10 +246,7 @@ public sealed class DocumentExtractionMiddlewareTests
         using MemoryStream input = new([42]);
         using Native native = new();
         using CountingStream body = new(OriginalBytes());
-        ExtractionDocumentArtifact artifact = new("application/json", body.ToArray());
-        ExtractionDocumentSourceOutput output = new("operation", native, artifact);
-        ExtractionDocument expected = new("secret/path");
-        expected.AddSourceOutput(output);
+        ExtractionDocument expected = new("secret/path") { RawRepresentation = new { Native = native, Body = body } };
         ExtractionDocumentSection section = new();
         section.Elements.Add(new ExtractionDocumentImageElement(new TextContent("visible **text**"), "visible text"));
         expected.Sections.Add(section);
@@ -264,7 +261,7 @@ public sealed class DocumentExtractionMiddlewareTests
         };
         FakeLogCollector logs = new();
         using LoggingDocumentExtractionClient client = new(inner, new FakeLogger(logs));
-        DocumentExtractionOptions options = new() { ExtractorName = "OPTIONS_ONLY_93", CaptureRawContent = true };
+        DocumentExtractionOptions options = new() { ExtractorName = "OPTIONS_ONLY_93" };
         options.AdditionalProperties.Add("native", native);
         Task<ExtractionDocument> pending = client.ExtractAsync(input, "secret/path", "application/pdf", options);
         Assert.False(pending.IsCompleted);
@@ -275,7 +272,6 @@ public sealed class DocumentExtractionMiddlewareTests
 
         Assert.Same(expected, actual);
         Assert.Equal("visible **text**", Assert.IsType<TextContent>(Assert.Single(actual.EnumerateContent()).Content).Text);
-        Assert.Same(output, Assert.Single(actual.SourceOutputs));
         Assert.Equal(OriginalBytes(), body.ToArray());
         AssertLifecycle(logs, "completed");
         client.Dispose();
@@ -283,7 +279,6 @@ public sealed class DocumentExtractionMiddlewareTests
         Assert.Equal(0, body.DisposeCount);
         body.Dispose();
         Assert.Equal(1, body.DisposeCount);
-        Assert.Equal(OriginalBytes(), artifact.Content.ToArray());
         Assert.Equal(0, native.DisposeCount);
         Assert.Equal(0, native.ToStringCount);
         Assert.Equal(42, input.ReadByte());
@@ -322,10 +317,8 @@ public sealed class DocumentExtractionMiddlewareTests
         Assert.Equal(42, input.ReadByte());
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Logging_SnapshotsOptionsBeforeReturningWithoutMutatingCaller(bool capture)
+    [Fact]
+    public async Task Logging_SnapshotsOptionsBeforeReturningWithoutMutatingCaller()
     {
         using MemoryStream input = new([42]);
         using Native native = new();
@@ -342,28 +335,24 @@ public sealed class DocumentExtractionMiddlewareTests
         };
         FakeLogCollector logs = new();
         using LoggingDocumentExtractionClient client = new(inner, new FakeLogger(logs));
-        DocumentExtractionOptions options = new() { ExtractorName = "OPTIONS_ONLY_93", CaptureRawContent = capture };
+        DocumentExtractionOptions options = new() { ExtractorName = "OPTIONS_ONLY_93" };
         options.AdditionalProperties.Add("native", native);
         Task<ExtractionDocument> pending = client.ExtractAsync(input, "secret/path", "application/pdf", options, cancellation.Token);
         DocumentExtractionOptions forwarded = Assert.IsType<DocumentExtractionOptions>(inner.Options);
         Assert.NotSame(options, forwarded);
         Assert.NotSame(options.AdditionalProperties, forwarded.AdditionalProperties);
         Assert.Equal("OPTIONS_ONLY_93", forwarded.ExtractorName);
-        Assert.Equal(capture, forwarded.CaptureRawContent);
         Assert.Same(native, forwarded.AdditionalProperties["native"]);
         Assert.Same(input, inner.Source);
         Assert.Equal("secret/path", inner.Identifier);
         Assert.Equal("application/pdf", inner.MediaType);
         Assert.Equal(cancellation.Token, inner.Token);
         options.ExtractorName = "caller changed";
-        options.CaptureRawContent = !capture;
         options.AdditionalProperties.Clear();
         Assert.Equal("OPTIONS_ONLY_93", forwarded.ExtractorName);
-        Assert.Equal(capture, forwarded.CaptureRawContent);
         forwarded.ExtractorName = "provider changed";
         forwarded.AdditionalProperties.Clear();
         Assert.Equal("caller changed", options.ExtractorName);
-        Assert.Equal(!capture, options.CaptureRawContent);
         Assert.Empty(options.AdditionalProperties);
         gate.Release();
         Assert.Same(expected, await pending);
@@ -374,19 +363,18 @@ public sealed class DocumentExtractionMiddlewareTests
     }
 
     [Fact]
-    public async Task Logging_DefaultOffNativeSourcesPreserveIdentityWithoutLeaks()
+    public async Task Logging_NativeRootAndSourcesPreserveIdentityWithoutLeaks()
     {
         using MemoryStream input = new([42]);
         using Native native = new();
-        ExtractionDocument expected = new("document");
-        ExtractionDocumentSourceOutput output = new("operation", native, contentCaptureDisabled: true);
-        ExtractionDocumentSourceReference reference = new(new ExtractionDocumentSourcePage("frame", 7, sourceOutput: output), rawRepresentation: native);
+        ExtractionDocument expected = new("document") { RawRepresentation = native };
+        ExtractionDocumentSourceReference reference = new(new ExtractionDocumentSourcePage("frame", 7), rawRepresentation: native);
         ExtractionDocumentImageElement image = new(new TextContent("visible **text**"), "visible text");
         image.Sources.Add(reference);
         ExtractionDocumentSection section = new();
         section.Elements.Add(image);
         expected.Sections.Add(section);
-        expected.AddSourcePage(reference.Page);
+        expected.SourcePages.Add(reference.Page);
         using TestClient inner = new(expected);
         FakeLogCollector logs = new();
         using LoggingDocumentExtractionClient client = new(inner, new FakeLogger(logs));
@@ -395,12 +383,9 @@ public sealed class DocumentExtractionMiddlewareTests
 
         Assert.Same(expected, actual);
         Assert.Null(inner.Options);
-        Assert.Same(output, Assert.Single(actual.SourceOutputs));
         Assert.Same(reference, Assert.Single(image.Sources));
         Assert.Same(native, reference.GetRawRepresentation());
-        Assert.Same(native, output.GetRawRepresentation());
-        Assert.Equal(ExtractionDocumentRawContentStatus.Disabled, output.ContentStatus);
-        Assert.Null(output.GetRawContent());
+        Assert.Same(native, actual.RawRepresentation);
         Assert.Same(image, Assert.Single(actual.EnumerateContent()));
         Assert.Equal("visible **text**", Assert.IsType<TextContent>(image.Content).Text);
         AssertLifecycle(logs, "completed");
@@ -410,34 +395,25 @@ public sealed class DocumentExtractionMiddlewareTests
     }
 
     [Fact]
-    public async Task Logging_CompletionLogFailurePreservesPrimaryAndDetachedData()
+    public async Task Logging_CompletionLogFailurePreservesPrimaryAndBorrowedData()
     {
         using MemoryStream input = new([42]);
         using Native native = new();
         IOException logFailure = new("completion logger failed");
-        ExtractionDocumentArtifact firstBody = new("application/json", OriginalBytes());
-        ExtractionDocumentArtifact middleBody = new("application/json", new byte[] { 17, 23 });
-        ExtractionDocumentArtifact lastBody = new("application/json", new byte[] { 31, 37 });
-        ExtractionDocument unreturned = new("secret/path");
-        unreturned.AddSourceOutput(new("first", native, firstBody));
-        unreturned.AddSourceOutput(new("middle", rawContent: middleBody));
-        unreturned.AddSourceOutput(new("last", rawContent: lastBody));
+        ExtractionDocument unreturned = new("secret/path") { RawRepresentation = native };
         using TestClient inner = new(unreturned);
         ThrowingLogger logger = new("Document extraction completed.", logFailure);
         using LoggingDocumentExtractionClient client = new(inner, logger);
 
         Exception actual = await Assert.ThrowsAnyAsync<Exception>(() =>
-            client.ExtractAsync(input, "secret/path", "application/pdf", new DocumentExtractionOptions { CaptureRawContent = true }));
+            client.ExtractAsync(input, "secret/path", "application/pdf", new DocumentExtractionOptions { }));
 
         Assert.Same(logFailure, actual);
+        Assert.Same(native, unreturned.RawRepresentation);
 
         Assert.Equal(new[] { "Document extraction invoked.", "Document extraction completed." }, logger.Messages);
         Assert.Equal(1, inner.CallCount);
-        Assert.Equal(OriginalBytes(), firstBody.Content.ToArray());
-        Assert.Equal(new byte[] { 17, 23 }, middleBody.Content.ToArray());
-        Assert.Equal(new byte[] { 31, 37 }, lastBody.Content.ToArray());
         client.Dispose();
-        Assert.Equal(3, unreturned.SourceOutputs.Count);
         Assert.Equal(0, native.DisposeCount);
         Assert.Equal(0, native.ToStringCount);
         Assert.Equal(42, input.ReadByte());

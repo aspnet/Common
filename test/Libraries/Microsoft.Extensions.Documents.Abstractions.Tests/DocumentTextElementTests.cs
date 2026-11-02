@@ -11,13 +11,12 @@ namespace Microsoft.Extensions.Documents.Tests;
 public class DocumentTextElementTests
 {
     [Fact]
-    public void StoresRolePayloadAndSemanticText()
+    public void StoresRoleAndAuthoritativePayload()
     {
-        ExtractionDocumentTextElement element = new(new TextContent("stored markdown"), "plain text", "pageFooter");
+        ExtractionDocumentTextElement element = new(new TextContent("stored markdown"), role: "pageFooter");
 
         Assert.Equal("pageFooter", element.Role);
         Assert.Equal("stored markdown", Assert.IsType<TextContent>(element.Content).Text);
-        Assert.Equal("plain text", element.Text);
     }
 
     [Theory]
@@ -32,9 +31,9 @@ public class DocumentTextElementTests
     {
         ExtractionDocument document = new("role", null);
         ExtractionDocumentSection section = new(null);
-        ExtractionDocumentTextElement element = new(new TextContent("**citation** [1]"), "citation [1]", role);
+        ExtractionDocumentTextElement element = new(new TextContent("**citation** [1]"), role: role);
         ExtractionDocumentSourcePage page = new("citation-page", 7);
-        document.AddSourcePage(page);
+        document.SourcePages.Add(page);
         ExtractionDocumentSourceReference citation = new(page, DocumentAnnotationTestData.Polygon());
         element.Sources.Add(citation);
         section.Elements.Add(element);
@@ -43,7 +42,6 @@ public class DocumentTextElementTests
         Assert.Equal(role, element.Role);
         Assert.Null(element.HeadingLevel);
         Assert.Equal("**citation** [1]", Assert.IsType<TextContent>(element.Content).Text);
-        Assert.Equal("citation [1]", element.Text);
         Assert.Null(document.Content);
         Assert.Same(citation, Assert.Single(element.Sources));
         Assert.Same(page, Assert.Single(document.SourcePages));
@@ -86,7 +84,9 @@ public class DocumentTextElementTests
     [InlineData(8)]
     [InlineData(9)]
     [InlineData(10)]
-    public void HeadingLevel_AcceptsOneThroughTen(int level)
+    [InlineData(11)]
+    [InlineData(int.MaxValue)]
+    public void HeadingLevel_AcceptsPositiveValues(int level)
     {
         ExtractionDocumentTextElement element = new(new TextContent("header"), role: "heading")
         {
@@ -98,8 +98,9 @@ public class DocumentTextElementTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(11)]
-    public void HeadingLevel_RejectsZeroAndEleven(int level)
+    [InlineData(-1)]
+    [InlineData(int.MinValue)]
+    public void HeadingLevel_RejectsNonpositiveValues(int level)
     {
         ExtractionDocumentTextElement element = new(new TextContent("header"), role: "heading")
         {
