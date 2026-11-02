@@ -15,7 +15,7 @@ namespace Microsoft.Extensions.DataIngestion;
 
 internal static class MarkdownParser
 {
-    internal static ExtractionDocument Parse(string markdown, string identifier)
+    internal static IngestionDocument Parse(string markdown, string identifier)
     {
         _ = Throw.IfNullOrEmpty(markdown);
         _ = Throw.IfNullOrEmpty(identifier);
@@ -36,10 +36,10 @@ internal static class MarkdownParser
         => cancellationToken.IsCancellationRequested ? System.Threading.Tasks.Task.FromCanceled<string>(cancellationToken) : reader.ReadToEndAsync();
 #endif
 
-    private static ExtractionDocument Map(MarkdownDocument markdownDocument, string documentMarkdown, string identifier)
+    private static IngestionDocument Map(MarkdownDocument markdownDocument, string documentMarkdown, string identifier)
     {
         ExtractionDocumentSection rootSection = new();
-        ExtractionDocument result = new(identifier)
+        IngestionDocument result = new(identifier)
         {
             Sections = { rootSection }
         };

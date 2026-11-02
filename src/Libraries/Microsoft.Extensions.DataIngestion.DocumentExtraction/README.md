@@ -7,9 +7,10 @@ using Microsoft.Extensions.DataIngestion;
 using Microsoft.Extensions.Documents;
 
 IngestionDocumentReader reader = new DocumentExtractionReader(extractionClient, extractionOptions);
-ExtractionDocument document = await reader.ReadAsync(stream, "document-id", "application/pdf", cancellationToken);
+IngestionDocument document = await reader.ReadAsync(stream, "document-id", "application/pdf", cancellationToken);
+ExtractionDocument extracted = document.ExtractedDocument;
 ```
 
-`DocumentExtractionReader` returns the exact shared document supplied by `IDocumentExtractionClient`. It does not stringify, render, or reparse the result. Nested sections, table cells, local payloads, source pages/polygons, and source references retain their identity, as does optional document `RawRepresentation`.
+`DocumentExtractionReader` creates an `IngestionDocument` envelope using the requested ingestion identifier. `ExtractedDocument` is the exact shared document supplied by `IDocumentExtractionClient`, not a copy. Its producer identifier can differ from the ingestion persistence key, and neither is rewritten. The reader does not stringify, render, or reparse the result. Nested sections, table cells, local payloads, source pages/polygons, source references, and optional `ExtractedDocument.RawRepresentation` retain their identity.
 
 The reader borrows the client and input stream. It snapshots options at construction and again for each call, and passes cancellation to extraction. Returned documents are non-disposable. Extraction clients remain responsible for detaching returned payload bytes before releasing provider resources. Native objects remain borrowed for explicit inspection; the bridge does not dispose them or capture raw response artifacts. Shared options have no raw-content capture switch.

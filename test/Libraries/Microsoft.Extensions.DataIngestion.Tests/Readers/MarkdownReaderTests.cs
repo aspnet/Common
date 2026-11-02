@@ -17,7 +17,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
     [Fact]
     public async Task PreservesRawMarkdownHeadingFooterAndExplicitTableHeaderRoles()
     {
-        ExtractionDocument document = await ReadAsync("""
+        IngestionDocument document = await ReadAsync("""
             ## **Actual heading**
 
             A *formatted* paragraph.
@@ -80,7 +80,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         | Emissions Review | Dec 2029 | All | 25% Emissions Cut |
         """;
 
-        ExtractionDocument document = await ReadAsync(markdownContent);
+        IngestionDocument document = await ReadAsync(markdownContent);
 
         ExtractionDocumentTableElement documentTable = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTableElement>());
         Assert.Equal(5, documentTable.Cells.RowCount);
@@ -125,7 +125,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         | READYTORUN_FLAG_PLATFORM_NATIVE_IMAGE      | 0x00000100 | The owning composite executable is in the platform native format
         """;
 
-        ExtractionDocument document = await ReadAsync(markdownContent);
+        IngestionDocument document = await ReadAsync(markdownContent);
 
         ExtractionDocumentTableElement documentTable = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTableElement>());
         Assert.Equal(10, documentTable.Cells.RowCount); // 10 rows (1 header + 9 data rows)
@@ -171,7 +171,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         ![Three](data:{contentType3};base64,{Convert.ToBase64String(imageBytes3)})
         """;
 
-        ExtractionDocument document = await ReadAsync(markdownContent);
+        IngestionDocument document = await ReadAsync(markdownContent);
 
         Assert.NotNull(document);
         var images = document.EnumerateContent().OfType<ExtractionDocumentImageElement>().ToArray();
@@ -206,7 +206,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         ![Logo](https://example.com/logo.png)
         """;
 
-        ExtractionDocument document = await ReadAsync(markdownContent);
+        IngestionDocument document = await ReadAsync(markdownContent);
 
         Assert.NotNull(document);
         var images = document.EnumerateContent().OfType<ExtractionDocumentImageElement>().ToArray();
@@ -242,7 +242,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         | 2020-2025 | ![Latest logo](data:image/png;base64,{Convert.ToBase64String(imageBytes)}) |
         """;
 
-        ExtractionDocument document = await ReadAsync(markdownContent);
+        IngestionDocument document = await ReadAsync(markdownContent);
 
         var table = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTableElement>());
         Assert.Equal(2, table.Cells.RowCount);
@@ -267,7 +267,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
     {
         string markdownContent = "This has <sup>[1]</sup> inline HTML.";
 
-        ExtractionDocument document = await ReadAsync(markdownContent);
+        IngestionDocument document = await ReadAsync(markdownContent);
 
         var paragraph = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTextElement>(), element => element.Role is null);
         Assert.Equal(markdownContent, Assert.IsType<TextContent>(paragraph.Content).Text);
@@ -281,14 +281,14 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         Text with <strong>bold</strong>, <em>italic</em>, <sub>subscript</sub>, and <sup>superscript</sup> tags.
         """;
 
-        ExtractionDocument document = await ReadAsync(markdownContent);
+        IngestionDocument document = await ReadAsync(markdownContent);
 
         var paragraph = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTextElement>(), element => element.Role is null);
         Assert.Equal(markdownContent, Assert.IsType<TextContent>(paragraph.Content).Text);
         Assert.Null(paragraph.Role);
     }
 
-    private async Task<ExtractionDocument> ReadAsync(string content)
+    private async Task<IngestionDocument> ReadAsync(string content)
     {
         using MemoryStream stream = new(System.Text.Encoding.UTF8.GetBytes(content));
         return await CreateDocumentReader().ReadAsync(stream, "id", "text/markdown");

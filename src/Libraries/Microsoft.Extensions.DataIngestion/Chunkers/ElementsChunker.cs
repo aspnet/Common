@@ -23,7 +23,7 @@ internal sealed class ElementsChunker
     }
 
     internal IEnumerable<IngestionChunk> Process(
-        ExtractionDocument document, string context, List<ExtractionDocumentElement> elements,
+        IngestionDocument document, string context, List<ExtractionDocumentElement> elements,
         IReadOnlyList<ExtractionDocumentElement>? contextElements = null, string? localContent = null,
         IReadOnlyDictionary<ExtractionDocumentElement, IReadOnlyList<ExtractionDocumentElement>>? elementSources = null)
     {

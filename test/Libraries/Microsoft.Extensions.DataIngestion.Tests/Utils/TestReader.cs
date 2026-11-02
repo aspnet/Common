@@ -5,19 +5,18 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Documents;
 
 namespace Microsoft.Extensions.DataIngestion;
 
 internal sealed class TestReader : IngestionDocumentReader
 {
-    public TestReader(Func<Stream, string, string, CancellationToken, Task<ExtractionDocument>> readAsyncCallback)
+    public TestReader(Func<Stream, string, string, CancellationToken, Task<IngestionDocument>> readAsyncCallback)
     {
         ReadAsyncCallback = readAsyncCallback;
     }
 
-    public Func<Stream, string, string, CancellationToken, Task<ExtractionDocument>> ReadAsyncCallback { get; }
+    public Func<Stream, string, string, CancellationToken, Task<IngestionDocument>> ReadAsyncCallback { get; }
 
-    public override Task<ExtractionDocument> ReadAsync(Stream source, string identifier, string mediaType, CancellationToken cancellationToken = default)
+    public override Task<IngestionDocument> ReadAsync(Stream source, string identifier, string mediaType, CancellationToken cancellationToken = default)
         => ReadAsyncCallback(source, identifier, mediaType, cancellationToken);
 }

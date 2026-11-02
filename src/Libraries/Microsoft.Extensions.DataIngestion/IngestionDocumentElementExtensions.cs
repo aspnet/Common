@@ -22,9 +22,9 @@ internal static class IngestionDocumentElementExtensions
     internal static string GetSemanticRow(ExtractionDocumentTableElement table, int row)
         => GetSemanticRow(table, row, [table]);
 
-    internal static IEnumerable<(ExtractionDocumentElement? Element, string? Content, IReadOnlyList<ExtractionDocumentElement> Sources)> EnumerateSemanticContent(ExtractionDocument document)
+    internal static IEnumerable<(ExtractionDocumentElement? Element, string? Content, IReadOnlyList<ExtractionDocumentElement> Sources)> EnumerateSemanticContent(IngestionDocument document)
     {
-        yield return (null, GetSemanticContent(document.Content), Array.Empty<ExtractionDocumentElement>());
+        yield return (null, GetSemanticContent(document.ExtractedDocument.Content), Array.Empty<ExtractionDocumentElement>());
         foreach (ExtractionDocumentSection section in document.Sections)
         {
             foreach (var item in EnumerateSectionContent(section, [], []))

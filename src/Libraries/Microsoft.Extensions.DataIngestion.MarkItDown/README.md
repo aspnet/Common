@@ -2,6 +2,8 @@
 
 Provides an implementation of the `IngestionDocumentReader` class for the [MarkItDown](https://github.com/microsoft/markitdown/) utility.
 
+Both readers return an `IngestionDocument` envelope. Its `ExtractedDocument` owns the shared document graph; `Sections` forwards the exact shared list. Markdown conversion populates shared text, section, table-cell, and image primitives rather than a separate ingestion element hierarchy. The envelope retains the requested ingestion persistence key.
+
 ## Install the package
 
 From the command-line:

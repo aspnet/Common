@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Documents;
 using Xunit;
 
 namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
@@ -27,7 +26,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task EmptyDocument()
         {
-            ExtractionDocument emptyDoc = new("emptyDoc");
+            IngestionDocument emptyDoc = new("emptyDoc");
             IngestionChunker chunker = CreateDocumentChunker();
 
             IReadOnlyList<IngestionChunk> chunks = await chunker.ProcessAsync(emptyDoc).ToListAsync();

@@ -30,7 +30,7 @@
           "Stage": "Stable"
         },
         {
-          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.Chunkers.DocumentTokenChunker.ProcessAsync(Microsoft.Extensions.Documents.ExtractionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.Chunkers.DocumentTokenChunker.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
           "Stage": "Stable"
         }
       ]
@@ -82,7 +82,7 @@
           "Stage": "Stable"
         },
         {
-          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.HeaderChunker.ProcessAsync(Microsoft.Extensions.Documents.ExtractionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.HeaderChunker.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
           "Stage": "Stable"
         }
       ]
@@ -96,7 +96,7 @@
           "Stage": "Stable"
         },
         {
-          "Member": "override System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DataIngestion.ImageAlternativeTextEnricher.ProcessAsync(Microsoft.Extensions.Documents.ExtractionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Member": "override System.Threading.Tasks.Task<Microsoft.Extensions.DataIngestion.IngestionDocument> Microsoft.Extensions.DataIngestion.ImageAlternativeTextEnricher.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
           "Stage": "Stable"
         }
       ]
@@ -178,7 +178,7 @@
           "Stage": "Stable"
         },
         {
-          "Member": "System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DataIngestion.IngestionPipeline.ProcessAsync(Microsoft.Extensions.Documents.ExtractionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Member": "System.Threading.Tasks.Task<Microsoft.Extensions.DataIngestion.IngestionDocument> Microsoft.Extensions.DataIngestion.IngestionPipeline.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
           "Stage": "Stable"
         },
         {
@@ -192,11 +192,11 @@
       ],
       "Properties": [
         {
-          "Member": "System.Collections.Generic.IList<Microsoft.Extensions.DataIngestion.IngestionChunkProcessor> Microsoft.Extensions.DataIngestion.IngestionPipeline.ChunkProcessors { get; }",
+          "Member": "System.Collections.Generic.List<Microsoft.Extensions.DataIngestion.IngestionChunkProcessor> Microsoft.Extensions.DataIngestion.IngestionPipeline.ChunkProcessors { get; }",
           "Stage": "Stable"
         },
         {
-          "Member": "System.Collections.Generic.IList<Microsoft.Extensions.DataIngestion.IngestionDocumentProcessor> Microsoft.Extensions.DataIngestion.IngestionPipeline.DocumentProcessors { get; }",
+          "Member": "System.Collections.Generic.List<Microsoft.Extensions.DataIngestion.IngestionDocumentProcessor> Microsoft.Extensions.DataIngestion.IngestionPipeline.DocumentProcessors { get; }",
           "Stage": "Stable"
         }
       ]
@@ -222,7 +222,7 @@
       "Stage": "Stable",
       "Properties": [
         {
-          "Member": "Microsoft.Extensions.Documents.ExtractionDocument? Microsoft.Extensions.DataIngestion.IngestionResult.Document { get; }",
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionDocument? Microsoft.Extensions.DataIngestion.IngestionResult.Document { get; }",
           "Stage": "Stable"
         },
         {
@@ -268,7 +268,7 @@
           "Stage": "Stable"
         },
         {
-          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.Chunkers.SectionChunker.ProcessAsync(Microsoft.Extensions.Documents.ExtractionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.Chunkers.SectionChunker.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
           "Stage": "Stable"
         }
       ]
@@ -282,7 +282,7 @@
           "Stage": "Stable"
         },
         {
-          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.Chunkers.SemanticSimilarityChunker.ProcessAsync(Microsoft.Extensions.Documents.ExtractionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.Chunkers.SemanticSimilarityChunker.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
           "Stage": "Stable"
         }
       ]

@@ -82,7 +82,7 @@ public abstract class DocumentReaderConformanceTests
     {
         using HttpResponseMessage response = await DownloadAsync(new(source));
 
-        ExtractionDocument document = await CreateDocumentReader().ReadAsync(
+        IngestionDocument document = await CreateDocumentReader().ReadAsync(
             await response.Content.ReadAsStreamAsync(),
             source, mediaType: response.Content.Headers.ContentType?.MediaType!);
 
@@ -97,7 +97,7 @@ public abstract class DocumentReaderConformanceTests
 
         try
         {
-            ExtractionDocument document = await CreateDocumentReader().ReadAsync(inputFile);
+            IngestionDocument document = await CreateDocumentReader().ReadAsync(inputFile);
 
             SimpleAsserts(document, inputFile.FullName, inputFile.FullName);
         }
@@ -205,7 +205,7 @@ public abstract class DocumentReaderConformanceTests
         return file;
     }
 
-    protected virtual void SimpleAsserts(ExtractionDocument document, string source, string expectedId)
+    protected virtual void SimpleAsserts(IngestionDocument document, string source, string expectedId)
     {
         Assert.NotNull(document);
         Assert.Equal(expectedId, document.Identifier);

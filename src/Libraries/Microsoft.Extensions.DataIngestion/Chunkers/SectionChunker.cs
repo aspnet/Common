@@ -11,7 +11,7 @@ using Microsoft.Shared.Diagnostics;
 namespace Microsoft.Extensions.DataIngestion.Chunkers;
 
 /// <summary>
-/// Treats each <see cref="ExtractionDocumentSection" /> in a <see cref="ExtractionDocument.Sections"/> as a separate entity.
+/// Treats each <see cref="ExtractionDocumentSection" /> in a <see cref="IngestionDocument.Sections"/> as a separate entity.
 /// </summary>
 public sealed class SectionChunker : IngestionChunker
 {
@@ -27,13 +27,13 @@ public sealed class SectionChunker : IngestionChunker
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<IngestionChunk> ProcessAsync(ExtractionDocument document, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public override async IAsyncEnumerable<IngestionChunk> ProcessAsync(IngestionDocument document, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         _ = Throw.IfNull(document);
 
         List<IngestionChunk> chunks = [];
         foreach (var chunk in _elementsChunker.Process(document, string.Empty, [],
-            localContent: IngestionDocumentElementExtensions.GetSemanticContent(document.Content)))
+            localContent: IngestionDocumentElementExtensions.GetSemanticContent(document.ExtractedDocument.Content)))
         {
             yield return chunk;
         }
@@ -52,7 +52,7 @@ public sealed class SectionChunker : IngestionChunker
         }
     }
 
-    private void Process(ExtractionDocument document, ExtractionDocumentSection section, List<IngestionChunk> chunks,
+    private void Process(IngestionDocument document, ExtractionDocumentSection section, List<IngestionChunk> chunks,
         HashSet<ExtractionDocumentSection> path, string? parentContext = null, IReadOnlyList<ExtractionDocumentElement>? parentSources = null)
     {
         if (section is null || !path.Add(section))

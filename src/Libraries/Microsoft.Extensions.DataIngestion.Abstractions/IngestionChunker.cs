@@ -3,12 +3,11 @@
 
 using System.Collections.Generic;
 using System.Threading;
-using Microsoft.Extensions.Documents;
 
 namespace Microsoft.Extensions.DataIngestion;
 
 /// <summary>
-/// Splits an <see cref="ExtractionDocument"/> into chunks.
+/// Splits an <see cref="IngestionDocument"/> into chunks.
 /// </summary>
 public abstract class IngestionChunker
 {
@@ -18,5 +17,5 @@ public abstract class IngestionChunker
     /// <param name="document">The document to split.</param>
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
     /// <returns>The chunks created from the document.</returns>
-    public abstract IAsyncEnumerable<IngestionChunk> ProcessAsync(ExtractionDocument document, CancellationToken cancellationToken = default);
+    public abstract IAsyncEnumerable<IngestionChunk> ProcessAsync(IngestionDocument document, CancellationToken cancellationToken = default);
 }

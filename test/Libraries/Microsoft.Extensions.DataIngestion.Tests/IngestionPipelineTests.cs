@@ -200,7 +200,7 @@ public sealed class IngestionPipelineTests : IDisposable
         using VectorStoreWriter<IngestionChunkVectorRecord> vectorStoreWriter = new(collection);
 
         // Create a document that explicitly has both text and image elements
-        ExtractionDocument document = new("multi-content-doc");
+        IngestionDocument document = new("multi-content-doc");
         document.Sections.Add(new ExtractionDocumentSection
         {
             Elements =
@@ -272,7 +272,7 @@ public sealed class IngestionPipelineTests : IDisposable
 
     internal class ImageChunker : IngestionChunker
     {
-        public override IAsyncEnumerable<IngestionChunk> ProcessAsync(ExtractionDocument document, CancellationToken cancellationToken = default)
+        public override IAsyncEnumerable<IngestionChunk> ProcessAsync(IngestionDocument document, CancellationToken cancellationToken = default)
             => document.EnumerateContent()
                     .OfType<ExtractionDocumentImageElement>()
                     .Where(image => image.Content is DataContent)
@@ -285,7 +285,7 @@ public sealed class IngestionPipelineTests : IDisposable
 
     internal sealed class MultiContentTypeChunker : IngestionChunker
     {
-        public override IAsyncEnumerable<IngestionChunk> ProcessAsync(ExtractionDocument document, CancellationToken cancellationToken = default)
+        public override IAsyncEnumerable<IngestionChunk> ProcessAsync(IngestionDocument document, CancellationToken cancellationToken = default)
         {
             List<IngestionChunk> chunks = [];
 
@@ -321,7 +321,7 @@ public sealed class IngestionPipelineTests : IDisposable
         MarkdownReader workingReader = new();
         TestReader failingForFirstReader = new(
             (source, identifier, mediaType, cancellationToken) => failed++ == 0
-                    ? Task.FromException<ExtractionDocument>(new ExpectedException())
+                    ? Task.FromException<IngestionDocument>(new ExpectedException())
                     : workingReader.ReadAsync(source, identifier, mediaType, cancellationToken));
 
         List<Activity> activities = [];

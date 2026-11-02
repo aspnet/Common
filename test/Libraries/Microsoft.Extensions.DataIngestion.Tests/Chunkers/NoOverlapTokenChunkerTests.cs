@@ -23,7 +23,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         public async Task TwoChunks()
         {
             string text = string.Join(" ", Enumerable.Repeat("word", 600)); // each word is 1 token
-            ExtractionDocument doc = new ExtractionDocument("twoChunksNoOverlapDoc");
+            IngestionDocument doc = new IngestionDocument("twoChunksNoOverlapDoc");
             doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
@@ -43,7 +43,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         public async Task ManyChunks()
         {
             string text = string.Join(" ", Enumerable.Repeat("word", 1500)); // each word is 1 token
-            ExtractionDocument doc = new ExtractionDocument("smallChunksNoOverlapDoc");
+            IngestionDocument doc = new IngestionDocument("smallChunksNoOverlapDoc");
             doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
@@ -67,7 +67,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         public async Task VerifyTokenCount()
         {
             string text = string.Join(" ", Enumerable.Repeat("word", 600)); // each word is 1 token
-            ExtractionDocument doc = new ExtractionDocument("verifyTokenCountDoc");
+            IngestionDocument doc = new IngestionDocument("verifyTokenCountDoc");
             doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =

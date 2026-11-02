@@ -22,7 +22,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task OneSection()
         {
-            ExtractionDocument doc = new ExtractionDocument("doc");
+            IngestionDocument doc = new IngestionDocument("doc");
             doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
@@ -41,7 +41,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task TwoSections()
         {
-            ExtractionDocument doc = new("doc")
+            IngestionDocument doc = new("doc")
             {
                 Sections =
                 {
@@ -77,7 +77,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task EmptySection()
         {
-            ExtractionDocument doc = new ExtractionDocument("doc");
+            IngestionDocument doc = new IngestionDocument("doc");
             doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements = { }
@@ -90,7 +90,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task NestedSections()
         {
-            ExtractionDocument doc = new("doc")
+            IngestionDocument doc = new("doc")
             {
                 Sections =
                 {
@@ -146,7 +146,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         public async Task SizeLimit_TwoChunks()
         {
             string text = string.Join(" ", Enumerable.Repeat("word", 600)); // each word is 1 token
-            ExtractionDocument doc = new ExtractionDocument("twoChunksNoOverlapDoc");
+            IngestionDocument doc = new IngestionDocument("twoChunksNoOverlapDoc");
             doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
@@ -165,7 +165,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task SectionWithHeader()
         {
-            ExtractionDocument doc = new ExtractionDocument("doc");
+            IngestionDocument doc = new IngestionDocument("doc");
             doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =

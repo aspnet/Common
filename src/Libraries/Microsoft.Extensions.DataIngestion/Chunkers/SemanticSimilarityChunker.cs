@@ -14,7 +14,7 @@ using Microsoft.Shared.Diagnostics;
 namespace Microsoft.Extensions.DataIngestion.Chunkers;
 
 /// <summary>
-/// Splits a <see cref="ExtractionDocument"/> into chunks based on semantic similarity between its elements based on cosine distance of their embeddings.
+/// Splits a <see cref="IngestionDocument"/> into chunks based on semantic similarity between its elements based on cosine distance of their embeddings.
 /// </summary>
 public sealed class SemanticSimilarityChunker : IngestionChunker
 {
@@ -45,13 +45,13 @@ public sealed class SemanticSimilarityChunker : IngestionChunker
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<IngestionChunk> ProcessAsync(ExtractionDocument document,
+    public override async IAsyncEnumerable<IngestionChunk> ProcessAsync(IngestionDocument document,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         _ = Throw.IfNull(document);
 
         foreach (var chunk in _elementsChunker.Process(document, string.Empty, [],
-            localContent: IngestionDocumentElementExtensions.GetSemanticContent(document.Content)))
+            localContent: IngestionDocumentElementExtensions.GetSemanticContent(document.ExtractedDocument.Content)))
         {
             yield return chunk;
         }
@@ -65,7 +65,7 @@ public sealed class SemanticSimilarityChunker : IngestionChunker
     }
 
     private async Task<List<(ExtractionDocumentElement element, float distance)>> CalculateDistancesAsync(
-        ExtractionDocument document, Dictionary<ExtractionDocumentElement, IReadOnlyList<ExtractionDocumentElement>> sources, CancellationToken cancellationToken)
+        IngestionDocument document, Dictionary<ExtractionDocumentElement, IReadOnlyList<ExtractionDocumentElement>> sources, CancellationToken cancellationToken)
     {
         List<(ExtractionDocumentElement element, float distance)> elementDistances = [];
         List<TextContent> semanticContents = [];
@@ -101,7 +101,7 @@ public sealed class SemanticSimilarityChunker : IngestionChunker
         return elementDistances;
     }
 
-    private IEnumerable<IngestionChunk> MakeChunks(ExtractionDocument document, List<(ExtractionDocumentElement element, float distance)> elementDistances,
+    private IEnumerable<IngestionChunk> MakeChunks(IngestionDocument document, List<(ExtractionDocumentElement element, float distance)> elementDistances,
         IReadOnlyDictionary<ExtractionDocumentElement, IReadOnlyList<ExtractionDocumentElement>> sources)
     {
         float distanceThreshold = Percentile(elementDistances);

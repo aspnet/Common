@@ -20,7 +20,7 @@ public class HeaderChunkerTests : DocumentChunkerTests
     [Fact]
     public async Task CanChunkNonTrivialDocument()
     {
-        ExtractionDocument doc = new("nonTrivial");
+        IngestionDocument doc = new("nonTrivial");
         doc.Sections.Add(new()
         {
             Elements =
@@ -61,7 +61,7 @@ public class HeaderChunkerTests : DocumentChunkerTests
     [Fact]
     public async Task CanRespectTokenLimit()
     {
-        ExtractionDocument doc = new("longOne");
+        IngestionDocument doc = new("longOne");
         doc.Sections.Add(new()
         {
             Elements =
@@ -87,7 +87,7 @@ public class HeaderChunkerTests : DocumentChunkerTests
     [Fact]
     public async Task ThrowsWhenLimitIsTooLowToFitAnythingMoreThanContext()
     {
-        ExtractionDocument doc = new("longOne");
+        IngestionDocument doc = new("longOne");
         doc.Sections.Add(new()
         {
             Elements =
@@ -109,7 +109,7 @@ public class HeaderChunkerTests : DocumentChunkerTests
     [Fact]
     public async Task CanSplitLongerParagraphsOnNewLine()
     {
-        ExtractionDocument doc = new("withNewLines");
+        IngestionDocument doc = new("withNewLines");
         doc.Sections.Add(new()
         {
             Elements =
@@ -137,7 +137,7 @@ public class HeaderChunkerTests : DocumentChunkerTests
     [Fact]
     public async Task ThrowsWhenHeaderSeparatorAndSingleRowExceedTokenLimit()
     {
-        ExtractionDocument document = CreateDocumentWithLargeTable();
+        IngestionDocument document = CreateDocumentWithLargeTable();
 
         // A structural table has tab-separated cells, not a fabricated Markdown separator.
         Tokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4");
@@ -151,7 +151,7 @@ public class HeaderChunkerTests : DocumentChunkerTests
     [Fact]
     public async Task CanSplitLargeTableIntoMultipleChunks_MultipleRowsPerChunk()
     {
-        ExtractionDocument document = CreateDocumentWithLargeTable();
+        IngestionDocument document = CreateDocumentWithLargeTable();
 
         Tokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4");
         const string FirstChunk = "Header A\nThis is some text that describes why we need the following table.\none\ttwo\tthree\tfour\tfive\n0\t1\t2\t3\t4\n5\t6\t7\t8\t9\n10\t11\t12\t13\t14";
@@ -170,7 +170,7 @@ public class HeaderChunkerTests : DocumentChunkerTests
     [Fact]
     public async Task CanSplitLargeTableIntoMultipleChunks_OneRowPerChunk()
     {
-        ExtractionDocument document = CreateDocumentWithLargeTable();
+        IngestionDocument document = CreateDocumentWithLargeTable();
 
         Tokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4");
         const string LastChunk = "Header A\none\ttwo\tthree\tfour\tfive\n20\t21\t22\t23\t24\nAnd some follow up.";
@@ -193,11 +193,11 @@ public class HeaderChunkerTests : DocumentChunkerTests
         Assert.Equal(LastChunk, GetText(chunks[5]), ignoreLineEndingDifferences: true);
     }
 
-    private static ExtractionDocument CreateDocumentWithLargeTable()
+    private static IngestionDocument CreateDocumentWithLargeTable()
     {
         ExtractionDocumentTableElement table = TestDocumentFactory.CreateTable(CreateTableCells(), hasColumnHeaders: true);
 
-        ExtractionDocument doc = new("withNewLines");
+        IngestionDocument doc = new("withNewLines");
         doc.Sections.Add(new()
         {
             Elements =
@@ -240,7 +240,7 @@ public class HeaderChunkerTests : DocumentChunkerTests
     [Fact]
     public async Task VerifyTokenCountIsSet()
     {
-        ExtractionDocument doc = new("tokenCountTest");
+        IngestionDocument doc = new("tokenCountTest");
         doc.Sections.Add(new()
         {
             Elements =

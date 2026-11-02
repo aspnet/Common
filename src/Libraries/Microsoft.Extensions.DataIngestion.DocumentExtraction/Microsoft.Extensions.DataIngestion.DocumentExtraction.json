@@ -10,7 +10,7 @@
           "Stage": "Stable"
         },
         {
-          "Member": "override System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DataIngestion.DocumentExtractionReader.ReadAsync(System.IO.Stream source, string identifier, string mediaType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Member": "override System.Threading.Tasks.Task<Microsoft.Extensions.DataIngestion.IngestionDocument> Microsoft.Extensions.DataIngestion.DocumentExtractionReader.ReadAsync(System.IO.Stream source, string identifier, string mediaType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
           "Stage": "Stable"
         }
       ]

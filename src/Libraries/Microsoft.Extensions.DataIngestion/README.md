@@ -4,7 +4,7 @@
 
 ## The packages
 
-The [Microsoft.Extensions.DataIngestion.Abstractions](https://www.nuget.org/packages/Microsoft.Extensions.DataIngestion.Abstractions) package provides readers, document processors, chunkers, chunk processors, writers, and non-generic `AIContent` chunks. Document stages exchange the experimental `ExtractionDocument` family from `Microsoft.Extensions.Documents.Abstractions`, in the `Microsoft.Extensions.Documents` namespace. Any .NET library can produce these documents without referencing `Microsoft.Extensions.DocumentExtraction`.
+The [Microsoft.Extensions.DataIngestion.Abstractions](https://www.nuget.org/packages/Microsoft.Extensions.DataIngestion.Abstractions) package provides readers, document processors, chunkers, chunk processors, writers, and non-generic `AIContent` chunks. Document stages retain `IngestionDocument` as the ingestion envelope. Its `ExtractedDocument` holds the single shared content graph using the experimental `ExtractionDocument` family from `Microsoft.Extensions.Documents.Abstractions`, in the `Microsoft.Extensions.Documents` namespace. Any .NET library can produce these graphs without referencing `Microsoft.Extensions.DocumentExtraction`.
 
 The [Microsoft.Extensions.DataIngestion](https://www.nuget.org/packages/Microsoft.Extensions.DataIngestion) package has an implicit dependency on the `Microsoft.Extensions.DataIngestion.Abstractions` package. This package enables you to easily integrate components such as enrichment processors, vector storage writers, and telemetry into your applications using familiar dependency injection and pipeline patterns. For example, it provides the [`SentimentEnricher`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.sentimentenricher), [`KeywordEnricher`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.keywordenricher), and [`SummaryEnricher`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dataingestion.summaryenricher) processors that can be chained together in ingestion pipelines.
 
@@ -39,7 +39,8 @@ using Microsoft.Extensions.DataIngestion;
 using Microsoft.Extensions.DataIngestion.Chunkers;
 using Microsoft.Extensions.Documents;
 
-ExtractionDocument document = new("manual-document");
+ExtractionDocument extracted = new("producer-document", new TextContent("Root-local text."));
+IngestionDocument document = new("ingestion-key", extracted);
 document.Sections.Add(new ExtractionDocumentSection
 {
     Elements = { new ExtractionDocumentTextElement(new TextContent("Plain text to ingest.")) }
@@ -49,14 +50,18 @@ using IngestionPipeline pipeline = new(
     new DocumentTokenChunker(new(tokenizer)),
     new VectorStoreWriter<IngestionChunkVectorRecord>(collection));
 
-ExtractionDocument processed = await pipeline.ProcessAsync(document);
+IngestionDocument processed = await pipeline.ProcessAsync(document);
 ```
 
-The readerless constructor supports manually assembled documents; the existing constructor accepting an `IngestionDocumentReader` also supports file ingestion. Document processors can return the original document or a replacement. Documents require no disposal, and reader implementations detach returned payload bytes before closing provider resources; direct ingestion propagates failures and cancellation.
+The readerless constructor supports manually assembled shared graphs through an ingestion envelope; the existing constructor accepting an `IngestionDocumentReader` also supports file ingestion. `new IngestionDocument(identifier)` creates an empty shared graph. The two-argument constructor retains the supplied graph without copying. `Sections` forwards its exact `List<ExtractionDocumentSection>`, and `EnumerateContent()` forwards shared structural traversal. Root payload, metadata, source pages, and native state live only on `ExtractedDocument`. The ingestion `Identifier` is the writer's persistence key, independent of the producer's shared document identifier. Neither is rewritten.
+
+Document processors can return the original envelope or a replacement. Pipeline `DocumentProcessors` and `ChunkProcessors` are concrete mutable `List` collections. Documents require no disposal, and reader implementations detach returned payload bytes before closing provider resources; direct ingestion propagates failures and cancellation. Existing reader-bound sequencing and failure results are unchanged. Retaining the ingestion root does not restore the former element hierarchy: adopting the shared element primitives is an intentional preview API break.
 
 Chunkers consume each document, section, and element's local text payload once. `TextContent.Text` is authoritative for text nodes; producer-supplied text is preserved without forcing Markdown. Heading levels can be any positive value, without allocating storage proportional to the level. Structural tables use tab-separated semantic row text, with repeated column headers only when the producer explicitly identifies them. This is embedding/chunk content, not a display renderer. Images prefer `AlternativeText`, falling back to image-only OCR `Text`; an available image `Source` remains the original asset reference, independent of the current `DataContent` or `UriContent` payload. Token limits include context and separators.
 
-`IngestionChunk.SourceElements` retains the contributing elements and their source graph, including heading context and nested sections. Source frame identifiers and physical page numbers are not assembly positions or durable citations. The document's ordinary `SourcePages` list retains blank/unnumbered frames; page dimensions, coordinate units/origin and source polygons remain available for region interpretation. Borrowed native objects in document `RawRepresentation` or source-reference `GetRawRepresentation()` are excluded from semantic chunk text and default storage.
+`DocumentTokenChunker`, `SectionChunker`, `HeaderChunker`, and `SemanticSimilarityChunker` consume the shared graph, including root-local and section-local text, without aggregating that text into the envelope. Image enrichment updates shared image nodes, including nested table-cell images.
+
+`IngestionChunk.Document` retains the envelope. Its read-only `SourceElements` snapshot retains contributing shared elements and their source graph, including heading context and nested sections. Source frame identifiers and physical page numbers are not assembly positions or durable citations. `ExtractedDocument.SourcePages` retains blank/unnumbered frames; page dimensions, coordinate units/origin and source polygons remain available for region interpretation. Borrowed native objects in `ExtractedDocument.RawRepresentation` or source-reference `GetRawRepresentation()` are excluded from semantic chunk text and default storage.
 
 ### Configuring the vector store
 

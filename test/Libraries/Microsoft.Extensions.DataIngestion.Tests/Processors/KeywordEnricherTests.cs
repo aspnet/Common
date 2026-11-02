@@ -8,7 +8,6 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DataIngestion.Tests;
-using Microsoft.Extensions.Documents;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
 using Xunit;
@@ -17,7 +16,7 @@ namespace Microsoft.Extensions.DataIngestion.Processors.Tests;
 
 public class KeywordEnricherTests
 {
-    private static readonly ExtractionDocument _document = new("test");
+    private static readonly IngestionDocument _document = new("test");
 
     [Fact]
     public void ThrowsOnNullOptions()

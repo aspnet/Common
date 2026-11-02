@@ -30,7 +30,7 @@ IngestionDocumentReader reader = new MarkdownReader();
 using IngestionPipeline pipeline = new(reader, CreateChunker(), CreateWriter());
 ```
 
-The reader returns an `ExtractionDocument` in the `Microsoft.Extensions.Documents` namespace. Markdown text is retained as producer-supplied `TextContent`, with heading roles and levels, nested sections, addressable table cells, and image bytes or source references. Structural sections and tables do not retain duplicate aggregate Markdown payloads.
+The reader returns an `IngestionDocument` envelope whose `ExtractedDocument` owns shared primitives in the `Microsoft.Extensions.Documents` namespace. `Sections` forwards that graph's exact list. Markdown text is retained as producer-supplied `TextContent`, with heading roles and levels, nested sections, addressable table cells, and image bytes or source references. Structural sections and tables do not retain duplicate aggregate Markdown payloads.
 
 ## Feedback & Contributing
 

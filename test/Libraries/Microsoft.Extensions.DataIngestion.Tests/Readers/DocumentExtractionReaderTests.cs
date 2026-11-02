@@ -30,20 +30,27 @@ public class DocumentExtractionReaderTests
         using MemoryStream stream = new(new byte[] { 1, 2, 3 });
         using FakeExtractionClient client = new((input, identifier, mediaType, options, cancellationToken) =>
         {
-            Assert.Same(stream, input);
-            Assert.Equal("requested-id", identifier);
+            if (identifier != "second-request")
+            {
+                Assert.Same(stream, input);
+                Assert.Equal("requested-id", identifier);
+            }
+
             Assert.Equal("application/pdf", mediaType);
             Assert.Null(options);
             return Task.FromResult(document);
         });
         DocumentExtractionReader reader = new(client);
 
-        ExtractionDocument result = await reader.ReadAsync(stream, "requested-id", "application/pdf");
+        IngestionDocument result = await reader.ReadAsync(stream, "requested-id", "application/pdf");
 
-        Assert.Same(document, result);
-        Assert.Same(page, Assert.Single(result.SourcePages));
-        Assert.Same(nativeResult, result.RawRepresentation);
-        Assert.Equal("local", Assert.IsType<TextContent>(result.Content).Text);
+        Assert.Same(document, result.ExtractedDocument);
+        Assert.Equal("requested-id", result.Identifier);
+        Assert.Equal("provider-id", document.Identifier);
+        Assert.Same(document.Sections, result.Sections);
+        Assert.Same(page, Assert.Single(result.ExtractedDocument.SourcePages));
+        Assert.Same(nativeResult, result.ExtractedDocument.RawRepresentation);
+        Assert.Equal("local", Assert.IsType<TextContent>(result.ExtractedDocument.Content).Text);
         Assert.True(stream.CanRead);
         providerBytes[0] = 0;
         stream.Dispose();
@@ -53,6 +60,15 @@ public class DocumentExtractionReaderTests
         Assert.True(nativeResult.CanRead);
         Assert.False(client.Disposed);
         Assert.Equal(1, client.Calls);
+        using MemoryStream secondStream = new();
+        IngestionDocument second = await reader.ReadAsync(secondStream, "second-request", "application/pdf");
+        Assert.NotSame(result, second);
+        Assert.Same(document, second.ExtractedDocument);
+        Assert.Equal("second-request", second.Identifier);
+        Assert.Equal("requested-id", result.Identifier);
+        Assert.Equal("provider-id", document.Identifier);
+        Assert.Equal(2, client.Calls);
+        Assert.True(secondStream.CanRead);
     }
 
     [Fact]

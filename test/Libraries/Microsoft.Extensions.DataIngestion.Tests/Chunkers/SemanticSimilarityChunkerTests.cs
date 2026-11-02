@@ -35,7 +35,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
             string text = ".NET is a free, cross-platform, open-source developer platform for building many " +
                 "kinds of applications. It can run programs written in multiple languages, with C# being the most popular. " +
                 "It relies on a high-performance runtime that is used in production by many high-scale apps.";
-            ExtractionDocument doc = new ExtractionDocument("doc");
+            IngestionDocument doc = new IngestionDocument("doc");
             doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
@@ -63,7 +63,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         [Fact]
         public async Task TwoTopicsParagraphs()
         {
-            ExtractionDocument doc = new ExtractionDocument("doc");
+            IngestionDocument doc = new IngestionDocument("doc");
             string text1 = ".NET is a free, cross-platform, open-source developer platform for building many" +
                 "kinds of applications. It can run programs written in multiple languages, with C# being the most popular.";
             string text2 = "It relies on a high-performance runtime that is used in production by many high-scale apps.";
@@ -118,7 +118,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
                 "Hephaestus\tFire & Forge\tHammer\tVulcan\nDemeter\tHarvest & Nature\tWheat\tCeres\nDionysus\tWine & Festivity\tGrapes\tBacchus";
             const string SecondChunk = "Ancient Greek Olympian Gods\nThe twelve Olympian gods were the principal deities of the Greek pantheon:\n" + GodsTablePrefix;
 
-            ExtractionDocument doc = new("dotnet-languages");
+            IngestionDocument doc = new("dotnet-languages");
             doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =

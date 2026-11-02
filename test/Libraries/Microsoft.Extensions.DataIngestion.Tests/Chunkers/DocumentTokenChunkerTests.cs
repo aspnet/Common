@@ -16,7 +16,7 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         public async Task SingleChunkText()
         {
             string text = "This is a short document that fits within a single chunk.";
-            ExtractionDocument doc = new ExtractionDocument("singleChunkDoc");
+            IngestionDocument doc = new IngestionDocument("singleChunkDoc");
             doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =

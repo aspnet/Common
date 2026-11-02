@@ -11,7 +11,7 @@ using Microsoft.Shared.Diagnostics;
 namespace Microsoft.Extensions.DataIngestion;
 
 /// <summary>
-/// Represents a chunk of content extracted from an <see cref="ExtractionDocument"/>.
+/// Represents a chunk of content extracted from an <see cref="IngestionDocument"/>.
 /// </summary>
 [DebuggerDisplay("Content = {Content}")]
 public class IngestionChunk
@@ -31,7 +31,7 @@ public class IngestionChunk
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="tokenCount"/> is zero or negative.
     /// </exception>
-    public IngestionChunk(AIContent content, ExtractionDocument document, int tokenCount, string? context = null)
+    public IngestionChunk(AIContent content, IngestionDocument document, int tokenCount, string? context = null)
     {
         Content = Throw.IfNull(content);
         Document = Throw.IfNull(document);
@@ -47,7 +47,7 @@ public class IngestionChunk
     /// <summary>
     /// Gets the document from which this chunk was extracted.
     /// </summary>
-    public ExtractionDocument Document { get; }
+    public IngestionDocument Document { get; }
 
     /// <summary>
     /// Gets the document elements contributing content or context to this chunk.

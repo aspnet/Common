@@ -34,20 +34,29 @@ public class AlternativeTextEnricherTests
             }
         };
         ExtractionDocumentImageElement image = new(new DataContent(new byte[] { 1, 2, 3 }, "image/png"));
-        ExtractionDocumentSourcePage page = new("frame", null);
-        ExtractionDocumentSourceReference source = new(page);
+        ExtractionDocumentSourcePage page = new("frame", 3, dimensions: new(100, 200),
+            coordinateUnit: ExtractionDocumentCoordinateUnit.Point, coordinateOrigin: ExtractionDocumentCoordinateOrigin.BottomLeft);
+        ExtractionDocumentSourcePage unknown = new("canvas", null);
+        ExtractionDocumentSourcePage blank = new("blank", 4);
+        ExtractionDocumentSourceReference source = new(page, new ExtractionDocumentPoint[] { new(1, 2), new(3, 4), new(5, 6) });
         image.Sources.Add(source);
         ExtractionDocumentTableElement inner = new(null, 1, 1);
         inner.Cells[0, 0] = new(image);
         ExtractionDocumentTableElement outer = new(null, 1, 1);
         outer.Cells[0, 0] = new(inner);
-        ExtractionDocument document = new("nested")
+        object native = new();
+        TextContent local = new("local");
+        ExtractionDocument graph = new("provider", local)
         {
+            RawRepresentation = native,
+            SourcePages = { unknown, page, blank },
             Sections = { new() { Elements = { outer, image } } }
         };
+        graph.Metadata.Add("native", native);
+        IngestionDocument document = new("nested", graph);
         ImageAlternativeTextEnricher enricher = new(new(client));
 
-        ExtractionDocument result = await enricher.ProcessAsync(document);
+        IngestionDocument result = await enricher.ProcessAsync(document);
 
         Assert.Same(document, result);
         Assert.Equal(1, calls);
@@ -55,6 +64,21 @@ public class AlternativeTextEnricherTests
         Assert.Same(image, inner.Cells[0, 0]!.Content);
         Assert.Same(source, Assert.Single(image.Sources));
         Assert.Same(page, source.Page);
+        Assert.Same(graph, result.ExtractedDocument);
+        Assert.Same(native, graph.RawRepresentation);
+        Assert.Same(native, graph.Metadata["native"]);
+        Assert.Same(local, graph.Content);
+        Assert.Equal(new[] { unknown, page, blank }, graph.SourcePages);
+        Assert.Equal(new ExtractionDocumentPageDimensions(100, 200), page.Dimensions);
+        Assert.Equal(ExtractionDocumentCoordinateUnit.Point, page.CoordinateUnit);
+        Assert.Equal(ExtractionDocumentCoordinateOrigin.BottomLeft, page.CoordinateOrigin);
+        Assert.Equal(new ExtractionDocumentPoint[] { new(1, 2), new(3, 4), new(5, 6) }, source.Polygon);
+        Assert.Null(unknown.PageNumber);
+        Assert.Equal(3, page.PageNumber);
+        Assert.Equal(4, blank.PageNumber);
+        Assert.Same(outer, Assert.Single(graph.Sections).Elements[0]);
+        Assert.Same(image, Assert.Single(graph.Sections).Elements[1]);
+        Assert.Same(inner, outer.Cells[0, 0]!.Content);
     }
 
     [Fact]
@@ -73,7 +97,7 @@ public class AlternativeTextEnricherTests
         ExtractionDocumentTableElement second = new(null, 1, 1);
         first.Cells[0, 0] = new(second);
         second.Cells[0, 0] = new(first);
-        ExtractionDocument document = new("cycle") { Sections = { new() { Elements = { first } } } };
+        IngestionDocument document = new("cycle") { Sections = { new() { Elements = { first } } } };
         ImageAlternativeTextEnricher enricher = new(new(client));
 
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => enricher.ProcessAsync(document));
@@ -155,7 +179,7 @@ public class AlternativeTextEnricherTests
             Content = null
         };
 
-        ExtractionDocument document = new("withImage")
+        IngestionDocument document = new("withImage")
         {
             Sections =
             {
@@ -215,7 +239,7 @@ public class AlternativeTextEnricherTests
 
         ImageAlternativeTextEnricher sut = new(new(chatClient) { BatchSize = batchSize });
 
-        ExtractionDocument document = CreateDocument(batchSize, batchCount, _imageContent);
+        IngestionDocument document = CreateDocument(batchSize, batchCount, _imageContent);
 
         await sut.ProcessAsync(document);
         Assert.Equal(batchCount, callsCount);
@@ -239,8 +263,8 @@ public class AlternativeTextEnricherTests
         ImageAlternativeTextEnricher sut = new(options);
 
         const int BatchCount = 2;
-        ExtractionDocument document = CreateDocument(options.BatchSize, BatchCount, _imageContent);
-        ExtractionDocument got = await sut.ProcessAsync(document);
+        IngestionDocument document = CreateDocument(options.BatchSize, BatchCount, _imageContent);
+        IngestionDocument got = await sut.ProcessAsync(document);
 
         Assert.Same(document, got);
         Assert.All(document.EnumerateContent().OfType<ExtractionDocumentImageElement>(), image => Assert.Null(image.AlternativeText));
@@ -252,7 +276,7 @@ public class AlternativeTextEnricherTests
         });
     }
 
-    private static ExtractionDocument CreateDocument(int batchSize, int batchCount, ReadOnlyMemory<byte> imageContent)
+    private static IngestionDocument CreateDocument(int batchSize, int batchCount, ReadOnlyMemory<byte> imageContent)
     {
         ExtractionDocumentSection rootSection = new();
         for (int i = 0; i < batchSize * batchCount; i++)

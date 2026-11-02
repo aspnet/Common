@@ -4,11 +4,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Documents;
 using Microsoft.Extensions.Logging;
 using Microsoft.Shared.Diagnostics;
 using static Microsoft.Extensions.DataIngestion.DiagnosticsConstants;
@@ -79,12 +79,14 @@ public sealed class IngestionPipeline : IDisposable
     /// <summary>
     /// Gets the document processors in the pipeline.
     /// </summary>
-    public IList<IngestionDocumentProcessor> DocumentProcessors { get; } = [];
+    [SuppressMessage("Design", "CA1002:Do not expose generic lists", Justification = "Pipeline processor configuration intentionally exposes a concrete mutable list.")]
+    public List<IngestionDocumentProcessor> DocumentProcessors { get; } = [];
 
     /// <summary>
     /// Gets the chunk processors in the pipeline.
     /// </summary>
-    public IList<IngestionChunkProcessor> ChunkProcessors { get; } = [];
+    [SuppressMessage("Design", "CA1002:Do not expose generic lists", Justification = "Pipeline processor configuration intentionally exposes a concrete mutable list.")]
+    public List<IngestionChunkProcessor> ChunkProcessors { get; } = [];
 
     /// <summary>
     /// Processes a document through the document processors, chunker, chunk processors, and writer.
@@ -93,7 +95,7 @@ public sealed class IngestionPipeline : IDisposable
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>The processed document, which may be replaced by a document processor.</returns>
     /// <remarks>Failures and cancellation propagate to the caller.</remarks>
-    public async Task<ExtractionDocument> ProcessAsync(ExtractionDocument document, CancellationToken cancellationToken = default)
+    public async Task<IngestionDocument> ProcessAsync(IngestionDocument document, CancellationToken cancellationToken = default)
     {
         Throw.IfNull(document);
         cancellationToken.ThrowIfCancellationRequested();
@@ -195,7 +197,7 @@ public sealed class IngestionPipeline : IDisposable
                 processFileActivity?.SetTag(ProcessFile.FilePathTagName, fileInfo.FullName);
                 _logger?.ReadingFile(fileInfo.FullName, GetShortName(_reader));
 
-                ExtractionDocument? document = null;
+                IngestionDocument? document = null;
                 Exception? failure = null;
                 try
                 {
@@ -220,7 +222,7 @@ public sealed class IngestionPipeline : IDisposable
         }
     }
 
-    private async Task<ExtractionDocument> IngestAsync(ExtractionDocument document, Activity? parentActivity, CancellationToken cancellationToken)
+    private async Task<IngestionDocument> IngestAsync(IngestionDocument document, Activity? parentActivity, CancellationToken cancellationToken)
     {
         foreach (IngestionDocumentProcessor processor in DocumentProcessors)
         {

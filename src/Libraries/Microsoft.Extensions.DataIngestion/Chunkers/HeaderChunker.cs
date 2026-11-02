@@ -29,7 +29,7 @@ public sealed class HeaderChunker : IngestionChunker
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<IngestionChunk> ProcessAsync(ExtractionDocument document,
+    public override async IAsyncEnumerable<IngestionChunk> ProcessAsync(IngestionDocument document,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         _ = Throw.IfNull(document);
@@ -85,7 +85,7 @@ public sealed class HeaderChunker : IngestionChunker
         }
     }
 
-    private IEnumerable<IngestionChunk> SplitIntoChunks(ExtractionDocument document,
+    private IEnumerable<IngestionChunk> SplitIntoChunks(IngestionDocument document,
         SortedDictionary<int, (string Content, IReadOnlyList<ExtractionDocumentElement> Sources)> headers,
         List<ExtractionDocumentElement> elements,
         IReadOnlyDictionary<ExtractionDocumentElement, IReadOnlyList<ExtractionDocumentElement>> elementSources)

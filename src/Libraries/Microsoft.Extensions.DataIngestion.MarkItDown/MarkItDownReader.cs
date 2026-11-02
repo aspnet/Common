@@ -7,7 +7,6 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Documents;
 using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.DataIngestion;
@@ -32,7 +31,7 @@ public class MarkItDownReader : IngestionDocumentReader
     }
 
     /// <inheritdoc/>
-    public override async Task<ExtractionDocument> ReadAsync(FileInfo source, string identifier, string? mediaType = null, CancellationToken cancellationToken = default)
+    public override async Task<IngestionDocument> ReadAsync(FileInfo source, string identifier, string? mediaType = null, CancellationToken cancellationToken = default)
     {
         _ = Throw.IfNull(source);
         _ = Throw.IfNullOrEmpty(identifier);
@@ -95,7 +94,7 @@ public class MarkItDownReader : IngestionDocumentReader
 
     /// <inheritdoc/>
     /// <remarks>The contents of <paramref name="source"/> are copied to a temporary file.</remarks>
-    public override async Task<ExtractionDocument> ReadAsync(Stream source, string identifier, string mediaType, CancellationToken cancellationToken = default)
+    public override async Task<IngestionDocument> ReadAsync(Stream source, string identifier, string mediaType, CancellationToken cancellationToken = default)
     {
         _ = Throw.IfNull(source);
         _ = Throw.IfNullOrEmpty(identifier);

@@ -35,7 +35,7 @@ public sealed class DocumentTokenChunker : IngestionChunker
 
     /// <inheritdoc/>
     public override async IAsyncEnumerable<IngestionChunk> ProcessAsync(
-        ExtractionDocument document, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        IngestionDocument document, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         _ = Throw.IfNull(document);
         StringBuilder text = new();

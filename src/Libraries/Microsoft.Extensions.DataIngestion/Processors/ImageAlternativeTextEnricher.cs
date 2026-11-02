@@ -34,7 +34,7 @@ public sealed class ImageAlternativeTextEnricher : IngestionDocumentProcessor
     }
 
     /// <inheritdoc/>
-    public override async Task<ExtractionDocument> ProcessAsync(ExtractionDocument document, CancellationToken cancellationToken = default)
+    public override async Task<IngestionDocument> ProcessAsync(IngestionDocument document, CancellationToken cancellationToken = default)
     {
         _ = Throw.IfNull(document);
 
@@ -63,7 +63,7 @@ public sealed class ImageAlternativeTextEnricher : IngestionDocumentProcessor
         return document;
     }
 
-    private static IEnumerable<ExtractionDocumentImageElement> EnumerateImages(ExtractionDocument document)
+    private static IEnumerable<ExtractionDocumentImageElement> EnumerateImages(IngestionDocument document)
     {
         HashSet<ExtractionDocumentImageElement> images = [];
         HashSet<ExtractionDocumentTableElement> path = [];

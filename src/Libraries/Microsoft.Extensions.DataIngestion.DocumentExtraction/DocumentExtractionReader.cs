@@ -5,12 +5,11 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DocumentExtraction;
-using Microsoft.Extensions.Documents;
 using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.DataIngestion;
 
-/// <summary>Reads the shared document returned by an extraction client.</summary>
+/// <summary>Wraps the shared document returned by an extraction client for ingestion.</summary>
 /// <remarks>
 /// The client and input stream remain owned by the caller. Returned documents require no disposal.
 /// This reader does not render, serialize, or reparse the extracted document.
@@ -30,13 +29,14 @@ public sealed class DocumentExtractionReader : IngestionDocumentReader
     }
 
     /// <inheritdoc/>
-    public override async Task<ExtractionDocument> ReadAsync(Stream source, string identifier, string mediaType, CancellationToken cancellationToken = default)
+    public override async Task<IngestionDocument> ReadAsync(Stream source, string identifier, string mediaType, CancellationToken cancellationToken = default)
     {
         _ = Throw.IfNull(source);
         _ = Throw.IfNullOrEmpty(identifier);
         _ = Throw.IfNullOrEmpty(mediaType);
         cancellationToken.ThrowIfCancellationRequested();
 
-        return await _client.ExtractAsync(source, identifier, mediaType, _options?.Clone(), cancellationToken).ConfigureAwait(false);
+        var extractedDocument = await _client.ExtractAsync(source, identifier, mediaType, _options?.Clone(), cancellationToken).ConfigureAwait(false);
+        return new IngestionDocument(identifier, extractedDocument);
     }
 }

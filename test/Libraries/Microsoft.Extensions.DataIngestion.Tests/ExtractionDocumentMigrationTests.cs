@@ -21,6 +21,87 @@ namespace Microsoft.Extensions.DataIngestion.Tests;
 public class ExtractionDocumentMigrationTests
 {
     [Theory]
+    [InlineData("DocumentToken")]
+    [InlineData("Section")]
+    [InlineData("Header")]
+    [InlineData("SemanticSimilarity")]
+    public async Task AllBuiltInChunkers_ConsumeExactEnvelopeGraphOnce(string kind)
+    {
+        ExtractionDocumentTextElement cell = new(new TextContent("cell"));
+        ExtractionDocumentImageElement image = new(new DataContent(new byte[] { 1, 2 }, "image/png"), "unused OCR")
+        {
+            AlternativeText = "description"
+        };
+        ExtractionDocumentTableElement table = new(null, 1, 2);
+        table.Cells[0, 0] = new(cell, role: "columnHeader");
+        table.Cells[0, 1] = new(image, role: "columnHeader");
+        ExtractionDocumentSection nested = new(new TextContent("nested")) { Elements = { table } };
+        ExtractionDocumentSection section = new(new TextContent("section")) { Elements = { nested } };
+        ExtractionDocument graph = new("provider", new TextContent("document")) { Sections = { section } };
+        IngestionDocument document = new("persistence", graph);
+        Tokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4o");
+        IngestionChunkerOptions options = new(tokenizer) { MaxTokensPerChunk = 100, OverlapTokens = 0 };
+        List<string> embedded = [];
+        using TestEmbeddingGenerator<TextContent, Embedding<float>> generator = new()
+        {
+            GenerateAsyncCallback = (values, _, _) =>
+            {
+                TextContent[] inputs = values.ToArray();
+                embedded.AddRange(inputs.Select(value => value.Text));
+                return Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(
+                    inputs.Select(_ => new Embedding<float>(new float[] { 1, 0, 0 }))));
+            }
+        };
+        IngestionChunker chunker = kind switch
+        {
+            "DocumentToken" => new DocumentTokenChunker(options),
+            "Section" => new SectionChunker(options),
+            "Header" => new HeaderChunker(options),
+            "SemanticSimilarity" => new SemanticSimilarityChunker(generator, options),
+            _ => throw new InvalidOperationException(kind)
+        };
+
+        List<IngestionChunk> chunks = await chunker.ProcessAsync(document).ToListAsync();
+
+        Assert.Equal(string.Join(Environment.NewLine, "document", "section", "nested", "cell\tdescription"),
+            string.Join(Environment.NewLine, chunks.Select(Text)));
+        Assert.All(chunks, chunk =>
+        {
+            Assert.Same(document, chunk.Document);
+            Assert.Same(graph, chunk.Document.ExtractedDocument);
+            Assert.Equal(tokenizer.CountTokens(Text(chunk), considerNormalization: false), chunk.TokenCount);
+            Assert.InRange(chunk.TokenCount, 1, 100);
+            Assert.Equal(chunk.SourceElements.Distinct().Count(), chunk.SourceElements.Count);
+        });
+        ExtractionDocumentElement[] sources = chunks.SelectMany(chunk => chunk.SourceElements).Distinct().ToArray();
+        Assert.Equal(new ExtractionDocumentElement[] { section, nested, table, cell, image }, sources);
+        Assert.Same(cell, table.Cells[0, 0]!.Content);
+        Assert.Same(image, table.Cells[0, 1]!.Content);
+        Assert.Equal("provider", graph.Identifier);
+        Assert.Equal("persistence", document.Identifier);
+        if (kind == "SemanticSimilarity")
+        {
+            Assert.Equal(new[] { "section", "nested", "cell\tdescription" }, embedded);
+        }
+        else
+        {
+            Assert.Empty(embedded);
+        }
+
+        ExtractionDocumentElement[][] snapshots = chunks.Select(chunk => chunk.SourceElements.ToArray()).ToArray();
+        graph.Sections.Clear();
+        section.Elements.Clear();
+        nested.Elements.Clear();
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            Assert.Equal(snapshots[i], chunks[i].SourceElements);
+        }
+
+        Assert.Equal(new ExtractionDocumentElement[] { section, nested, table, cell, image },
+            chunks.SelectMany(chunk => chunk.SourceElements).Distinct());
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task HeaderChunker_RepeatsOnlyExplicitColumnHeadersAndAttributesActualRows(bool hasHeader)
@@ -32,7 +113,7 @@ public class ExtractionDocumentMigrationTests
         table.Cells[0, 0] = new(first, role: hasHeader ? "columnHeader" : null);
         table.Cells[1, 0] = new(second);
         table.Cells[2, 0] = new(third);
-        ExtractionDocument document = new("rows") { Sections = { new() { Elements = { table } } } };
+        IngestionDocument document = new("rows") { Sections = { new() { Elements = { table } } } };
         HeaderChunker chunker = new(new(TiktokenTokenizer.CreateForModel("gpt-4o")) { MaxTokensPerChunk = 3 });
 
         List<IngestionChunk> chunks = await chunker.ProcessAsync(document).ToListAsync();
@@ -56,7 +137,7 @@ public class ExtractionDocumentMigrationTests
     {
         ExtractionDocumentSection nested = new(new TextContent("nested")) { Elements = { new ExtractionDocumentTextElement(new TextContent("leaf")) } };
         ExtractionDocumentSection section = new(new TextContent("section")) { Elements = { nested } };
-        ExtractionDocument document = new("locals", new TextContent("document")) { Sections = { section } };
+        IngestionDocument document = new("locals", new ExtractionDocument("graph", new TextContent("document"))) { Sections = { section } };
         IngestionChunkerOptions options = new(TiktokenTokenizer.CreateForModel("gpt-4o")) { MaxTokensPerChunk = 100 };
         IngestionChunker chunker = useSectionChunker ? new SectionChunker(options) : new HeaderChunker(options);
 
@@ -76,7 +157,7 @@ public class ExtractionDocumentMigrationTests
         ExtractionDocumentTextElement first = new(new TextContent(string.Join(" ", Enumerable.Repeat("first", 10))));
         ExtractionDocumentTextElement last = new(new TextContent(string.Join(" ", Enumerable.Repeat("last", 10))));
         ExtractionDocumentSection section = new() { Elements = { first, last } };
-        ExtractionDocument document = new("ranges") { Sections = { section } };
+        IngestionDocument document = new("ranges") { Sections = { section } };
 
         List<IngestionChunk> chunks = await Tokens(5).ProcessAsync(document).ToListAsync();
 
@@ -95,7 +176,7 @@ public class ExtractionDocumentMigrationTests
         ExtractionDocumentTableElement second = new(null, 1, 1);
         first.Cells[0, 0] = new(second);
         second.Cells[0, 0] = new(first);
-        ExtractionDocument document = new("cycle") { Sections = { new() { Elements = { first } } } };
+        IngestionDocument document = new("cycle") { Sections = { new() { Elements = { first } } } };
 
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await Tokens(100).ProcessAsync(document).ToListAsync());
@@ -137,12 +218,13 @@ public class ExtractionDocumentMigrationTests
             Elements = { new ExtractionDocumentTextElement(new TextContent("plain **literal**")), nested }
         };
         section.Sources.Add(new(unknown));
-        ExtractionDocument document = new("manual", new TextContent("document"))
+        ExtractionDocument graph = new("provider", new TextContent("document"))
         {
             Sections = { section },
             SourcePages = { unknown, numbered, blank },
             RawRepresentation = nativeResult
         };
+        IngestionDocument document = new("manual", graph);
         polygon[0] = new(0, 0);
 
         Tokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4o");
@@ -158,7 +240,7 @@ public class ExtractionDocumentMigrationTests
         Assert.Same(reference, table.Cells[0, 0]!.Sources[0]);
         Assert.Same(reference, cellText.Sources[0]);
         Assert.Same(numbered, reference.Page);
-        Assert.Same(nativeResult, document.RawRepresentation);
+        Assert.Same(nativeResult, document.ExtractedDocument.RawRepresentation);
         Assert.Same(nativeObservation, reference.GetRawRepresentation());
         Assert.Equal(new ExtractionDocumentPoint[] { new(12, 24), new(60, 24), new(60, 48) }, reference.Polygon);
         Assert.Equal(new ExtractionDocumentPageDimensions(612, 792), numbered.Dimensions);
@@ -166,7 +248,7 @@ public class ExtractionDocumentMigrationTests
         Assert.Equal(ExtractionDocumentCoordinateOrigin.BottomLeft, numbered.CoordinateOrigin);
         Assert.Null(unknown.PageNumber);
         Assert.Equal(7, numbered.PageNumber);
-        Assert.Equal(new[] { unknown, numbered, blank }, document.SourcePages);
+        Assert.Equal(new[] { unknown, numbered, blank }, document.ExtractedDocument.SourcePages);
         Assert.Equal(10, blank.PageNumber);
         Assert.DoesNotContain(chunk.SourceElements.SelectMany(element => element.Sources), source => ReferenceEquals(source.Page, blank));
         Assert.DoesNotContain("PRIVATE", Text(chunk));
@@ -181,7 +263,7 @@ public class ExtractionDocumentMigrationTests
     {
         ExtractionDocumentImageElement image = new(new DataContent(new byte[] { 3, 4 }, "image/png"), ocr) { AlternativeText = alternative };
         ExtractionDocumentSection section = new() { Elements = { image } };
-        ExtractionDocument document = new("image") { Sections = { section } };
+        IngestionDocument document = new("image") { Sections = { section } };
         IngestionChunk chunk = Assert.Single(await Tokens(100).ProcessAsync(document).ToListAsync());
         Assert.Equal(expected, Text(chunk));
         Assert.Equal(new ExtractionDocumentElement[] { section, image }, chunk.SourceElements);
@@ -194,7 +276,7 @@ public class ExtractionDocumentMigrationTests
         ExtractionDocumentTextElement cell = new(new TextContent("not semantic when producer payload exists"));
         ExtractionDocumentTableElement table = new(new TextContent("producer's plain table"), 1, 1);
         table.Cells[0, 0] = new(cell);
-        ExtractionDocument document = new("table") { Sections = { new() { Elements = { table } } } };
+        IngestionDocument document = new("table") { Sections = { new() { Elements = { table } } } };
 
         IngestionChunk chunk = Assert.Single(await Tokens(100).ProcessAsync(document).ToListAsync());
 
@@ -215,7 +297,7 @@ public class ExtractionDocumentMigrationTests
         ExtractionDocumentSourcePage page = new("unknown", null);
         heading.Sources.Add(new(page));
         ExtractionDocumentSection section = new() { Elements = { heading, body, footer } };
-        ExtractionDocument document = new("heading") { Sections = { section } };
+        IngestionDocument document = new("heading") { Sections = { section } };
         IngestionChunkerOptions options = new(TiktokenTokenizer.CreateForModel("gpt-4o")) { MaxTokensPerChunk = 100 };
         IngestionChunker chunker = useSectionChunker ? new SectionChunker(options) : new HeaderChunker(options);
 
@@ -234,7 +316,7 @@ public class ExtractionDocumentMigrationTests
     {
         ExtractionDocumentTextElement heading = new(new TextContent("Unknown level"), role: "heading");
         ExtractionDocumentTextElement custom = new(new TextContent("custom body"), role: "customHeading");
-        ExtractionDocument document = new("roles") { Sections = { new() { Elements = { heading, custom } } } };
+        IngestionDocument document = new("roles") { Sections = { new() { Elements = { heading, custom } } } };
         IngestionChunk chunk = Assert.Single(await new HeaderChunker(
             new(TiktokenTokenizer.CreateForModel("gpt-4o")) { MaxTokensPerChunk = 100 }).ProcessAsync(document).ToListAsync());
         Assert.Equal("Unknown level", chunk.Context);
@@ -252,7 +334,7 @@ public class ExtractionDocumentMigrationTests
         ExtractionDocumentTextElement sibling = new(new TextContent("Sibling"), role: "heading") { HeadingLevel = 12 };
         ExtractionDocumentTextElement first = new(new TextContent("first"));
         ExtractionDocumentTextElement second = new(new TextContent("second"));
-        ExtractionDocument document = new("deep-headings")
+        IngestionDocument document = new("deep-headings")
         {
             Sections = { new() { Elements = { root, deepest, first, sibling, second } } }
         };
@@ -302,7 +384,7 @@ public class ExtractionDocumentMigrationTests
             Source = new("https://example.test/original.png"),
             AlternativeText = "description"
         };
-        ExtractionDocument document = new("mutable") { Sections = { new() { Elements = { text, image } } } };
+        IngestionDocument document = new("mutable") { Sections = { new() { Elements = { text, image } } } };
 
         IngestionChunk chunk = Assert.Single(await Tokens(100).ProcessAsync(document).ToListAsync());
 
@@ -328,7 +410,7 @@ public class ExtractionDocumentMigrationTests
         // Ten "word" tokens; the final chunk must not be followed by an overlap-only chunk.
         string input = string.Join(" ", Enumerable.Repeat("word", 10));
         ExtractionDocumentTextElement leaf = new(new TextContent(input));
-        ExtractionDocument document = new("overlap") { Sections = { new() { Elements = { leaf } } } };
+        IngestionDocument document = new("overlap") { Sections = { new() { Elements = { leaf } } } };
         Tokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4o");
         List<IngestionChunk> chunks = await new DocumentTokenChunker(
             new(tokenizer) { MaxTokensPerChunk = limit, OverlapTokens = overlap }).ProcessAsync(document).ToListAsync();
@@ -367,12 +449,13 @@ public class ExtractionDocumentMigrationTests
         ExtractionDocumentTableElement table = new(null, 1, 1);
         table.Cells[0, 0] = new(cell);
         table.Cells[0, 0]!.Sources.Add(new(page));
-        ExtractionDocument document = new("consumer-document")
+        ExtractionDocument graph = new("provider-document")
         {
             Sections = { new() { Elements = { table } } },
             SourcePages = { page },
             RawRepresentation = nativeResult
         };
+        IngestionDocument document = new("consumer-document", graph);
         using TestEmbeddingGenerator<AIContent> embeddings = new();
         using InMemoryVectorStore store = new(new() { EmbeddingGenerator = embeddings });
         VectorStoreCollection<Guid, DurableRecord> collection =
@@ -382,10 +465,14 @@ public class ExtractionDocumentMigrationTests
         pipeline.DocumentProcessors.Add(new LocalDocumentProcessor(calls));
         pipeline.ChunkProcessors.Add(new LocalChunkProcessor(calls));
 
-        ExtractionDocument result = await pipeline.ProcessAsync(document);
+        IngestionDocument result = await pipeline.ProcessAsync(document);
         DurableRecord record = Assert.Single(await collection.GetAsync(r => r.DocumentId == document.Identifier, top: 10).ToListAsync());
 
         Assert.Same(document, result);
+        Assert.Same(graph, result.ExtractedDocument);
+        Assert.Equal("provider-document", graph.Identifier);
+        Assert.Equal("consumer-document", record.DocumentId);
+        Assert.Empty(await collection.GetAsync(r => r.DocumentId == graph.Identifier, top: 10).ToListAsync());
         Assert.Equal(new[] { "document", "chunk", "record" }, calls);
         Assert.Equal("processor-local" + Environment.NewLine + "durable text", Assert.IsType<TextContent>(record.Content).Text);
         Assert.Equal("consumer-document/frame/0/0", record.DurableSource);
@@ -393,7 +480,7 @@ public class ExtractionDocumentMigrationTests
         Assert.NotEqual(Guid.Empty, record.Key);
         Assert.True(embeddings.WasCalled);
         Assert.DoesNotContain("PRIVATE_RAW", record.SerializedContent!);
-        Assert.Same(nativeResult, document.RawRepresentation);
+        Assert.Same(nativeResult, document.ExtractedDocument.RawRepresentation);
         Assert.Same(page, table.Cells[0, 0]!.Sources.Single().Page);
 
         Guid previousKey = record.Key;
@@ -417,8 +504,8 @@ public class ExtractionDocumentMigrationTests
         pipeline.DocumentProcessors.Add(new LocalDocumentProcessor(calls));
         using CancellationTokenSource cancellation = new();
         cancellation.Cancel();
-        await Assert.ThrowsAsync<OperationCanceledException>(() => pipeline.ProcessAsync(new ExtractionDocument("cancel"), cancellation.Token));
-        await Assert.ThrowsAsync<ArgumentNullException>("document", () => pipeline.ProcessAsync((ExtractionDocument)null!));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => pipeline.ProcessAsync(new IngestionDocument("cancel"), cancellation.Token));
+        await Assert.ThrowsAsync<ArgumentNullException>("document", () => pipeline.ProcessAsync((IngestionDocument)null!));
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await pipeline.ProcessAsync(new[] { new FileInfo("never-opened.md") }).ToListAsync());
         Assert.Contains("reader", error.Message);
@@ -467,10 +554,10 @@ public class ExtractionDocumentMigrationTests
 
     private sealed class LocalDocumentProcessor(List<string> calls) : IngestionDocumentProcessor
     {
-        public override Task<ExtractionDocument> ProcessAsync(ExtractionDocument document, CancellationToken cancellationToken = default)
+        public override Task<IngestionDocument> ProcessAsync(IngestionDocument document, CancellationToken cancellationToken = default)
         {
             calls.Add("document");
-            document.Content = new TextContent("processor-local");
+            document.ExtractedDocument.Content = new TextContent("processor-local");
             return Task.FromResult(document);
         }
     }

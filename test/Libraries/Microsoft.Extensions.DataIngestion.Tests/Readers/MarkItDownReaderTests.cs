@@ -19,7 +19,7 @@ public class MarkItDownReaderTests : DocumentReaderConformanceTests
         ? new MarkItDownReader(extractImages: extractImages)
         : throw new SkipTestException("MarkItDown is not installed");
 
-    protected override void SimpleAsserts(ExtractionDocument document, string source, string expectedId)
+    protected override void SimpleAsserts(IngestionDocument document, string source, string expectedId)
     {
         Assert.NotNull(document);
         Assert.Equal(expectedId, document.Identifier);

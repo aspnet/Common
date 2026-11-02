@@ -6,13 +6,12 @@ using System.IO;
 using System.Net.Mime;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Documents;
 using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.DataIngestion;
 
 /// <summary>
-/// Reads source content and converts it to an <see cref="ExtractionDocument"/>.
+/// Reads source content and converts it to an <see cref="IngestionDocument"/>.
 /// </summary>
 /// <remarks>
 /// Returned documents require no disposal. Implementations must detach returned
@@ -21,20 +20,20 @@ namespace Microsoft.Extensions.DataIngestion;
 public abstract class IngestionDocumentReader
 {
     /// <summary>
-    /// Reads a file and converts it to an <see cref="ExtractionDocument"/>.
+    /// Reads a file and converts it to an <see cref="IngestionDocument"/>.
     /// </summary>
     /// <param name="source">The file to read.</param>
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
     /// <returns>A task representing the asynchronous read operation.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
-    public Task<ExtractionDocument> ReadAsync(FileInfo source, CancellationToken cancellationToken = default)
+    public Task<IngestionDocument> ReadAsync(FileInfo source, CancellationToken cancellationToken = default)
     {
         string identifier = Throw.IfNull(source).FullName; // entire path is more unique than just part of it.
         return ReadAsync(source, identifier, GetMediaType(source), cancellationToken);
     }
 
     /// <summary>
-    /// Reads a file and converts it to an <see cref="ExtractionDocument"/>.
+    /// Reads a file and converts it to an <see cref="IngestionDocument"/>.
     /// </summary>
     /// <param name="source">The file to read.</param>
     /// <param name="identifier">The unique identifier for the document.</param>
@@ -42,7 +41,7 @@ public abstract class IngestionDocumentReader
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
     /// <returns>A task representing the asynchronous read operation.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="source"/> or <paramref name="identifier"/> is <see langword="null"/> or empty.</exception>
-    public virtual async Task<ExtractionDocument> ReadAsync(FileInfo source, string identifier, string? mediaType = null, CancellationToken cancellationToken = default)
+    public virtual async Task<IngestionDocument> ReadAsync(FileInfo source, string identifier, string? mediaType = null, CancellationToken cancellationToken = default)
     {
         _ = Throw.IfNull(source);
         _ = Throw.IfNullOrEmpty(identifier);
@@ -52,14 +51,14 @@ public abstract class IngestionDocumentReader
     }
 
     /// <summary>
-    /// Reads a stream and converts it to an <see cref="ExtractionDocument"/>.
+    /// Reads a stream and converts it to an <see cref="IngestionDocument"/>.
     /// </summary>
     /// <param name="source">The stream to read.</param>
     /// <param name="identifier">The unique identifier for the document.</param>
     /// <param name="mediaType">The media type of the content.</param>
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
     /// <returns>A task representing the asynchronous read operation.</returns>
-    public abstract Task<ExtractionDocument> ReadAsync(Stream source, string identifier, string mediaType, CancellationToken cancellationToken = default);
+    public abstract Task<IngestionDocument> ReadAsync(Stream source, string identifier, string mediaType, CancellationToken cancellationToken = default);
 
     private static string GetMediaType(FileInfo source) =>
         MediaTypeMap.GetMediaType(source.Extension) ?? "application/octet-stream";

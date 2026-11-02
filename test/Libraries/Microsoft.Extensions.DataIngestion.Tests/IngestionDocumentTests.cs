@@ -2,7 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Documents;
 using Xunit;
@@ -11,6 +15,112 @@ namespace Microsoft.Extensions.DataIngestion.Tests;
 
 public class IngestionDocumentTests
 {
+    [Fact]
+    public void LegacyConstructor_CreatesDistinctEmptyGraphs()
+    {
+        IngestionDocument first = new("legacy");
+        IngestionDocument second = new("legacy");
+        Assert.Equal("legacy", first.Identifier);
+        Assert.Equal("legacy", first.ExtractedDocument.Identifier);
+        Assert.NotSame(first.ExtractedDocument, second.ExtractedDocument);
+        Assert.Same(first.ExtractedDocument.Sections, first.Sections);
+        Assert.Empty(first.Sections);
+        Assert.Empty(first.EnumerateContent());
+        Assert.Null(first.ExtractedDocument.Content);
+        Assert.Empty(first.ExtractedDocument.Metadata);
+        Assert.Empty(first.ExtractedDocument.SourcePages);
+    }
+
+    [Fact]
+    public void Constructors_ValidateIdentifierAndGraph()
+    {
+        ExtractionDocument graph = new("provider");
+        Assert.Throws<ArgumentNullException>("identifier", () => new IngestionDocument(null!));
+        Assert.Throws<ArgumentException>("identifier", () => new IngestionDocument(""));
+        Assert.Throws<ArgumentNullException>("identifier", () => new IngestionDocument(null!, graph));
+        Assert.Throws<ArgumentException>("identifier", () => new IngestionDocument("", graph));
+        Assert.Throws<ArgumentNullException>("extractedDocument", () => new IngestionDocument("id", null!));
+        Assert.Equal("provider", graph.Identifier);
+        Assert.Empty(graph.Sections);
+    }
+
+    [Fact]
+    public void Envelope_RetainsExactGraphAndIndependentIdsAndSharesListMutations()
+    {
+        object native = new();
+        TextContent content = new("root local");
+        ExtractionDocumentSourcePage blank = new("blank", 2);
+        ExtractionDocument graph = new("provider-id", content) { RawRepresentation = native, SourcePages = { blank } };
+        graph.Metadata.Add("producer", native);
+        IngestionDocument document = new("persistence-id", graph);
+        ExtractionDocumentTextElement leaf = new(new TextContent("leaf"));
+        ExtractionDocumentSection section = new(new TextContent("section")) { Elements = { leaf } };
+        document.Sections.Add(section);
+        Assert.Same(graph, document.ExtractedDocument);
+        Assert.Equal("persistence-id", document.Identifier);
+        Assert.Equal("provider-id", graph.Identifier);
+        Assert.Same(graph.Sections, document.Sections);
+        Assert.Same(section, Assert.Single(graph.Sections));
+        Assert.Same(leaf, Assert.Single(document.EnumerateContent()));
+        Assert.Equal(graph.EnumerateContent(), document.EnumerateContent());
+        Assert.Same(content, document.ExtractedDocument.Content);
+        Assert.Same(native, document.ExtractedDocument.Metadata["producer"]);
+        Assert.Same(native, document.ExtractedDocument.RawRepresentation);
+        Assert.Same(blank, Assert.Single(document.ExtractedDocument.SourcePages));
+        graph.Sections.Clear();
+        Assert.Empty(document.Sections);
+        Assert.Empty(document.EnumerateContent());
+        graph.Sections.Add(section);
+        Assert.Same(section, Assert.Single(document.Sections));
+        document.Sections.Remove(section);
+        Assert.Empty(graph.Sections);
+        Assert.Equal("provider-id", graph.Identifier);
+        Assert.Equal("persistence-id", document.Identifier);
+    }
+
+    [Fact]
+    public void PublicSurface_UsesSealedGetOnlyEnvelopeAndExactRootSignatures()
+    {
+        Type root = typeof(IngestionDocument);
+        Assert.True(root.IsPublic);
+        Assert.True(root.IsSealed);
+        foreach (string name in new[] { "Identifier", "ExtractedDocument", "Sections" })
+        {
+            Assert.Null(root.GetProperty(name)!.SetMethod);
+        }
+
+        Assert.Equal(typeof(ExtractionDocument), root.GetProperty("ExtractedDocument")!.PropertyType);
+        Assert.Equal(typeof(List<ExtractionDocumentSection>), root.GetProperty("Sections")!.PropertyType);
+        Assert.Equal(typeof(IEnumerable<ExtractionDocumentElement>), root.GetMethod("EnumerateContent")!.ReturnType);
+        foreach (string name in new[] { "Content", "Metadata", "SourcePages", "RawRepresentation" })
+        {
+            Assert.Null(root.GetProperty(name));
+        }
+
+        Assert.Equal(typeof(Task<IngestionDocument>),
+            typeof(IngestionDocumentReader).GetMethod("ReadAsync", new[] { typeof(Stream), typeof(string), typeof(string), typeof(CancellationToken) })!.ReturnType);
+        Assert.Equal(typeof(Task<IngestionDocument>),
+            typeof(IngestionDocumentProcessor).GetMethod("ProcessAsync", new[] { root, typeof(CancellationToken) })!.ReturnType);
+        Assert.Equal(typeof(IAsyncEnumerable<IngestionChunk>),
+            typeof(IngestionChunker).GetMethod("ProcessAsync", new[] { root, typeof(CancellationToken) })!.ReturnType);
+        Assert.Equal(root, typeof(IngestionChunk).GetProperty("Document")!.PropertyType);
+        Assert.Equal(typeof(IReadOnlyList<ExtractionDocumentElement>), typeof(IngestionChunk).GetProperty("SourceElements")!.PropertyType);
+        Assert.Equal(typeof(List<IngestionDocumentProcessor>), typeof(IngestionPipeline).GetProperty("DocumentProcessors")!.PropertyType);
+        Assert.Equal(typeof(List<IngestionChunkProcessor>), typeof(IngestionPipeline).GetProperty("ChunkProcessors")!.PropertyType);
+        Assert.Equal(typeof(Task<IngestionDocument>),
+            typeof(IngestionPipeline).GetMethod("ProcessAsync", new[] { root, typeof(CancellationToken) })!.ReturnType);
+        Assert.Equal(root, typeof(IngestionResult).GetProperty("Document")!.PropertyType);
+        Assert.Equal(typeof(Task),
+            typeof(IngestionChunkWriter).GetMethod("WriteAsync", new[] { typeof(IAsyncEnumerable<IngestionChunk>), typeof(CancellationToken) })!.ReturnType);
+        Assert.Equal(typeof(IAsyncEnumerable<IngestionChunk>),
+            typeof(IngestionChunkProcessor).GetMethod("ProcessAsync", new[] { typeof(IAsyncEnumerable<IngestionChunk>), typeof(CancellationToken) })!.ReturnType);
+        foreach (Type reader in new[] { typeof(MarkdownReader), typeof(MarkItDownReader), typeof(MarkItDownMcpReader), typeof(DocumentExtractionReader) })
+        {
+            Assert.Equal(typeof(Task<IngestionDocument>),
+                reader.GetMethod("ReadAsync", new[] { typeof(Stream), typeof(string), typeof(string), typeof(CancellationToken) })!.ReturnType);
+        }
+    }
+
     private readonly ExtractionDocumentElement?[,] _rows =
     {
         { new ExtractionDocumentTextElement(new TextContent("header")) },
@@ -21,7 +131,7 @@ public class IngestionDocumentTests
     [Fact]
     public void EnumeratorFlattensTheStructureAndPreservesOrder()
     {
-        ExtractionDocument doc = new("withSubSections");
+        IngestionDocument doc = new("withSubSections");
         doc.Sections.Add(new ExtractionDocumentSection(new TextContent("first section"))
         {
             Elements =
