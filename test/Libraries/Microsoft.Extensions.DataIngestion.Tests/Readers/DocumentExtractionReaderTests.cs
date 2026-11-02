@@ -17,10 +17,16 @@ public class DocumentExtractionReaderTests
     [Fact]
     public async Task ReadAsync_ReturnsExactDocumentAndBorrowsClientAndStream()
     {
-        ExtractionDocumentSourceOutput output = new("output", rawRepresentation: new object());
-        ExtractionDocumentSourcePage page = new("frame", null, sourceOutput: output);
-        ExtractionDocument document = new("provider-id", new TextContent("local"));
-        document.AddSourcePage(page);
+        using MemoryStream nativeResult = new(new byte[] { 4, 5, 6 });
+        ExtractionDocumentSourcePage page = new("frame", null);
+        byte[] providerBytes = [7, 8, 9];
+        ExtractionDocumentImageElement image = new(new DataContent((byte[])providerBytes.Clone(), "image/png"), "OCR");
+        ExtractionDocument document = new("provider-id", new TextContent("local"))
+        {
+            SourcePages = { page },
+            RawRepresentation = nativeResult,
+            Sections = { new() { Elements = { image } } }
+        };
         using MemoryStream stream = new(new byte[] { 1, 2, 3 });
         using FakeExtractionClient client = new((input, identifier, mediaType, options, cancellationToken) =>
         {
@@ -36,9 +42,15 @@ public class DocumentExtractionReaderTests
 
         Assert.Same(document, result);
         Assert.Same(page, Assert.Single(result.SourcePages));
-        Assert.Same(output, Assert.Single(result.SourceOutputs));
+        Assert.Same(nativeResult, result.RawRepresentation);
         Assert.Equal("local", Assert.IsType<TextContent>(result.Content).Text);
         Assert.True(stream.CanRead);
+        providerBytes[0] = 0;
+        stream.Dispose();
+        Assert.Same(image, Assert.Single(Assert.Single(result.Sections).Elements));
+        Assert.Equal(new byte[] { 7, 8, 9 }, Assert.IsType<DataContent>(image.Content).Data.ToArray());
+        Assert.Equal("OCR", image.Text);
+        Assert.True(nativeResult.CanRead);
         Assert.False(client.Disposed);
         Assert.Equal(1, client.Calls);
     }
@@ -47,7 +59,7 @@ public class DocumentExtractionReaderTests
     public async Task ReadAsync_ClonesConstructionOptionsAndEachCallButBorrowsOpaqueValues()
     {
         object borrowed = new();
-        DocumentExtractionOptions options = new() { ExtractorName = "original", CaptureRawContent = true };
+        DocumentExtractionOptions options = new() { ExtractorName = "original" };
         options.AdditionalProperties.Add("opaque", borrowed);
         DocumentExtractionOptions? first = null;
         using FakeExtractionClient client = new((input, identifier, mediaType, received, cancellationToken) =>
@@ -55,7 +67,6 @@ public class DocumentExtractionReaderTests
             Assert.NotNull(received);
             Assert.NotSame(options, received);
             Assert.Equal("original", received.ExtractorName);
-            Assert.True(received.CaptureRawContent);
             Assert.Same(borrowed, received.AdditionalProperties["opaque"]);
             Assert.False(received.AdditionalProperties.ContainsKey("later"));
             if (first is not null)
@@ -70,7 +81,6 @@ public class DocumentExtractionReaderTests
         });
         DocumentExtractionReader reader = new(client, options);
         options.ExtractorName = "mutated by caller";
-        options.CaptureRawContent = false;
         options.AdditionalProperties.Add("later", 17);
         using MemoryStream stream = new();
 

@@ -2,9 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using Markdig;
 using Markdig.Extensions.Tables;
 using Markdig.Syntax;
@@ -97,22 +95,12 @@ internal static class MarkdownParser
         {
             HeadingBlock heading => new ExtractionDocumentTextElement(new TextContent(elementMarkdown), role: "heading")
             {
-                Text = GetText(heading.Inline),
                 HeadingLevel = heading.Level
             },
-            ParagraphBlock footer when previousWasBreak => new ExtractionDocumentTextElement(new TextContent(elementMarkdown), role: "pageFooter")
-            {
-                Text = GetText(footer.Inline),
-            },
+            ParagraphBlock when previousWasBreak => new ExtractionDocumentTextElement(new TextContent(elementMarkdown), role: "pageFooter"),
             ParagraphBlock image when image.Inline!.Descendants<LinkInline>().FirstOrDefault() is LinkInline link && link.IsImage => MapImage(link),
-            ParagraphBlock paragraph => new ExtractionDocumentTextElement(new TextContent(elementMarkdown))
-            {
-                Text = GetText(paragraph.Inline),
-            },
-            CodeBlock codeBlock => new ExtractionDocumentTextElement(new TextContent(elementMarkdown))
-            {
-                Text = GetText(codeBlock.Inline),
-            },
+            ParagraphBlock => new ExtractionDocumentTextElement(new TextContent(elementMarkdown)),
+            CodeBlock => new ExtractionDocumentTextElement(new TextContent(elementMarkdown)),
             _ => throw new NotSupportedException($"Block type '{block.GetType().Name}' is not supported.")
         };
 
@@ -203,53 +191,6 @@ internal static class MarkdownParser
         return quote;
     }
 
-    private static string? GetText(ContainerInline? containerInline)
-    {
-        Debug.Assert(containerInline != null, "ContainerInline should not be null here.");
-        Debug.Assert(containerInline!.FirstChild != null, "FirstChild should not be null here.");
-
-        if (ReferenceEquals(containerInline.FirstChild, containerInline.LastChild))
-        {
-            // If there is only one child, return its text.
-            return containerInline.FirstChild!.ToString();
-        }
-
-        StringBuilder content = new(100);
-        foreach (Inline inline in containerInline)
-        {
-#pragma warning disable IDE0058 // Expression value is never used
-            if (inline is LiteralInline literalInline)
-            {
-                content.Append(literalInline.Content);
-            }
-            else if (inline is LineBreakInline)
-            {
-                content.AppendLine(); // Append a new line for line breaks
-            }
-            else if (inline is ContainerInline another)
-            {
-                // EmphasisInline is also a ContainerInline, but it does not get any special treatment,
-                // as we use raw text here (instead of a markdown, where emphasis can be expressed).
-                content.Append(GetText(another));
-            }
-            else if (inline is CodeInline codeInline)
-            {
-                content.Append(codeInline.Content);
-            }
-            else if (inline is HtmlInline htmlInline)
-            {
-                content.Append(htmlInline.Tag);
-            }
-            else
-            {
-                throw new NotSupportedException($"Inline type '{inline.GetType().Name}' is not supported.");
-            }
-#pragma warning restore IDE0058 // Expression value is never used
-        }
-
-        return content.ToString();
-    }
-
 #pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
 #pragma warning disable S3967 // Multidimensional arrays should not be used
     private static ExtractionDocumentTableElement MapTable(Table table, string outputContent)
@@ -319,7 +260,8 @@ internal static class MarkdownParser
                 for (int cellIndex = 0; cellIndex < firstRow.Count; cellIndex++)
                 {
                     var tableCell = (TableCell)firstRow[cellIndex];
-                    if (tableCell.Count > 0 && !string.IsNullOrWhiteSpace(MapBlock(outputContent, previousWasBreak: false, tableCell[0]).Text))
+                    if (tableCell.Count > 0 && MapBlock(outputContent, previousWasBreak: false, tableCell[0]).Content is TextContent text &&
+                        !string.IsNullOrWhiteSpace(text.Text))
                     {
                         return false;
                     }

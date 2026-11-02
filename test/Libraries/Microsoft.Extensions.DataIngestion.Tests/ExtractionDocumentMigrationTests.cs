@@ -108,11 +108,15 @@ public class ExtractionDocumentMigrationTests
     [Fact]
     public async Task DocumentTokenChunker_ConsumesLocalPayloadsOnceWithNestedCellsAndImageSources()
     {
-        ExtractionDocumentSourceOutput output = new("operation", rawRepresentation: "PRIVATE_PROVIDER_RESPONSE");
-        ExtractionDocumentSourcePage unknown = new("canvas", null, sourceOutput: output);
-        ExtractionDocumentSourcePage numbered = new("page-seven", 7, sourceOutput: output);
-        ExtractionDocumentSourceReference reference = new(numbered,
-            [new(0, 0), new(1, 0), new(1, 1)], rawRepresentation: "PRIVATE_OBSERVATION");
+        object nativeResult = new { Value = "PRIVATE_PROVIDER_RESPONSE" };
+        object nativeObservation = new { Value = "PRIVATE_OBSERVATION" };
+        ExtractionDocumentSourcePage unknown = new("canvas", null);
+        ExtractionDocumentSourcePage numbered = new("page-seven", 7,
+            dimensions: new(612, 792), coordinateUnit: ExtractionDocumentCoordinateUnit.Point,
+            coordinateOrigin: ExtractionDocumentCoordinateOrigin.BottomLeft);
+        ExtractionDocumentSourcePage blank = new("blank-frame", 10);
+        ExtractionDocumentPoint[] polygon = [new(12, 24), new(60, 24), new(60, 48)];
+        ExtractionDocumentSourceReference reference = new(numbered, polygon, rawRepresentation: nativeObservation);
         ExtractionDocumentTextElement cellText = new(new TextContent("cell"));
         cellText.Sources.Add(reference);
         ExtractionDocumentImageElement image = new(new DataContent(new byte[] { 1, 2 }, "image/png"), "OCR")
@@ -133,9 +137,13 @@ public class ExtractionDocumentMigrationTests
             Elements = { new ExtractionDocumentTextElement(new TextContent("plain **literal**")), nested }
         };
         section.Sources.Add(new(unknown));
-        ExtractionDocument document = new("manual", new TextContent("document")) { Sections = { section } };
-        document.AddSourcePage(unknown);
-        document.AddSourcePage(numbered);
+        ExtractionDocument document = new("manual", new TextContent("document"))
+        {
+            Sections = { section },
+            SourcePages = { unknown, numbered, blank },
+            RawRepresentation = nativeResult
+        };
+        polygon[0] = new(0, 0);
 
         Tokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4o");
         DocumentTokenChunker chunker = new(new(tokenizer) { MaxTokensPerChunk = 100, OverlapTokens = 0 });
@@ -150,10 +158,17 @@ public class ExtractionDocumentMigrationTests
         Assert.Same(reference, table.Cells[0, 0]!.Sources[0]);
         Assert.Same(reference, cellText.Sources[0]);
         Assert.Same(numbered, reference.Page);
-        Assert.Same(output, reference.Page.SourceOutput);
+        Assert.Same(nativeResult, document.RawRepresentation);
+        Assert.Same(nativeObservation, reference.GetRawRepresentation());
+        Assert.Equal(new ExtractionDocumentPoint[] { new(12, 24), new(60, 24), new(60, 48) }, reference.Polygon);
+        Assert.Equal(new ExtractionDocumentPageDimensions(612, 792), numbered.Dimensions);
+        Assert.Equal(ExtractionDocumentCoordinateUnit.Point, numbered.CoordinateUnit);
+        Assert.Equal(ExtractionDocumentCoordinateOrigin.BottomLeft, numbered.CoordinateOrigin);
         Assert.Null(unknown.PageNumber);
         Assert.Equal(7, numbered.PageNumber);
-        Assert.Equal(new[] { unknown, numbered }, document.SourcePages);
+        Assert.Equal(new[] { unknown, numbered, blank }, document.SourcePages);
+        Assert.Equal(10, blank.PageNumber);
+        Assert.DoesNotContain(chunk.SourceElements.SelectMany(element => element.Sources), source => ReferenceEquals(source.Page, blank));
         Assert.DoesNotContain("PRIVATE", Text(chunk));
         Assert.DoesNotContain("OCR", Text(chunk));
     }
@@ -229,6 +244,81 @@ public class ExtractionDocumentMigrationTests
         Assert.Null(heading.HeadingLevel);
     }
 
+    [Fact]
+    public async Task HeaderChunker_PreservesSparsePositiveLevelsAndClearsDeeperContext()
+    {
+        ExtractionDocumentTextElement root = new(new TextContent("Root"), role: "heading") { HeadingLevel = 11 };
+        ExtractionDocumentTextElement deepest = new(new TextContent("Deep"), role: "heading") { HeadingLevel = int.MaxValue };
+        ExtractionDocumentTextElement sibling = new(new TextContent("Sibling"), role: "heading") { HeadingLevel = 12 };
+        ExtractionDocumentTextElement first = new(new TextContent("first"));
+        ExtractionDocumentTextElement second = new(new TextContent("second"));
+        ExtractionDocument document = new("deep-headings")
+        {
+            Sections = { new() { Elements = { root, deepest, first, sibling, second } } }
+        };
+        Tokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4o");
+
+        List<IngestionChunk> chunks = await new HeaderChunker(new(tokenizer) { MaxTokensPerChunk = 10 })
+            .ProcessAsync(document).ToListAsync();
+
+        Assert.Equal(2, chunks.Count);
+        Assert.Equal("Root Deep", chunks[0].Context);
+        Assert.Equal("Root Deep" + Environment.NewLine + "first", Text(chunks[0]));
+        Assert.Equal("Root Sibling", chunks[1].Context);
+        Assert.Equal("Root Sibling" + Environment.NewLine + "second", Text(chunks[1]));
+        Assert.Contains(root, chunks[0].SourceElements);
+        Assert.Contains(deepest, chunks[0].SourceElements);
+        Assert.DoesNotContain(sibling, chunks[0].SourceElements);
+        Assert.Contains(root, chunks[1].SourceElements);
+        Assert.Contains(sibling, chunks[1].SourceElements);
+        Assert.DoesNotContain(deepest, chunks[1].SourceElements);
+        Assert.All(chunks, chunk =>
+        {
+            Assert.Equal(tokenizer.CountTokens(Text(chunk), considerNormalization: false), chunk.TokenCount);
+            Assert.InRange(chunk.TokenCount, 1, 10);
+        });
+    }
+
+    [Fact]
+    public async Task DocumentTokenChunker_UsesMutatedAuthoritativeTextAndOriginalImageSource()
+    {
+        ExtractionDocumentTextElement text = new(new TextContent("before"), role: "customRole");
+        TextContent replacement = new("after **literal**");
+        ExtractionDocumentElement element = text;
+        element.Content = replacement;
+        Assert.Throws<ArgumentNullException>("value", () => element.Content = null);
+        foreach (AIContent invalid in new AIContent[]
+        {
+            new DataContent(new byte[] { 1 }, "image/png"),
+            new UriContent("https://example.test/invalid.png", "image/png")
+        })
+        {
+            Assert.Throws<ArgumentException>("value", () => element.Content = invalid);
+            Assert.Same(replacement, element.Content);
+        }
+
+        ExtractionDocumentImageElement image = new(new UriContent("https://example.test/current.png", "image/png"), "OCR")
+        {
+            Source = new("https://example.test/original.png"),
+            AlternativeText = "description"
+        };
+        ExtractionDocument document = new("mutable") { Sections = { new() { Elements = { text, image } } } };
+
+        IngestionChunk chunk = Assert.Single(await Tokens(100).ProcessAsync(document).ToListAsync());
+
+        Assert.Same(replacement, text.Content);
+        Assert.Equal("customRole", text.Role);
+        Assert.Equal("after **literal**" + Environment.NewLine + "![description](https://example.test/original.png)", Text(chunk));
+        Assert.DoesNotContain("before", Text(chunk));
+        Assert.DoesNotContain("current.png", Text(chunk));
+        Assert.DoesNotContain("OCR", Text(chunk));
+        Assert.Equal(new Uri("https://example.test/current.png"), Assert.IsType<UriContent>(image.Content).Uri);
+        Assert.Equal(new Uri("https://example.test/original.png"), image.Source);
+        Assert.Equal("OCR", image.Text);
+        Assert.Contains(text, chunk.SourceElements);
+        Assert.Contains(image, chunk.SourceElements);
+    }
+
     [Theory]
     [InlineData(0, 2, 5)]
     [InlineData(1, 3, 5)]
@@ -271,14 +361,18 @@ public class ExtractionDocumentMigrationTests
     public async Task DirectPipeline_OrdersProcessorsAndPersistsDurableCellReferences()
     {
         List<string> calls = [];
-        ExtractionDocumentSourceOutput output = new("extract-operation", rawRepresentation: "PRIVATE_RAW");
-        ExtractionDocumentSourcePage page = new("frame", 9, sourceOutput: output);
+        object nativeResult = new { Value = "PRIVATE_RAW" };
+        ExtractionDocumentSourcePage page = new("frame", 9);
         ExtractionDocumentTextElement cell = new(new TextContent("durable text"));
         ExtractionDocumentTableElement table = new(null, 1, 1);
         table.Cells[0, 0] = new(cell);
         table.Cells[0, 0]!.Sources.Add(new(page));
-        ExtractionDocument document = new("consumer-document") { Sections = { new() { Elements = { table } } } };
-        document.AddSourcePage(page);
+        ExtractionDocument document = new("consumer-document")
+        {
+            Sections = { new() { Elements = { table } } },
+            SourcePages = { page },
+            RawRepresentation = nativeResult
+        };
         using TestEmbeddingGenerator<AIContent> embeddings = new();
         using InMemoryVectorStore store = new(new() { EmbeddingGenerator = embeddings });
         VectorStoreCollection<Guid, DurableRecord> collection =
@@ -294,11 +388,12 @@ public class ExtractionDocumentMigrationTests
         Assert.Same(document, result);
         Assert.Equal(new[] { "document", "chunk", "record" }, calls);
         Assert.Equal("processor-local" + Environment.NewLine + "durable text", Assert.IsType<TextContent>(record.Content).Text);
-        Assert.Equal("consumer-document/extract-operation/frame/0/0", record.DurableSource);
+        Assert.Equal("consumer-document/frame/0/0", record.DurableSource);
         Assert.Equal("processed", record.Classification);
         Assert.NotEqual(Guid.Empty, record.Key);
         Assert.True(embeddings.WasCalled);
         Assert.DoesNotContain("PRIVATE_RAW", record.SerializedContent!);
+        Assert.Same(nativeResult, document.RawRepresentation);
         Assert.Same(page, table.Cells[0, 0]!.Sources.Single().Page);
 
         Guid previousKey = record.Key;
@@ -359,7 +454,7 @@ public class ExtractionDocumentMigrationTests
             ExtractionDocumentTableElement table = Assert.Single(chunk.SourceElements.OfType<ExtractionDocumentTableElement>());
             ExtractionDocumentTableCell cell = table.Cells[0, 0]!;
             ExtractionDocumentSourcePage page = Assert.Single(cell.Sources).Page;
-            record.DurableSource = $"{chunk.Document.Identifier}/{page.SourceOutput!.Identifier}/{page.Identifier}/{cell.RowIndex}/{cell.ColumnIndex}";
+            record.DurableSource = $"{chunk.Document.Identifier}/{page.Identifier}/{cell.RowIndex}/{cell.ColumnIndex}";
             return record;
         }
 

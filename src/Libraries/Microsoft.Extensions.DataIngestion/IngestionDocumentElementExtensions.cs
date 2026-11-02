@@ -17,7 +17,7 @@ internal static class IngestionDocumentElementExtensions
     internal static string? GetSemanticContent(AIContent? content) => (content as TextContent)?.Text;
 
     internal static bool UsesTableCells(ExtractionDocumentTableElement table)
-        => string.IsNullOrEmpty(GetSemanticContent(table.Content) ?? table.Text);
+        => string.IsNullOrEmpty(GetSemanticContent(table.Content));
 
     internal static string GetSemanticRow(ExtractionDocumentTableElement table, int row)
         => GetSemanticRow(table, row, [table]);
@@ -44,7 +44,7 @@ internal static class IngestionDocumentElementExtensions
                 : description;
         }
 
-        string? localContent = GetSemanticContent(element.Content) ?? element.Text;
+        string? localContent = GetSemanticContent(element.Content);
         if (!string.IsNullOrEmpty(localContent) || element is not ExtractionDocumentTableElement table)
         {
             return localContent;

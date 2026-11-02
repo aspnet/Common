@@ -15,7 +15,7 @@ namespace Microsoft.Extensions.DataIngestion;
 /// Reads source content and converts it to an <see cref="ExtractionDocument"/>.
 /// </summary>
 /// <remarks>
-/// Returned documents and detached byte artifacts require no disposal. Implementations must detach returned
+/// Returned documents require no disposal. Implementations must detach returned
 /// content from temporary streams and provider resources before releasing them. Caller-supplied streams remain borrowed.
 /// </remarks>
 public abstract class IngestionDocumentReader

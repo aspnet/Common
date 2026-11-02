@@ -17,7 +17,6 @@ namespace Microsoft.Extensions.DataIngestion;
 /// </summary>
 public sealed class HeaderChunker : IngestionChunker
 {
-    private const int MaxHeaderLevel = 10;
     private readonly ElementsChunker _elementsChunker;
 
     /// <summary>
@@ -36,8 +35,7 @@ public sealed class HeaderChunker : IngestionChunker
         _ = Throw.IfNull(document);
 
         List<ExtractionDocumentElement> elements = [];
-        string?[] headers = new string?[MaxHeaderLevel + 1];
-        IReadOnlyList<ExtractionDocumentElement>?[] headerSources = new IReadOnlyList<ExtractionDocumentElement>?[MaxHeaderLevel + 1];
+        SortedDictionary<int, (string Content, IReadOnlyList<ExtractionDocumentElement> Sources)> headers = [];
         Dictionary<ExtractionDocumentElement, IReadOnlyList<ExtractionDocumentElement>> elementSources = [];
 
         foreach (var (element, content, sources) in IngestionDocumentElementExtensions.EnumerateSemanticContent(document))
@@ -54,7 +52,7 @@ public sealed class HeaderChunker : IngestionChunker
                 continue;
             }
 
-            if (string.IsNullOrEmpty(content))
+            if (content is null || content.Length == 0)
             {
                 continue;
             }
@@ -62,16 +60,17 @@ public sealed class HeaderChunker : IngestionChunker
             elementSources[element] = sources;
             if (element is ExtractionDocumentTextElement header && string.Equals(header.Role, "heading", StringComparison.OrdinalIgnoreCase))
             {
-                foreach (var chunk in SplitIntoChunks(document, headers, headerSources, elements, elementSources))
+                foreach (var chunk in SplitIntoChunks(document, headers, elements, elementSources))
                 {
                     yield return chunk;
                 }
 
                 int headerLevel = header.HeadingLevel.GetValueOrDefault();
-                headers[headerLevel] = content;
-                headerSources[headerLevel] = sources;
-                headers.AsSpan(headerLevel + 1).Clear(); // clear all lower level headers
-                headerSources.AsSpan(headerLevel + 1).Clear();
+                headers[headerLevel] = (content, sources);
+                foreach (int lowerLevel in headers.Keys.Where(level => level > headerLevel).ToArray())
+                {
+                    _ = headers.Remove(lowerLevel);
+                }
 
                 continue; // don't add headers to the elements list, they are part of the context
             }
@@ -80,21 +79,22 @@ public sealed class HeaderChunker : IngestionChunker
         }
 
         // take care of any remaining paragraphs
-        foreach (var chunk in SplitIntoChunks(document, headers, headerSources, elements, elementSources))
+        foreach (var chunk in SplitIntoChunks(document, headers, elements, elementSources))
         {
             yield return chunk;
         }
     }
 
-    private IEnumerable<IngestionChunk> SplitIntoChunks(ExtractionDocument document, string?[] headers,
-        IReadOnlyList<ExtractionDocumentElement>?[] headerSources, List<ExtractionDocumentElement> elements,
+    private IEnumerable<IngestionChunk> SplitIntoChunks(ExtractionDocument document,
+        SortedDictionary<int, (string Content, IReadOnlyList<ExtractionDocumentElement> Sources)> headers,
+        List<ExtractionDocumentElement> elements,
         IReadOnlyDictionary<ExtractionDocumentElement, IReadOnlyList<ExtractionDocumentElement>> elementSources)
     {
         if (elements.Count > 0)
         {
-            string chunkHeader = string.Join(" ", headers.Where(h => !string.IsNullOrEmpty(h)));
+            string chunkHeader = string.Join(" ", headers.Values.Select(header => header.Content));
 
-            var contextSources = headerSources.Where(sources => sources is not null).SelectMany(sources => sources!).Distinct().ToArray();
+            var contextSources = headers.Values.SelectMany(header => header.Sources).Distinct().ToArray();
             foreach (var chunk in _elementsChunker.Process(document, chunkHeader, elements, contextSources, elementSources: elementSources))
             {
                 yield return chunk;

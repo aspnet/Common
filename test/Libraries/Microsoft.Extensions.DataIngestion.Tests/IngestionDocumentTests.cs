@@ -83,11 +83,23 @@ public class IngestionDocumentTests
 
     [Theory]
     [InlineData(-1)]
-    [InlineData(100)]
+    [InlineData(0)]
     public void InvalidHeaderLevelThrows(int level)
     {
         ExtractionDocumentTextElement header = new(new TextContent("header"), role: "heading");
 
         Assert.Throws<ArgumentOutOfRangeException>("value", () => header.HeadingLevel = level);
+    }
+
+    [Theory]
+    [InlineData(11)]
+    [InlineData(int.MaxValue)]
+    public void PositiveHeaderLevelsArePreserved(int level)
+    {
+        ExtractionDocumentTextElement header = new(new TextContent("header"), role: "heading") { HeadingLevel = level };
+
+        Assert.Equal(level, header.HeadingLevel);
+        Assert.Equal("header", Assert.IsType<TextContent>(header.Content).Text);
+        Assert.Equal("heading", header.Role);
     }
 }

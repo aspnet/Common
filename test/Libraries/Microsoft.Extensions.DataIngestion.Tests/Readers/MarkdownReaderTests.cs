@@ -18,7 +18,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
     public async Task PreservesRawMarkdownHeadingFooterAndExplicitTableHeaderRoles()
     {
         ExtractionDocument document = await ReadAsync("""
-            ## Actual heading
+            ## **Actual heading**
 
             A *formatted* paragraph.
 
@@ -35,8 +35,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         ExtractionDocumentTextElement heading = Assert.IsType<ExtractionDocumentTextElement>(elements[0]);
         Assert.Equal("heading", heading.Role);
         Assert.Equal(2, heading.HeadingLevel);
-        Assert.Equal("## Actual heading", Assert.IsType<TextContent>(heading.Content).Text);
-        Assert.Equal("Actual heading", heading.Text);
+        Assert.Equal("## **Actual heading**", Assert.IsType<TextContent>(heading.Content).Text);
         ExtractionDocumentTextElement paragraph = Assert.IsType<ExtractionDocumentTextElement>(elements[1]);
         Assert.Null(paragraph.Role);
         Assert.Equal("A *formatted* paragraph.", Assert.IsType<TextContent>(paragraph.Content).Text);
@@ -49,7 +48,6 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         Assert.Equal("pageFooter", footer.Role);
         Assert.Null(footer.HeadingLevel);
         Assert.Equal("Footer text.", Assert.IsType<TextContent>(footer.Content).Text);
-        Assert.Equal("Footer text.", footer.Text);
         Assert.Equal(4, elements.Length);
     }
 
@@ -272,8 +270,8 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         ExtractionDocument document = await ReadAsync(markdownContent);
 
         var paragraph = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTextElement>(), element => element.Role is null);
-        Assert.Equal("This has <sup>[1]</sup> inline HTML.", paragraph.Text);
         Assert.Equal(markdownContent, Assert.IsType<TextContent>(paragraph.Content).Text);
+        Assert.Null(paragraph.Role);
     }
 
     [ConditionalFact]
@@ -286,8 +284,8 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         ExtractionDocument document = await ReadAsync(markdownContent);
 
         var paragraph = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTextElement>(), element => element.Role is null);
-        Assert.Equal("Text with <strong>bold</strong>, <em>italic</em>, <sub>subscript</sub>, and <sup>superscript</sup> tags.", paragraph.Text);
         Assert.Equal(markdownContent, Assert.IsType<TextContent>(paragraph.Content).Text);
+        Assert.Null(paragraph.Role);
     }
 
     private async Task<ExtractionDocument> ReadAsync(string content)
