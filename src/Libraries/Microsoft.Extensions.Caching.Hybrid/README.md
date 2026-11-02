@@ -76,6 +76,17 @@ public class SomeService(HybridCache cache)
 }
 ```
 
+To read a value that may already be cached, without creating it when it is missing, use the `GetAsync`
+extension method; a miss is never written to the cache:
+
+```csharp
+var (found, info) = await _cache.GetAsync<SomeDataType>($"{name}-{id}", cancellationToken: token);
+if (found)
+{
+    // use info
+}
+```
+
 Additional usage guidance - including expiration, custom serialization support, and alternate usage
 to reduce delegate allocation - is available
 on [learn.microsoft.com](https://learn.microsoft.com/aspnet/core/performance/caching/hybrid).

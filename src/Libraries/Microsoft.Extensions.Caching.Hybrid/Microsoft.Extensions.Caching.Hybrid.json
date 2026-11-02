@@ -24,6 +24,16 @@
       ]
     },
     {
+      "Type": "static class Microsoft.Extensions.Caching.Hybrid.HybridCacheExtensions",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "static System.Threading.Tasks.ValueTask<(bool Found, T? Value)> Microsoft.Extensions.Caching.Hybrid.HybridCacheExtensions.GetAsync<T>(this Microsoft.Extensions.Caching.Hybrid.HybridCache cache, string key, Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
       "Type": "class Microsoft.Extensions.Caching.Hybrid.HybridCacheOptions",
       "Stage": "Stable",
       "Methods": [

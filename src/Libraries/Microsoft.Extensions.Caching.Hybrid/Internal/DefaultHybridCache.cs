@@ -218,6 +218,84 @@ internal sealed partial class DefaultHybridCache : HybridCache
         return new(state.ExecuteDirectAsync(value, static (state, _) => new(state), options)); // note this spans L2 write etc
     }
 
+    // backs HybridCacheExtensions.GetAsync; reads L1 then L2, but never invokes the underlying data store, so a miss is never written anywhere
+    internal ValueTask<(bool Found, T? Value)> GetAsync<T>(string key, HybridCacheEntryOptions? options, CancellationToken cancellationToken)
+    {
+        bool canBeCanceled = cancellationToken.CanBeCanceled;
+        if (canBeCanceled)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        HybridCacheEntryFlags flags = GetEffectiveFlags(options) | HybridCacheEntryFlags.DisableUnderlyingData;
+        if (!ValidateKey(key))
+        {
+            // we can't use cache, and there is nothing else to ask
+            return default;
+        }
+
+        bool eventSourceEnabled = HybridCacheEventSource.Log.IsEnabled();
+
+        if ((flags & HybridCacheEntryFlags.DisableLocalCacheRead) == 0)
+        {
+            if (TryGetExisting<T>(key, out CacheItem<T>? typed)
+                && typed.TryGetValue(_logger, out T? value))
+            {
+                // short-circuit
+                if (eventSourceEnabled)
+                {
+                    HybridCacheEventSource.Log.LocalCacheHit();
+                }
+
+                return new((true, value));
+            }
+            else
+            {
+                if (eventSourceEnabled)
+                {
+                    HybridCacheEventSource.Log.LocalCacheMiss();
+                }
+            }
+        }
+
+        // the state type matches the stateless GetOrCreateAsync overload, so that we can share a stampede with callers
+        // of that overload who also pass DisableUnderlyingData; the factory is never invoked, because of that flag
+        ValueTask<T> pending;
+        if (GetOrCreateStampedeState<Func<CancellationToken, ValueTask<T>>, T>(key, flags,
+            out StampedeState<Func<CancellationToken, ValueTask<T>>, T>? stampede, canBeCanceled, tags: null))
+        {
+            // new query; we're responsible for making it happen
+            if (canBeCanceled)
+            {
+                stampede.QueueUserWorkItem(null!, static (_, _) => default, options);
+                pending = stampede.JoinAsync(_logger, cancellationToken);
+            }
+            else
+            {
+                _ = stampede.ExecuteDirectAsync(null!, static (_, _) => default, options);
+                pending = stampede.UnwrapReservedAsync(_logger);
+            }
+        }
+        else
+        {
+            // pre-existing query
+            if (eventSourceEnabled)
+            {
+                HybridCacheEventSource.Log.StampedeJoin();
+            }
+
+            pending = stampede.JoinAsync(_logger, cancellationToken);
+        }
+
+        return AwaitedAsync(stampede, pending);
+
+        static async ValueTask<(bool Found, T? Value)> AwaitedAsync(StampedeState<Func<CancellationToken, ValueTask<T>>, T> stampede, ValueTask<T> pending)
+        {
+            T value = await pending.ConfigureAwait(false);
+            return stampede.IsDefaultResult ? (false, default) : (true, value);
+        }
+    }
+
     // exposed as internal for testability
     internal TimeSpan GetL1AbsoluteExpirationRelativeToNow(HybridCacheEntryOptions? options)
         => GetEffectiveLocalCacheExpiration(options) ?? _defaultLocalCacheExpiration;

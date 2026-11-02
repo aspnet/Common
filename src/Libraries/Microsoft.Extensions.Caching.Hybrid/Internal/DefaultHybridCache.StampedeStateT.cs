@@ -26,6 +26,10 @@ internal partial class DefaultHybridCache
         private HybridCacheEntryOptions? _options;
         private Task<T>? _sharedUnwrap; // allows multiple non-cancellable callers to share a single task (when no defensive copy needed)
 
+        // true when neither L2 nor the underlying data store provided a value; shared by all joined callers,
+        // and assigned before the result is published, so it is safe to read once the result has been observed
+        internal bool IsDefaultResult { get; private set; }
+
         // ONLY set the result, without any other side-effects
         internal void SetResultDirect(CacheItem<T> value)
             => _result?.TrySetResult(value);
@@ -427,11 +431,29 @@ internal partial class DefaultHybridCache
 
         private void SetDefaultResult()
         {
-            // note we don't store this dummy result in L1 or L2
+            // note we don't store this dummy result in L1 or L2; we complete with our own cache item, because
+            // it already holds one reservation per joined caller, and each caller releases one when unwrapping
             if (_result is not null)
             {
+                CacheItem<T> cacheItem;
+                switch (CacheItem)
+                {
+                    case ImmutableCacheItem<T> immutable:
+                        immutable.SetValue(default!, size: -1);
+                        cacheItem = immutable;
+                        break;
+                    case MutableCacheItem<T> mutable:
+                        mutable.SetFallbackValue(default!);
+                        cacheItem = mutable;
+                        break;
+                    default:
+                        cacheItem = ThrowUnexpectedCacheItem();
+                        break;
+                }
+
+                IsDefaultResult = true;
                 Cache.RemoveStampedeState(in Key);
-                _ = _result.TrySetResult(ImmutableCacheItem<T>.GetReservedShared());
+                _ = _result.TrySetResult(cacheItem);
             }
         }
 
