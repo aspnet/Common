@@ -42,5 +42,9 @@ public sealed class ToolApprovalResponseContent : InputResponseContent
     /// <summary>
     /// Gets or sets the optional reason for the approval or rejection.
     /// </summary>
+    /// <remarks>
+    /// When a function call is rejected by function invocation middleware, this reason is appended to the rejection message.
+    /// Callers can use the reason to indicate whether the rejection is final or a new call may be requested for approval.
+    /// </remarks>
     public string? Reason { get; set; }
 }
