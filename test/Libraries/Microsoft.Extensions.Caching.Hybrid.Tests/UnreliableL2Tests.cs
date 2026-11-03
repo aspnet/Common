@@ -127,7 +127,7 @@ public class UnreliableL2Tests(ITestOutputHelper testLog) : IClassFixture<TestEv
 
         await cache.SetAsync("discovery_123", 200);
 
-        int result = await cache.GetOrCreateAsync("discovery_123", static _ => ValueTask.FromResult(404));
+        int result = await cache.GetOrCreateAsync("discovery_123", static _ => new ValueTask<int>(404));
 
         Assert.Equal(200, result);
     }
@@ -150,7 +150,7 @@ public class UnreliableL2Tests(ITestOutputHelper testLog) : IClassFixture<TestEv
 
         await cache.SetAsync("tagged_key", 300, tags: ["tag1"]);
 
-        int result = await cache.GetOrCreateAsync("tagged_key", static _ => ValueTask.FromResult(404), tags: ["tag1"]);
+        int result = await cache.GetOrCreateAsync("tagged_key", static _ => new ValueTask<int>(404), tags: ["tag1"]);
 
         Assert.Equal(300, result);
     }
