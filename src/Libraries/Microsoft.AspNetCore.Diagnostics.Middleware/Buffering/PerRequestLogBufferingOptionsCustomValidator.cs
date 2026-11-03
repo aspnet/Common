@@ -10,7 +10,7 @@ namespace Microsoft.AspNetCore.Diagnostics.Buffering;
 
 internal sealed class PerRequestLogBufferingOptionsCustomValidator : IValidateOptions<PerRequestLogBufferingOptions>
 {
-    private const char WildcardChar = '*';
+    private const string Wildcard = "*";
 
     public ValidateOptionsResult Validate(string? name, PerRequestLogBufferingOptions options)
     {
@@ -22,8 +22,8 @@ internal sealed class PerRequestLogBufferingOptionsCustomValidator : IValidateOp
                 continue;
             }
 
-            int wildcardIndex = rule.CategoryName.IndexOf(WildcardChar, StringComparison.Ordinal);
-            if (wildcardIndex >= 0 && rule.CategoryName.IndexOf(WildcardChar, wildcardIndex + 1) >= 0)
+            int wildcardIndex = rule.CategoryName.IndexOf(Wildcard, StringComparison.Ordinal);
+            if (wildcardIndex >= 0 && rule.CategoryName.IndexOf(Wildcard, wildcardIndex + 1, StringComparison.Ordinal) >= 0)
             {
                 resultBuilder.AddError("Only one wildcard character is allowed in category name.", nameof(options.Rules));
             }

@@ -24,7 +24,7 @@ internal sealed class IPAddressListParser : HeaderParser<IReadOnlyList<IPAddress
 
             do
             {
-                nextSeparatorIndex = value!.IndexOf(',', startIndex);
+                nextSeparatorIndex = value!.IndexOf(",", startIndex, StringComparison.Ordinal);
                 var length = (nextSeparatorIndex >= 0 ? nextSeparatorIndex : value.Length) - startIndex;
 
                 if (length == 0)

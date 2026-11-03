@@ -4,6 +4,8 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using DnsResolver = Microsoft.Extensions.ServiceDiscovery.Dns.Resolver.DnsResolver;
+using DnsResolverOptions = Microsoft.Extensions.ServiceDiscovery.Dns.DnsResolverOptions;
 
 namespace Microsoft.Extensions.ServiceDiscovery.Dns.Tests.Fuzzing;
 

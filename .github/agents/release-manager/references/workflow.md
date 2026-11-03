@@ -8,7 +8,7 @@ flowchart TD
     Track -->|Monthly| M0["0: Capture original public main SHA; approve public release branch cut"]
     M0 --> M1["1a: Internal infrastructure preparation"]
     M1 --> MV["1b: Manual product version bump; separate approved commit"]
-    MV --> M2["2: Validate all manifests; 9 canonical, 8 LTS, 10 overlay"]
+    MV --> M2["2: Validate all manifests; 9 canonical, 8 LTS, 10/11 overlays"]
     M2 --> M3["3: Stage CI, internal landing, official build; test-policy gate"]
     Track -->|Servicing| S1["1-2: Existing release branch; approve patch bump and backports"]
     S1 --> S3["3: Merge prep PR, verify mirror SHA, official build; test-policy gate"]

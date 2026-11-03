@@ -732,7 +732,7 @@ public sealed class OpenAIRealtimeClientSession : IRealtimeClientSession
     private static BinaryData ExtractAudioBinaryData(DataContent content)
     {
         string dataUri = content.Uri?.ToString() ?? string.Empty;
-        int commaIndex = dataUri.LastIndexOf(',');
+        int commaIndex = dataUri.LastIndexOf(",", StringComparison.Ordinal);
 
         if (commaIndex >= 0 && commaIndex < dataUri.Length - 1)
         {

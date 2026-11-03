@@ -49,7 +49,7 @@ Inspect `MajorVersion`, `MinorVersion`, `PatchVersion` in `eng/Versions.props`, 
 
 ## Stage 2 - Update Dependencies (monthly release)
 
-Update the branch's product dependencies to the pending .NET 9, .NET 8, and .NET 10 servicing releases using `darc update-dependencies`. The BAR build IDs come from the release.dot.net Release Tracker, which is behind Microsoft auth and unreachable by the agent, so the user supplies them (pasted `ReleaseManifest.json` or a downloaded copy). This stage has three sub-stages, each its own commit: .NET 9, then .NET 8, then .NET 10.
+Update the branch's product dependencies to the pending .NET 9, .NET 8, .NET 10, and .NET 11 servicing releases using `darc update-dependencies`. The BAR build IDs come from the release.dot.net Release Tracker, which is behind Microsoft auth and unreachable by the agent, so the user supplies them (pasted `ReleaseManifest.json` or a downloaded copy). This stage has four sub-stages, each its own commit: .NET 9, then .NET 8, then .NET 10, then .NET 11.
 
 Read and follow [references/stage-2-update-dependencies.md](references/stage-2-update-dependencies.md).
 

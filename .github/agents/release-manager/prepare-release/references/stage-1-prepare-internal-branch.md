@@ -36,6 +36,11 @@ Remove the entire `<packageSourceMapping>` section. This section looks like:
 ```
 
 **Important**: Do NOT add new internal feed sources to NuGet.config - those are managed by Dependency Flow automation and will be added automatically.
+Confirm that both `eng/common/SetupNugetSources.ps1` and
+`eng/common/SetupNugetSources.sh` recognize `dotnet11` when the public feed
+is present, so the private-feed setup below also adds `dotnet11-internal`
+and `dotnet11-internal-transport`. Check this again after Arcade tooling
+updates, which can replace the checked-in scripts.
 
 ## 3. eng/Versions.props
 

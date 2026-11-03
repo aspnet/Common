@@ -28,7 +28,7 @@
 
   <ItemGroup>
     <Compile Remove="FxPolyfills\**" />
-    <Compile Condition="'$(TargetFramework)' == 'net10.0'" Remove="ServerSentEvents\**" />
+    <Compile Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net10.0'))" Remove="ServerSentEvents\**" />
   </ItemGroup>
 
   <ItemGroup>

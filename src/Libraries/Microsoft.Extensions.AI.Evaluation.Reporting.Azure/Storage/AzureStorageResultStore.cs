@@ -187,10 +187,10 @@ public sealed class AzureStorageResultStore(DataLakeDirectoryClient client) : IE
     }
 
     private static string GetLastSegmentFromPath(string name)
-        => name.Substring(name.LastIndexOf('/') + 1);
+        => name.Substring(name.LastIndexOf("/", StringComparison.Ordinal) + 1);
 
     private static string StripExtension(string name)
-        => name.Substring(0, name.LastIndexOf('.'));
+        => name.Substring(0, name.LastIndexOf(".", StringComparison.Ordinal));
 
     private static (string path, bool isDir) GetResultPath(
         string? executionName = null,

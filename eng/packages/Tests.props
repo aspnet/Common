@@ -60,8 +60,15 @@
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(MicrosoftAspNetCoreTestHostVersion)" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == '$(LatestTargetFramework)'">
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(MicrosoftAspNetCoreMvcTestingNet10Version)" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(MicrosoftAspNetCoreTestHostNet10Version)" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == '$(LatestTargetFramework)'">
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(MicrosoftAspNetCoreMvcTestingNet11Version)" />
+    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(MicrosoftAspNetCoreTestHostNet11Version)" />
+    <PackageVersion Update="Microsoft.Data.SqlClient" Version="7.0.0" />
+    <PackageVersion Update="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="$(MicrosoftExtensionsConfigurationEnvironmentVariablesNet11Version)" />
+    <PackageVersion Update="Microsoft.Extensions.Configuration.UserSecrets" Version="$(MicrosoftExtensionsConfigurationUserSecretsNet11Version)" />
   </ItemGroup>
 </Project>

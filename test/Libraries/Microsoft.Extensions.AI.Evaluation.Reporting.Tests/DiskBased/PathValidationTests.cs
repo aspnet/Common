@@ -6,6 +6,7 @@ extern alias Reporting;
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 using PathValidation = Reporting::Microsoft.Extensions.AI.Evaluation.Reporting.Utilities.PathValidation;
@@ -486,13 +487,13 @@ public class PathValidationTests
     private static class NativeMethods
     {
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        internal static extern uint GetShortPathNameW(string lpszLongPath, char[] lpszShortPath, uint cchBuffer);
+        internal static extern uint GetShortPathNameW(string lpszLongPath, StringBuilder lpszShortPath, uint cchBuffer);
     }
 
     private static string GetShortPath(string longPath)
     {
-        var buffer = new char[260];
-        uint len = NativeMethods.GetShortPathNameW(longPath, buffer, (uint)buffer.Length);
-        return len > 0 ? new string(buffer, 0, (int)len) : longPath;
+        var buffer = new StringBuilder(260);
+        uint len = NativeMethods.GetShortPathNameW(longPath, buffer, (uint)buffer.Capacity);
+        return len > 0 ? buffer.ToString() : longPath;
     }
 }

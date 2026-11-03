@@ -5,7 +5,7 @@
   <!-- TFMs and their permutations -->
   <PropertyGroup>
     <TargetFrameworkName>net</TargetFrameworkName>
-    <TargetFrameworkMajorVersion>10</TargetFrameworkMajorVersion>
+    <TargetFrameworkMajorVersion>11</TargetFrameworkMajorVersion>
     <TargetFrameworkMinorVersion>0</TargetFrameworkMinorVersion>
     <TargetFrameworkVersion>$(TargetFrameworkMajorVersion).$(TargetFrameworkMinorVersion)</TargetFrameworkVersion>
 
@@ -13,7 +13,7 @@
     <LatestTargetFramework>$(TargetFrameworkName)$(TargetFrameworkVersion)</LatestTargetFramework>
     <!-- All the .NET TFMs we're building -->
     <SupportedNetCoreTargetFrameworks>$(LatestTargetFramework)</SupportedNetCoreTargetFrameworks>
-    <NetCoreTargetFrameworks>$(SupportedNetCoreTargetFrameworks);net9.0;net8.0</NetCoreTargetFrameworks>
+    <NetCoreTargetFrameworks>$(SupportedNetCoreTargetFrameworks);net10.0;net9.0;net8.0</NetCoreTargetFrameworks>
 
     <!-- The minimum supported .NET version for external consumers. This is used for packaging control, see Packaging.targets -->
     <MinimumSupportedTfmForPackaging>net8.0</MinimumSupportedTfmForPackaging>
@@ -27,6 +27,8 @@
     <CustomTargetFrameworks Condition="Exists('$(MSBuildThisFileDirectory)\.targetframeworks')">$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)\.targetframeworks').Trim())</CustomTargetFrameworks>
     <SupportedNetCoreTargetFrameworks Condition="'$(CustomTargetFrameworks)' != ''">$(LatestTargetFramework)</SupportedNetCoreTargetFrameworks>
     <NetCoreTargetFrameworks Condition="'$(CustomTargetFrameworks)' != ''">$(SupportedNetCoreTargetFrameworks)</NetCoreTargetFrameworks>
+    <NetCoreTargetFrameworks Condition="'$(CustomTargetFrameworks)' != '' AND $(CustomTargetFrameworks.Contains('net10.0'))">$(NetCoreTargetFrameworks);net10.0</NetCoreTargetFrameworks>
+    <NetCoreTargetFrameworks Condition="'$(CustomTargetFrameworks)' != '' AND $(CustomTargetFrameworks.Contains('net9.0'))">$(NetCoreTargetFrameworks);net9.0</NetCoreTargetFrameworks>
     <NetCoreTargetFrameworks Condition="'$(CustomTargetFrameworks)' != '' AND $(CustomTargetFrameworks.Contains('net8.0'))">$(NetCoreTargetFrameworks);net8.0</NetCoreTargetFrameworks>
     <ConditionalNet462 Condition="'$(CustomTargetFrameworks)' == '' OR $(CustomTargetFrameworks.Contains('net462'))">;net462</ConditionalNet462>
 

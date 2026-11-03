@@ -40,7 +40,7 @@ public class AIChatWebExecutionTests : TemplateExecutionTestBase<AIChatWebExecut
             ("--vector-store",      ["azureaisearch", "local", "qdrant"]),
             ("--aspire",            ["true", "false"]),
             ("--managed-identity",  ["true", "false"]),
-            ("--Framework",         ["net9.0", "net10.0"])
+            ("--Framework",         ["net9.0", "net10.0", "net11.0"])
         ];
 
         foreach (var args in GetPossibleOptions(allOptionValues))

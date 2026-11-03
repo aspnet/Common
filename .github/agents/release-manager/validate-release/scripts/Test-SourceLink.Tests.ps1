@@ -181,6 +181,19 @@ Describe 'Release Source Link verification' {
         $rows[0].SourceCommit | Should -Be 'fixture-sha'
     }
 
+    It 'checks the .NET 11 library TFM against its original symbols' {
+        $net11Packages = Join-Path $TestDrive 'net11-packages'
+        $net11Symbols = Join-Path $TestDrive 'net11-symbols'
+        New-Item -ItemType Directory -Path $net11Packages, $net11Symbols | Out-Null
+        $null = New-TestPackage $net11Packages Library11 @('net11.0') $valid
+        $null = New-TestPackage $net11Symbols Library11 @('net11.0') $valid -Symbols
+
+        $rows = @(Invoke-SourceLinkSweep $net11Packages Original $net11Symbols '' -CheckMetadataOnly)
+        $rows.Count | Should -Be 1
+        $rows[0].Tfm | Should -Be 'net11.0'
+        $rows[0].Result | Should -Be 'metadata-valid'
+    }
+
     It 'reports missing original symbols as a failure' {
         $missing = Join-Path $TestDrive 'missing'
         New-Item -ItemType Directory -Path $missing | Out-Null
