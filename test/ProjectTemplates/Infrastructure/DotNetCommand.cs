@@ -11,6 +11,9 @@ public class DotNetCommand : TestCommand
     {
         FileName = WellKnownPaths.RepoDotNetExePath;
 
+        // Reusable MSBuild nodes can keep redirected output pipes open after a command exits.
+        EnvironmentVariables["MSBUILDDISABLENODEREUSE"] = "1";
+
         foreach (var arg in args)
         {
             Arguments.Add(arg);

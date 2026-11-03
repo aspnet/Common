@@ -3,7 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Microsoft.Extensions.VectorData</RootNamespace>
     <Description>Abstractions for vector database access.</Description>
-    <TargetFrameworks>net10.0;net8.0;netstandard2.0;net462</TargetFrameworks>
+    <TargetFrameworks>net11.0;net10.0;net8.0;netstandard2.0;net462</TargetFrameworks>
     <StrongNameKeyId>MicrosoftSharedLib</StrongNameKeyId>
     <Stage>normal</Stage>
     <MinCodeCoverage>75</MinCodeCoverage>

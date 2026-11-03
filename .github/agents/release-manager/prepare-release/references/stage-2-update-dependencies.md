@@ -2,15 +2,16 @@
 
 This stage is for the **monthly release**. Servicing releases should follow [stages-1-2-servicing-branch.md](stages-1-2-servicing-branch.md) instead.
 
-Update the internal release branch's product dependencies to the pending .NET 9, .NET 8, and .NET 10 release updates using `darc update-dependencies` against Build Asset Registry (BAR) build IDs.
+Update the internal release branch's product dependencies to the pending .NET 9, .NET 8, .NET 10, and .NET 11 release updates using `darc update-dependencies` against Build Asset Registry (BAR) build IDs.
 
-This stage has three sub-stages. Run them in order, and give each its own commit:
+This stage has four sub-stages. Run them in order, and give each its own commit:
 
 1. Update Dependencies: .NET 9
 2. Update Dependencies: .NET 8
 3. Update Dependencies: .NET 10
+4. Update Dependencies: .NET 11
 
-> **Why .NET 9 is first (intentional, not numeric order).** .NET 9 owns the canonical product entries in `Version.Details.xml` and non-suffixed `...Version` properties. Apply it on a clean tree, keeping intended dependency edits and actual darc feed sources. Layer .NET 8 (`...LTSVersion`) and .NET 10 (`...Net10Version`) on top, restoring canonical locations to the .NET 9 values. Discard incidental tooling changes; templating ownership is explicit below.
+> **Why .NET 9 is first (intentional, not numeric order).** .NET 9 owns the canonical product entries in `Version.Details.xml` and non-suffixed `...Version` properties. Apply it on a clean tree, keeping intended dependency edits and actual darc feed sources. Layer .NET 8 (`...LTSVersion`), .NET 10 (`...Net10Version`), and .NET 11 (`...Net11Version`) on top, restoring canonical locations to the .NET 9 values. Discard incidental tooling changes; templating ownership is explicit below.
 
 Review each sub-stage and obtain explicit approval before its commit, following the [stage workflow](../README.md#stage-workflow-monthly-release). There are no automatic commits. Report the commit SHA, then wait for a separate explicit push instruction.
 
@@ -27,18 +28,19 @@ Before committing each sub-stage, review the diff yourself and revert any incide
 
 The Release Tracker at <https://release.dot.net/releases> is a Blazor WebAssembly app behind Microsoft (MSAL) authentication. The agent cannot reach or render it, so the **user** provides the inputs.
 
-**Collect the inputs for all three sub-stages up front, in a single prompt, before running any `darc` commands.** For each pending release, the user opens it on the Release Tracker, clicks its `{}` artifacts link, and opens `manifests/ReleaseManifest.json`. Accept each one either pasted into the chat or as a local path to a downloaded copy:
+**Collect the inputs for all four sub-stages up front, in a single prompt, before running any `darc` commands.** For each pending release, the user opens it on the Release Tracker, clicks its `{}` artifacts link, and opens `manifests/ReleaseManifest.json`. Accept each one either pasted into the chat or as a local path to a downloaded copy:
 
 Warn explicitly that the tracker may stage **multiple releases for the same version line at once**. Confirm intended month/release date and target versions for every line, not just "latest". Inspect the manifest's actual assets; a plausible filename, valid BAR repository/SHA or latest build alone does not prove it is the intended month's release.
 
 - **.NET 9** -- the pending 9.0 release's `manifests/ReleaseManifest.json`.
 - **.NET 8** -- the pending 8.0 release's `manifests/ReleaseManifest.json`.
 - **.NET 10** -- the pending 10.0 release's `manifests/ReleaseManifest.json`, or a pasted list of its BAR build IDs from the release page.
+- **.NET 11** -- the pending 11.0 release's `manifests/ReleaseManifest.json`, or a pasted list of its BAR build IDs from the release page.
 
 Each build entry in a `ReleaseManifest.json` has a `repo` and a `barBuildId`. Read the IDs you need:
 
 - **.NET 9 and .NET 8:** the `barBuildId` for `dotnet-runtime`, `dotnet-aspnetcore`, and `dotnet-efcore`.
-- **.NET 10:** all relevant BAR entries, classified into product vs SDK/tooling ownership below. Order matters when VMR builds overwrite the same properties.
+- **.NET 10 and .NET 11:** all relevant BAR entries (or the pasted lists), classified into product vs SDK/tooling ownership below. Order matters when VMR builds overwrite the same properties.
 
 Validate every ID with `darc get-build --id <barId>` before applying it, and confirm the repository and commit look correct. If an ID does not resolve, stop and ask the user.
 
@@ -156,7 +158,47 @@ Once all IDs are applied, fix up the changes:
 
 Only `NuGet.config` and `eng/Versions.props` belong in this commit -- no `eng/common/` files and no `Version.Details.xml`.
 
-Before each commit, compare final properties to the ownership table: .NET 9 canonical details, .NET 8 LTS overlay, .NET 10 Net10 overlay, both intended templating properties, and the real darc-produced feeds needed for those exact assets. Revert incidental `global.json`, tool manifest, common/Arcade/Helix files and unrelated properties, preserving any pre-existing user work. Retain no guessed feed URLs. Validate evaluated dependency/package versions and restore provenance; record an inaccessible feed as a blocker, not a passed restore. Never run a whole-file restore on a file that also contains unrelated user changes.
+## Sub-stage 4 - Update Dependencies: .NET 11
+
+Classify the .NET 11 BAR IDs and record their asset/property ownership as in
+Sub-stage 3. Apply the product/runtime VMR build first, then the SDK/tooling VMR
+build for the intended templating version. Capture emitted versions and feed
+provenance before the next update; if the owners disagree or are unclear, stop
+for evidence and confirmation rather than choosing the numerically latest value.
+
+```
+darc update-dependencies --id <barId> --no-coherency-updates
+```
+
+Use the same overlay procedure as Sub-stage 3: restore `Version.Details.xml`
+and incidental Arcade / Helix tooling files under `eng/common/`, preserve
+actual darc-added internal feed sources in `NuGet.config`, and move the 11.0
+product versions into their matching `...Net11Version` properties in
+`eng/Versions.props`. Restore the 9.0 canonical properties and retain the
+10.0 overlay. Keep the SDK-owned base
+`MicrosoftDotNetBuildTasksTemplatingVersion` needed by project template builds,
+without treating the SDK's overwritten product versions as authoritative or
+inventing a `...Net11Version` templating property without a consumer. Verify
+that every 11.0 dependency (including `System.Numerics.Tensors` and test-only
+packages) resolves from the staged trusted feeds. Do not silently replace
+missing versions with earlier bands.
+
+Review the diff, obtain explicit approval, and commit only `NuGet.config` and
+`eng/Versions.props`:
+
+```
+git commit -m "Update 11.0 dependencies"
+```
+
+Before each commit, compare final properties to the ownership table: .NET 9
+canonical details, .NET 8 LTS overlay, .NET 10 Net10 overlay, .NET 11 Net11
+overlay, the intended templating properties, and the actual darc-produced
+feeds needed for those exact assets. Revert incidental `global.json`, tool
+manifest, common/Arcade/Helix files and unrelated properties, preserving any
+pre-existing user work. Retain no guessed feed URLs. Validate evaluated
+dependency/package versions and restore provenance; record an inaccessible
+feed as a blocker, not a passed restore. Never run a whole-file restore on a
+file that also contains unrelated user changes.
 
 ## After the stage
 

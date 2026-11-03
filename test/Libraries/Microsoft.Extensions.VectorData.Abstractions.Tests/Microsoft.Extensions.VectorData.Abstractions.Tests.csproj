@@ -3,7 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Microsoft.Extensions.VectorData.Abstractions</RootNamespace>
     <Description>Unit tests for Microsoft.Extensions.VectorData.Abstractions.</Description>
-    <TargetFrameworks>net10.0;net472</TargetFrameworks>
+    <TargetFrameworks>net11.0;net10.0;net472</TargetFrameworks>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);MEVD9001</NoWarn> <!-- Microsoft.Extensions.VectorData experimental provider-facing APIs -->
     <NoWarn>$(NoWarn);S103;S1135;LA0003</NoWarn>

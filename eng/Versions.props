@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup Label="Version settings">
-    <MajorVersion>10</MajorVersion>
-    <MinorVersion>11</MinorVersion>
+    <MajorVersion>11</MajorVersion>
+    <MinorVersion>0</MinorVersion>
     <PatchVersion>0</PatchVersion>
     <PreReleaseVersionLabel>preview</PreReleaseVersionLabel>
     <PreReleaseVersionIteration>1</PreReleaseVersionIteration>
@@ -87,6 +87,63 @@
     <MicrosoftEntityFrameworkCoreSqliteVersion>9.0.21</MicrosoftEntityFrameworkCoreSqliteVersion>
     <!-- Dependencies from https://github.com/dotnet/arcade -->
     <MicrosoftDotNetBuildTasksTemplatingVersion>10.0.0-beta.26515.1</MicrosoftDotNetBuildTasksTemplatingVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="net11">
+    <!-- Released .NET 11 RC3 dependencies available on the trusted dotnet-public feed. -->
+    <MicrosoftBclAsyncInterfacesNet11Version>11.0.0-rc.3.26522.148</MicrosoftBclAsyncInterfacesNet11Version>
+    <MicrosoftBclMemoryNet11Version>11.0.0-rc.3.26522.148</MicrosoftBclMemoryNet11Version>
+    <MicrosoftBclTimeProviderNet11Version>11.0.0-rc.3.26522.148</MicrosoftBclTimeProviderNet11Version>
+    <MicrosoftExtensionsCachingAbstractionsNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsCachingAbstractionsNet11Version>
+    <MicrosoftExtensionsCachingMemoryNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsCachingMemoryNet11Version>
+    <MicrosoftExtensionsConfigurationAbstractionsNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsConfigurationAbstractionsNet11Version>
+    <MicrosoftExtensionsConfigurationBinderNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsConfigurationBinderNet11Version>
+    <MicrosoftExtensionsConfigurationJsonNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsConfigurationJsonNet11Version>
+    <MicrosoftExtensionsConfigurationNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsConfigurationNet11Version>
+    <MicrosoftExtensionsDependencyInjectionAbstractionsNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsDependencyInjectionAbstractionsNet11Version>
+    <MicrosoftExtensionsDependencyInjectionNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsDependencyInjectionNet11Version>
+    <MicrosoftExtensionsDiagnosticsNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsDiagnosticsNet11Version>
+    <MicrosoftExtensionsHostingAbstractionsNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsHostingAbstractionsNet11Version>
+    <MicrosoftExtensionsHostingNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsHostingNet11Version>
+    <MicrosoftExtensionsHttpNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsHttpNet11Version>
+    <MicrosoftExtensionsLoggingAbstractionsNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsLoggingAbstractionsNet11Version>
+    <MicrosoftExtensionsLoggingConfigurationNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsLoggingConfigurationNet11Version>
+    <MicrosoftExtensionsLoggingConsoleNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsLoggingConsoleNet11Version>
+    <MicrosoftExtensionsLoggingNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsLoggingNet11Version>
+    <MicrosoftExtensionsOptionsConfigurationExtensionsNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsOptionsConfigurationExtensionsNet11Version>
+    <MicrosoftExtensionsOptionsNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsOptionsNet11Version>
+    <MicrosoftExtensionsPrimitivesNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsPrimitivesNet11Version>
+    <MicrosoftNETCoreAppRefNet11Version>11.0.0-rc.3.26522.148</MicrosoftNETCoreAppRefNet11Version>
+    <MicrosoftNETCoreAppRuntimewinx64Net11Version>11.0.0-rc.3.26522.148</MicrosoftNETCoreAppRuntimewinx64Net11Version>
+    <SystemCollectionsImmutableNet11Version>11.0.0-rc.3.26522.148</SystemCollectionsImmutableNet11Version>
+    <SystemConfigurationConfigurationManagerNet11Version>11.0.0-rc.3.26522.148</SystemConfigurationConfigurationManagerNet11Version>
+    <SystemDiagnosticsDiagnosticSourceNet11Version>11.0.0-rc.3.26522.148</SystemDiagnosticsDiagnosticSourceNet11Version>
+    <SystemDiagnosticsPerformanceCounterNet11Version>11.0.0-rc.3.26522.148</SystemDiagnosticsPerformanceCounterNet11Version>
+    <SystemIOHashingNet11Version>11.0.0-rc.3.26522.148</SystemIOHashingNet11Version>
+    <SystemIOPipelinesNet11Version>11.0.0-rc.3.26522.148</SystemIOPipelinesNet11Version>
+    <SystemMemoryDataNet11Version>11.0.0-rc.3.26522.148</SystemMemoryDataNet11Version>
+    <SystemNetHttpJsonNet11Version>11.0.0-rc.3.26522.148</SystemNetHttpJsonNet11Version>
+    <SystemRuntimeCachingNet11Version>11.0.0-rc.3.26522.148</SystemRuntimeCachingNet11Version>
+    <SystemSecurityCryptographyPkcsNet11Version>11.0.0-rc.3.26522.148</SystemSecurityCryptographyPkcsNet11Version>
+    <SystemSecurityCryptographyXmlNet11Version>11.0.0-rc.3.26522.148</SystemSecurityCryptographyXmlNet11Version>
+    <SystemTextEncodingsWebNet11Version>11.0.0-rc.3.26522.148</SystemTextEncodingsWebNet11Version>
+    <SystemNumericsTensorsNet11Version>11.0.0-rc.3.26522.148</SystemNumericsTensorsNet11Version>
+    <SystemTextJsonNet11Version>11.0.0-rc.3.26522.148</SystemTextJsonNet11Version>
+    <SystemThreadingChannelsNet11Version>11.0.0-rc.3.26522.148</SystemThreadingChannelsNet11Version>
+    <SystemLinqAsyncEnumerableNet11Version>11.0.0-rc.3.26522.148</SystemLinqAsyncEnumerableNet11Version>
+    <!-- Dependencies from aspnetcore and efcore in the .NET 11 VMR. -->
+    <MicrosoftAspNetCoreAppRefNet11Version>11.0.0-rc.3.26522.148</MicrosoftAspNetCoreAppRefNet11Version>
+    <MicrosoftAspNetCoreAppRuntimewinx64Net11Version>11.0.0-rc.3.26522.148</MicrosoftAspNetCoreAppRuntimewinx64Net11Version>
+    <MicrosoftAspNetCoreMvcTestingNet11Version>11.0.0-rc.3.26522.148</MicrosoftAspNetCoreMvcTestingNet11Version>
+    <MicrosoftAspNetCoreTestHostNet11Version>11.0.0-rc.3.26522.148</MicrosoftAspNetCoreTestHostNet11Version>
+    <MicrosoftExtensionsCachingSqlServerNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsCachingSqlServerNet11Version>
+    <MicrosoftExtensionsCachingStackExchangeRedisNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsCachingStackExchangeRedisNet11Version>
+    <MicrosoftExtensionsDiagnosticsHealthChecksNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsDiagnosticsHealthChecksNet11Version>
+    <MicrosoftExtensionsFeaturesNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsFeaturesNet11Version>
+    <MicrosoftExtensionsHttpPollyNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsHttpPollyNet11Version>
+    <MicrosoftExtensionsObjectPoolNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsObjectPoolNet11Version>
+    <MicrosoftEntityFrameworkCoreSqliteNet11Version>11.0.0-rc.3.26522.148</MicrosoftEntityFrameworkCoreSqliteNet11Version>
+    <MicrosoftExtensionsConfigurationEnvironmentVariablesNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsConfigurationEnvironmentVariablesNet11Version>
+    <MicrosoftExtensionsConfigurationUserSecretsNet11Version>11.0.0-rc.3.26522.148</MicrosoftExtensionsConfigurationUserSecretsNet11Version>
   </PropertyGroup>
   <PropertyGroup Label="net10">
     <!-- Packages from dotnet/runtime -->
