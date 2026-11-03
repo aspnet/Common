@@ -13,6 +13,7 @@ using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Http.Resilience.Internal;
 using Microsoft.Extensions.Http.Resilience.Test.Helpers;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Polly.Testing;
 using Xunit;
 
@@ -166,6 +167,9 @@ public sealed partial class HttpClientBuilderExtensionsTests
             options.CircuitBreaker.MinimumThroughput = 1000;
         });
 
+        // A frozen clock keeps the sampling window from expiring when a slow agent stalls the test.
+        _builder.Services.AddSingleton<TimeProvider>(new FakeTimeProvider());
+
         _builder.AddHttpMessageHandler(() => new TestHandlerStub((_, _) =>
         {
             requests++;
@@ -213,6 +217,7 @@ public sealed partial class HttpClientBuilderExtensionsTests
         using var metricCollector = new MetricCollector<int>(null, "Polly", "resilience.polly.strategy.events");
 
         var client = new ServiceCollection()
+            .AddSingleton<TimeProvider>(new FakeTimeProvider())
             .AddHttpClient(ClientName)
             .ConfigurePrimaryHttpMessageHandler(() => new TestHandlerStub(HttpStatusCode.InternalServerError))
             .AddStandardResilienceHandler()

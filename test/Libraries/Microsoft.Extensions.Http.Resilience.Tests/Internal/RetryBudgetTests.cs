@@ -234,11 +234,11 @@ public class RetryBudgetTests
         var budget = CreateBudget(retryRatio: 0.1, minimumThroughput: 10);
 
         using var start = new Barrier(Threads);
-        await Task.WhenAll(Enumerable.Range(0, Threads).Select(_ => Task.Run(() =>
+        await RunOnDedicatedThreadsAsync(Threads, () =>
         {
             start.SignalAndWait();
             RecordRequests(budget, RequestsPerThread);
-        })));
+        });
 
         CountAllowedRetries(budget, Threads * RequestsPerThread).Should().Be(Threads * RequestsPerThread / 10);
     }
@@ -253,15 +253,20 @@ public class RetryBudgetTests
 
         var allowed = 0;
         using var start = new Barrier(Threads);
-        await Task.WhenAll(Enumerable.Range(0, Threads).Select(_ => Task.Run(() =>
+        await RunOnDedicatedThreadsAsync(Threads, () =>
         {
             start.SignalAndWait();
             Interlocked.Add(ref allowed, CountAllowedRetries(budget, AttemptsPerThread));
-        })));
+        });
 
         // The check and the increment aren't atomic, so each thread can overshoot by at most one retry.
         allowed.Should().BeInRange(100, 100 + Threads);
     }
+
+    // Blocking thread-pool threads on a barrier starves tests that run in parallel, so each participant gets its own thread.
+    private static Task RunOnDedicatedThreadsAsync(int threads, Action action)
+        => Task.WhenAll(Enumerable.Range(0, threads).Select(_ => Task.Factory.StartNew(
+            action, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)));
 
     private static void RecordRequests(RetryBudget budget, int count)
     {

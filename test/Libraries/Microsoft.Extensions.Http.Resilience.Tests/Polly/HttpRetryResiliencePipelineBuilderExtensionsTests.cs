@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Http.Resilience.Internal;
+using Microsoft.Extensions.Time.Testing;
 using Polly;
 using Polly.Retry;
 using Polly.Telemetry;
@@ -354,7 +355,8 @@ public class HttpRetryResiliencePipelineBuilderExtensionsTests
         var telemetry = new TelemetryOptions();
         telemetry.TelemetryListeners.Add(new Listener(_events));
 
-        return new ResiliencePipelineBuilder<HttpResponseMessage>()
+        // A frozen clock keeps the sampling window from expiring when a slow agent stalls the test.
+        return new ResiliencePipelineBuilder<HttpResponseMessage> { TimeProvider = new FakeTimeProvider() }
             .AddRetryWithBudget(options)
             .ConfigureTelemetry(telemetry)
             .Build();
