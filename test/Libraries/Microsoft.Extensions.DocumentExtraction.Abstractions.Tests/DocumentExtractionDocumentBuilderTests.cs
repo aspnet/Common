@@ -19,12 +19,33 @@ namespace Microsoft.Extensions.DocumentExtraction.Tests;
 public sealed class DocumentExtractionDocumentBuilderTests
 {
     [Fact]
-    public void Interface_ExposesDirectDocumentExchangeWithoutStagingProtocol()
+    public void Client_ExposesAbstractDirectDocumentExchangeWithoutStagingProtocol()
     {
-        Type client = typeof(IDocumentExtractionClient);
+        Type client = typeof(DocumentExtractionClient);
+        Assert.True(client.IsPublic);
+        Assert.True(client.IsClass);
+        Assert.True(client.IsAbstract);
+        Assert.False(client.IsSealed);
+        Assert.False(client.IsInterface);
         Assert.Contains(typeof(IDisposable), client.GetInterfaces());
-        Assert.Equal(new[] { "ExtractAsync", "GetService" }, client.GetMethods().Select(static method => method.Name).OrderBy(static name => name));
+        Assert.Single(client.GetInterfaces());
+        const BindingFlags DeclaredInstance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+        const BindingFlags DeclaredMembers = DeclaredInstance | BindingFlags.Static;
+        ConstructorInfo constructor = Assert.Single(client.GetConstructors(DeclaredInstance));
+        Assert.True(constructor.IsFamily);
+        Assert.Empty(constructor.GetParameters());
+        Assert.Empty(client.GetConstructors());
+        Assert.Equal(new[] { "Dispose", "Dispose", "ExtractAsync", "GetService" },
+            client.GetMethods(DeclaredMembers).Select(static method => method.Name).OrderBy(static name => name));
+        Assert.Empty(client.GetFields(DeclaredMembers));
+        Assert.Null(client.GetMethod("Finalize", DeclaredInstance));
+        Assert.Null(client.Assembly.GetType("Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient"));
         MethodInfo extract = client.GetMethod("ExtractAsync")!;
+        Assert.True(extract.IsPublic);
+        Assert.True(extract.IsAbstract);
+        Assert.True(extract.IsVirtual);
+        Assert.False(extract.IsFinal);
+        Assert.False(extract.IsStatic);
         Assert.Equal(typeof(Task<ExtractionDocument>), extract.ReturnType);
         ParameterInfo[] parameters = extract.GetParameters();
         Assert.Equal(new[] { typeof(Stream), typeof(string), typeof(string), typeof(DocumentExtractionOptions), typeof(CancellationToken) },
@@ -34,8 +55,43 @@ public sealed class DocumentExtractionDocumentBuilderTests
         Assert.True(parameters[3].IsOptional);
         Assert.Null(parameters[3].DefaultValue);
         Assert.True(parameters[4].IsOptional);
+        Assert.True(parameters[4].DefaultValue is null || Equals(default(CancellationToken), parameters[4].DefaultValue));
         Assert.Null(client.GetMethod("ExtractPagesAsync"));
-        Assert.Equal(typeof(object), client.GetMethod("GetService")!.ReturnType);
+        MethodInfo getService = client.GetMethod("GetService")!;
+        Assert.True(getService.IsPublic);
+        Assert.True(getService.IsVirtual);
+        Assert.False(getService.IsFinal);
+        Assert.False(getService.IsAbstract);
+        Assert.Equal(typeof(object), getService.ReturnType);
+        ParameterInfo[] serviceParameters = getService.GetParameters();
+        Assert.Equal(new[] { typeof(Type), typeof(object) }, serviceParameters.Select(static parameter => parameter.ParameterType));
+        Assert.Equal(new[] { "serviceType", "serviceKey" }, serviceParameters.Select(static parameter => parameter.Name));
+        Assert.False(serviceParameters[0].IsOptional);
+        Assert.True(serviceParameters[1].IsOptional);
+        Assert.Null(serviceParameters[1].DefaultValue);
+        MethodInfo dispose = client.GetMethod("Dispose", Type.EmptyTypes)!;
+        Assert.True(dispose.IsPublic);
+        Assert.False(dispose.IsAbstract);
+        Assert.True(!dispose.IsVirtual || dispose.IsFinal);
+        Assert.Equal(typeof(void), dispose.ReturnType);
+        MethodInfo hook = client.GetMethod("Dispose", DeclaredInstance, null, new[] { typeof(bool) }, null)!;
+        Assert.True(hook.IsFamily);
+        Assert.True(hook.IsVirtual);
+        Assert.False(hook.IsFinal);
+        Assert.False(hook.IsAbstract);
+        Assert.Equal(typeof(void), hook.ReturnType);
+        Assert.Equal("disposing", Assert.Single(hook.GetParameters()).Name);
+#if NET8_0_OR_GREATER
+        NullabilityInfoContext nullability = new();
+        NullabilityInfo returnInfo = nullability.Create(extract.ReturnParameter);
+        Assert.Equal(NullabilityState.NotNull, returnInfo.ReadState);
+        Assert.Equal(NullabilityState.NotNull, Assert.Single(returnInfo.GenericTypeArguments).ReadState);
+        Assert.All(parameters.Take(3), parameter => Assert.Equal(NullabilityState.NotNull, nullability.Create(parameter).ReadState));
+        Assert.Equal(NullabilityState.Nullable, nullability.Create(parameters[3]).ReadState);
+        Assert.Equal(NullabilityState.NotNull, nullability.Create(serviceParameters[0]).ReadState);
+        Assert.Equal(NullabilityState.Nullable, nullability.Create(serviceParameters[1]).ReadState);
+        Assert.Equal(NullabilityState.Nullable, nullability.Create(getService.ReturnParameter).ReadState);
+#endif
 
         foreach (string name in new[]
         {
@@ -227,22 +283,137 @@ public sealed class DocumentExtractionDocumentBuilderTests
         Assert.Equal(43, inputB.ReadByte());
     }
 
+    [Fact]
+    public async Task Client_MinimalImplementationReturnsExactDocumentAndInheritsDefaults()
+    {
+        using MemoryStream input = new([42]);
+        using NativeObservation borrowed = new();
+        using CancellationTokenSource cancellation = new();
+        ExtractionDocument expected = new("minimal", new TextContent("visible")) { RawRepresentation = borrowed };
+        DocumentExtractionOptions options = new() { ExtractorName = "provider:model" };
+        options.AdditionalProperties.Add("native", borrowed);
+        using MinimalClient minimal = new(expected);
+        DocumentExtractionClient client = minimal;
+
+        ExtractionDocument actual = await client.ExtractAsync(input, "minimal", "application/pdf", options, cancellation.Token);
+
+        Assert.Same(expected, actual);
+        Assert.Same(input, minimal.Input);
+        Assert.Equal("minimal", minimal.Identifier);
+        Assert.Equal("application/pdf", minimal.MediaType);
+        Assert.Same(options, minimal.Options);
+        Assert.Equal(cancellation.Token, minimal.Token);
+        Assert.Equal(1, minimal.CallCount);
+        Assert.Same(minimal, client.GetService(typeof(DocumentExtractionClient)));
+        client.Dispose();
+        Assert.Equal("visible", Assert.IsType<TextContent>(actual.Content).Text);
+        Assert.Same(borrowed, actual.RawRepresentation);
+        Assert.Same(borrowed, options.AdditionalProperties["native"]);
+        Assert.Equal(0, borrowed.DisposeCount);
+        Assert.Equal(0, borrowed.ToStringCount);
+        Assert.Equal(42, input.ReadByte());
+    }
+
+    [Fact]
+    public void Client_GetServiceReturnsSelfForAssignableUnkeyedTypes()
+    {
+        using MinimalClient client = new(new("lookup"));
+        foreach (Type type in new[] { typeof(MinimalClient), typeof(DocumentExtractionClient), typeof(object), typeof(IDisposable) })
+        {
+            Assert.Same(client, client.GetService(type));
+            Assert.Same(client, client.GetService(type, null));
+        }
+
+        Assert.Null(client.GetService(typeof(string)));
+        Assert.Equal(0, client.CallCount);
+    }
+
+    [Fact]
+    public void Client_GetServiceRejectsEveryNonNullKey()
+    {
+        using MinimalClient client = new(new("keyed"));
+        foreach (object key in new object[] { string.Empty, "sdk-key", new object(), 0 })
+        {
+            foreach (Type type in new[] { typeof(MinimalClient), typeof(DocumentExtractionClient), typeof(object), typeof(IDisposable), typeof(string) })
+            {
+                Assert.Null(client.GetService(type, key));
+            }
+        }
+
+        Assert.Equal(0, client.CallCount);
+        Assert.Same(client, client.GetService(typeof(MinimalClient)));
+    }
+
+    [Fact]
+    public void Client_GetServiceRejectsNullServiceType()
+    {
+        using MinimalClient client = new(new("null-type"));
+        Assert.Equal("serviceType", Assert.Throws<ArgumentNullException>(() => client.GetService(null!)).ParamName);
+        Assert.Equal("serviceType", Assert.Throws<ArgumentNullException>(() => client.GetService(null!, null)).ParamName);
+        Assert.Equal("serviceType", Assert.Throws<ArgumentNullException>(() => client.GetService(null!, "sdk-key")).ParamName);
+        Assert.Equal(0, client.CallCount);
+    }
+
+    [Fact]
+    public void Client_DisposeDispatchesProtectedHookWithoutGlobalOnceGuard()
+    {
+        DisposeRecordingClient client = new();
+        client.Dispose();
+        IDisposable disposable = client;
+        disposable.Dispose();
+
+        Assert.Equal(new[] { true, true }, client.Disposals);
+        Assert.Same(client, client.GetService(typeof(DocumentExtractionClient)));
+    }
+
+    private sealed class MinimalClient(ExtractionDocument result) : DocumentExtractionClient
+    {
+        internal int CallCount { get; private set; }
+        internal Stream? Input { get; private set; }
+        internal string? Identifier { get; private set; }
+        internal string? MediaType { get; private set; }
+        internal DocumentExtractionOptions? Options { get; private set; }
+        internal CancellationToken Token { get; private set; }
+
+        public override Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
+            DocumentExtractionOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            Input = document;
+            Identifier = identifier;
+            MediaType = mediaType;
+            Options = options;
+            Token = cancellationToken;
+            return Task.FromResult(result);
+        }
+    }
+
+    private sealed class DisposeRecordingClient : DocumentExtractionClient
+    {
+        internal List<bool> Disposals { get; } = [];
+
+        public override Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
+            DocumentExtractionOptions? options = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ExtractionDocument(identifier));
+
+        protected override void Dispose(bool disposing)
+        {
+            Disposals.Add(disposing);
+            base.Dispose(disposing);
+        }
+    }
+
     private static ExtractionDocumentPoint[] Polygon() => [new(10.25, 20.5), new(40.75, 18.25), new(44.5, 60.125), new(12.875, 58.75), new(8.5, 35.25)];
     private static ExtractionDocumentSourcePage Frame() =>
         new("pdf-frame", 7, new ExtractionDocumentPageDimensions(200, 100), ExtractionDocumentCoordinateUnit.Point, ExtractionDocumentCoordinateOrigin.BottomLeft);
 
     // Direct implementations snapshot at their own public boundary; no core finalizer is involved.
     private sealed class DirectAdapter(Func<Stream, string, string, DocumentExtractionOptions?, CancellationToken, Task<ExtractionDocument>> extract)
-        : IDocumentExtractionClient
+        : DocumentExtractionClient
     {
-        public Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
+        public override Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
             DocumentExtractionOptions? options = null, CancellationToken cancellationToken = default)
             => extract(document, identifier, mediaType, options?.Clone(), cancellationToken);
-
-        public object? GetService(Type serviceType, object? serviceKey = null) => null;
-        public void Dispose()
-        {
-        }
     }
 
     private sealed class NativeObservation : IDisposable

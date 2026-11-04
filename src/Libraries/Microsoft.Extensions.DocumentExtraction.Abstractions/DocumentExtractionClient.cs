@@ -6,6 +6,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Documents;
+using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.DocumentExtraction;
 
@@ -21,8 +22,15 @@ namespace Microsoft.Extensions.DocumentExtraction;
 /// they are not implicitly disposed or deep-cloned. The shared contract does not guarantee original HTTP
 /// bytes, response-content retention or durable serialization.
 /// </remarks>
-public interface IDocumentExtractionClient : IDisposable
+public abstract class DocumentExtractionClient : IDisposable
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DocumentExtractionClient"/> class.
+    /// </summary>
+    protected DocumentExtractionClient()
+    {
+    }
+
     /// <summary>
     /// Extracts a canonical document without requiring a separate page or observation protocol.
     /// </summary>
@@ -32,7 +40,7 @@ public interface IDocumentExtractionClient : IDisposable
     /// <param name="options">Optional per-call overrides. Providers must reject unsupported explicit settings.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task producing the caller-owned extracted document.</returns>
-    Task<ExtractionDocument> ExtractAsync(
+    public abstract Task<ExtractionDocument> ExtractAsync(
         Stream document,
         string identifier,
         string mediaType,
@@ -45,5 +53,26 @@ public interface IDocumentExtractionClient : IDisposable
     /// <param name="serviceType">The requested service type.</param>
     /// <param name="serviceKey">An optional service key.</param>
     /// <returns>The service, or <see langword="null"/>.</returns>
-    object? GetService(Type serviceType, object? serviceKey = null);
+    public virtual object? GetService(Type serviceType, object? serviceKey = null)
+    {
+        _ = Throw.IfNull(serviceType);
+        return serviceKey is null && serviceType.IsInstanceOfType(this) ? this : null;
+    }
+
+    /// <summary>
+    /// Releases resources owned by this client.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Releases resources owned by this client.
+    /// </summary>
+    /// <param name="disposing">Whether managed resources should be released.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+    }
 }

@@ -13,7 +13,7 @@ namespace Microsoft.Extensions.DocumentExtraction;
 /// <summary>
 /// Provides a base class for extraction middleware that delegates to another client.
 /// </summary>
-public class DelegatingDocumentExtractionClient : IDocumentExtractionClient
+public class DelegatingDocumentExtractionClient : DocumentExtractionClient
 {
     private bool _disposed;
 
@@ -21,16 +21,16 @@ public class DelegatingDocumentExtractionClient : IDocumentExtractionClient
     /// Initializes a new instance of the <see cref="DelegatingDocumentExtractionClient"/> class.
     /// </summary>
     /// <param name="innerClient">The wrapped client.</param>
-    protected DelegatingDocumentExtractionClient(IDocumentExtractionClient innerClient)
+    protected DelegatingDocumentExtractionClient(DocumentExtractionClient innerClient)
     {
         InnerClient = Throw.IfNull(innerClient);
     }
 
     /// <summary>Gets the wrapped client.</summary>
-    protected IDocumentExtractionClient InnerClient { get; }
+    protected DocumentExtractionClient InnerClient { get; }
 
     /// <inheritdoc />
-    public virtual Task<ExtractionDocument> ExtractAsync(
+    public override Task<ExtractionDocument> ExtractAsync(
         Stream document,
         string identifier,
         string mediaType,
@@ -44,7 +44,7 @@ public class DelegatingDocumentExtractionClient : IDocumentExtractionClient
     }
 
     /// <inheritdoc />
-    public virtual object? GetService(Type serviceType, object? serviceKey = null)
+    public override object? GetService(Type serviceType, object? serviceKey = null)
     {
         _ = Throw.IfNull(serviceType);
         return serviceKey is null && serviceType.IsInstanceOfType(this)
@@ -52,23 +52,23 @@ public class DelegatingDocumentExtractionClient : IDocumentExtractionClient
             : InnerClient.GetService(serviceType, serviceKey);
     }
 
-    /// <inheritdoc />
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
-
     /// <summary>
     /// Releases resources owned by this middleware.
     /// </summary>
     /// <param name="disposing">Whether managed resources should be released.</param>
-    protected virtual void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
-        if (disposing && !_disposed)
+        try
         {
-            _disposed = true;
-            InnerClient.Dispose();
+            if (disposing && !_disposed)
+            {
+                _disposed = true;
+                InnerClient.Dispose();
+            }
+        }
+        finally
+        {
+            base.Dispose(disposing);
         }
     }
 }

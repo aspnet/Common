@@ -36,8 +36,8 @@ public sealed class DocumentExtractionMiddlewareTests
         DocumentExtractionClientBuilder builder = new(_ => new TestClient(expected));
         builder.UseLogging();
 
-        using IDocumentExtractionClient first = builder.Build(firstWithoutServices ? null : firstServices);
-        using IDocumentExtractionClient second = builder.Build(secondServices);
+        using DocumentExtractionClient first = builder.Build(firstWithoutServices ? null : firstServices);
+        using DocumentExtractionClient second = builder.Build(secondServices);
         if (firstWithoutServices)
         {
             Assert.IsType<TestClient>(first);
@@ -68,8 +68,8 @@ public sealed class DocumentExtractionMiddlewareTests
         ExtractionDocument expected = new("document");
         DocumentExtractionClientBuilder builder = new(_ => new TestClient(expected));
         builder.UseLogging(explicitFactory);
-        using IDocumentExtractionClient first = builder.Build();
-        using IDocumentExtractionClient second = builder.Build(services);
+        using DocumentExtractionClient first = builder.Build();
+        using DocumentExtractionClient second = builder.Build(services);
         using MemoryStream input = new();
         Assert.Same(expected, await first.ExtractAsync(input, "first", "application/pdf"));
         Assert.Same(expected, await second.ExtractAsync(input, "second", "application/pdf"));
@@ -87,7 +87,7 @@ public sealed class DocumentExtractionMiddlewareTests
     {
         List<TestClient> clients = [];
         ServiceCollection services = new();
-        IDocumentExtractionClient Factory(IServiceProvider _)
+        DocumentExtractionClient Factory(IServiceProvider _)
         {
             TestClient client = new();
             clients.Add(client);
@@ -101,12 +101,12 @@ public sealed class DocumentExtractionMiddlewareTests
         using ServiceProvider provider = services.BuildServiceProvider();
         using IServiceScope firstScope = provider.CreateScope();
         using IServiceScope secondScope = provider.CreateScope();
-        IDocumentExtractionClient Resolve(IServiceProvider scopeServices) => keyed
-            ? scopeServices.GetRequiredKeyedService<IDocumentExtractionClient>("key")
-            : scopeServices.GetRequiredService<IDocumentExtractionClient>();
-        IDocumentExtractionClient first = Resolve(firstScope.ServiceProvider);
-        IDocumentExtractionClient repeated = Resolve(firstScope.ServiceProvider);
-        IDocumentExtractionClient second = Resolve(secondScope.ServiceProvider);
+        DocumentExtractionClient Resolve(IServiceProvider scopeServices) => keyed
+            ? scopeServices.GetRequiredKeyedService<DocumentExtractionClient>("key")
+            : scopeServices.GetRequiredService<DocumentExtractionClient>();
+        DocumentExtractionClient first = Resolve(firstScope.ServiceProvider);
+        DocumentExtractionClient repeated = Resolve(firstScope.ServiceProvider);
+        DocumentExtractionClient second = Resolve(secondScope.ServiceProvider);
         Assert.NotSame(first, second);
         if (lifetime == ServiceLifetime.Scoped)
         {
@@ -136,7 +136,7 @@ public sealed class DocumentExtractionMiddlewareTests
         List<string> disposed = [];
         builder.Use((client, _) => new RecordingMiddleware(client, () => disposed.Add("first")));
         builder.Use((client, _) => new RecordingMiddleware(client, () => disposed.Add("second")));
-        using (IDocumentExtractionClient client = builder.Build())
+        using (DocumentExtractionClient client = builder.Build())
         {
             Assert.IsType<RecordingMiddleware>(client);
             Assert.IsType<RecordingMiddleware>(((RecordingMiddleware)client).Inner);
@@ -150,8 +150,8 @@ public sealed class DocumentExtractionMiddlewareTests
         using ServiceProvider provider = services.BuildServiceProvider();
         using IServiceScope firstScope = provider.CreateScope();
         using IServiceScope secondScope = provider.CreateScope();
-        Assert.Same(singletonClient, firstScope.ServiceProvider.GetRequiredService<IDocumentExtractionClient>());
-        Assert.Same(singletonClient, secondScope.ServiceProvider.GetRequiredService<IDocumentExtractionClient>());
+        Assert.Same(singletonClient, firstScope.ServiceProvider.GetRequiredService<DocumentExtractionClient>());
+        Assert.Same(singletonClient, secondScope.ServiceProvider.GetRequiredService<DocumentExtractionClient>());
         firstScope.Dispose();
         secondScope.Dispose();
         Assert.Equal(0, singletonClient.DisposeCount);
@@ -217,7 +217,7 @@ public sealed class DocumentExtractionMiddlewareTests
         Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => builder.Build()));
         Assert.Equal(new[] { "wrapped" }, disposed);
         Assert.Equal(1, inner.DisposeCount);
-        Assert.Throws<ArgumentNullException>(() => new DocumentExtractionClientBuilder((IDocumentExtractionClient)null!));
+        Assert.Throws<ArgumentNullException>(() => new DocumentExtractionClientBuilder((DocumentExtractionClient)null!));
     }
 
     [Fact]
@@ -232,8 +232,8 @@ public sealed class DocumentExtractionMiddlewareTests
             return inner;
         }).Use(client => new RecordingMiddleware(client, () => { }));
         using ServiceProvider provider = services.BuildServiceProvider();
-        IDocumentExtractionClient client = provider.GetRequiredKeyedService<IDocumentExtractionClient>("key");
-        Assert.Same(client, provider.GetRequiredKeyedService<IDocumentExtractionClient>("key"));
+        DocumentExtractionClient client = provider.GetRequiredKeyedService<DocumentExtractionClient>("key");
+        Assert.Same(client, provider.GetRequiredKeyedService<DocumentExtractionClient>("key"));
         Assert.Same(client, client.GetService(typeof(RecordingMiddleware)));
         Assert.Null(client.GetService(typeof(RecordingMiddleware), "different"));
         provider.Dispose();
@@ -463,6 +463,272 @@ public sealed class DocumentExtractionMiddlewareTests
         Assert.Equal(42, input.ReadByte());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FactoryRegistration_SingletonSharesOneOwnedPipelineAcrossScopes(bool keyed)
+    {
+        ServiceCollection services = new();
+        List<TestClient> terminals = [];
+        IServiceProvider? factoryServices = null;
+        int middlewareDisposals = 0;
+        DocumentExtractionClient Factory(IServiceProvider serviceProvider)
+        {
+            factoryServices = serviceProvider;
+            TestClient terminal = new();
+            terminals.Add(terminal);
+            return terminal;
+        }
+
+        DocumentExtractionClientBuilder builder = keyed
+            ? services.AddKeyedDocumentExtractionClient("singleton-key", Factory, ServiceLifetime.Singleton)
+            : services.AddDocumentExtractionClient(Factory, ServiceLifetime.Singleton);
+        builder.Use(inner => new RecordingMiddleware(inner, () => middlewareDisposals++));
+        using ServiceProvider provider = services.BuildServiceProvider();
+        using IServiceScope firstScope = provider.CreateScope();
+        using IServiceScope secondScope = provider.CreateScope();
+        DocumentExtractionClient Resolve(IServiceProvider scopeServices) => keyed
+            ? scopeServices.GetRequiredKeyedService<DocumentExtractionClient>("singleton-key")
+            : scopeServices.GetRequiredService<DocumentExtractionClient>();
+
+        DocumentExtractionClient first = Resolve(firstScope.ServiceProvider);
+        Assert.Same(first, Resolve(firstScope.ServiceProvider));
+        Assert.Same(first, Resolve(secondScope.ServiceProvider));
+        Assert.Same(first, Resolve(secondScope.ServiceProvider));
+        Assert.Same(first, Resolve(provider));
+        TestClient terminal = Assert.Single(terminals);
+        Assert.Same(terminal, Assert.IsType<RecordingMiddleware>(first).Inner);
+        Assert.Same(provider.GetRequiredService<IServiceProvider>(), factoryServices);
+        Assert.Equal(0, terminal.DisposeCount);
+        Assert.Equal(0, middlewareDisposals);
+
+        firstScope.Dispose();
+        secondScope.Dispose();
+        Assert.Equal(0, terminal.DisposeCount);
+        Assert.Equal(0, middlewareDisposals);
+        Assert.Same(first, Resolve(provider));
+        Assert.Single(terminals);
+        provider.Dispose();
+        Assert.Equal(1, middlewareDisposals);
+        Assert.Equal(1, terminal.DisposeCount);
+    }
+
+    [Fact]
+    public async Task BuiltLoggingPipeline_PreservesExactExtractionOrderAndNativeKeyedLookup()
+    {
+        using MemoryStream input = new([42, 43]);
+        using Native native = new();
+        using CountingStream body = new(OriginalBytes());
+        using CancellationTokenSource cancellation = new();
+        ExtractionDocument expected = new("secret/path", new TextContent("visible **text**")) { RawRepresentation = native };
+        ExtractionDocumentSourceReference reference = new(new ExtractionDocumentSourcePage("frame", 7), rawRepresentation: native);
+        ExtractionDocumentImageElement image = new(new TextContent("visible text"), "visible text");
+        image.Sources.Add(reference);
+        ExtractionDocumentSection section = new();
+        section.Elements.Add(image);
+        expected.Sections.Add(section);
+        expected.SourcePages.Add(reference.Page);
+        List<string> events = [];
+        object supportedKey = new();
+        object unsupportedKey = new();
+        using PipelineTerminal terminal = new(native, supportedKey, events);
+        FakeLogCollector logs = new();
+        using TestLoggerFactory factory = new(logs);
+        ExtractionRecordingMiddleware? secondRecorder = null;
+        DocumentExtractionClientBuilder builder = new(terminal);
+        builder.Use(inner => new ExtractionRecordingMiddleware(inner, "first", events));
+        builder.UseLogging(factory);
+        builder.Use(inner => secondRecorder = new ExtractionRecordingMiddleware(inner, "second", events));
+        using DocumentExtractionClient pipeline = builder.Build();
+        ExtractionRecordingMiddleware first = Assert.IsType<ExtractionRecordingMiddleware>(pipeline);
+        Assert.IsType<LoggingDocumentExtractionClient>(first.Inner);
+        ExtractionRecordingMiddleware second = Assert.IsType<ExtractionRecordingMiddleware>(secondRecorder);
+        Assert.Same(terminal, second.Inner);
+
+        Assert.Same(pipeline, pipeline.GetService(typeof(DocumentExtractionClient)));
+        Assert.Same(pipeline, pipeline.GetService(typeof(object)));
+        Assert.Same(native, pipeline.GetService(typeof(Native)));
+        Assert.Same(native, pipeline.GetService(typeof(Native), supportedKey));
+        Assert.Null(pipeline.GetService(typeof(Native), unsupportedKey));
+        Assert.Null(pipeline.GetService(typeof(Stream), supportedKey));
+
+        void AssertLookups()
+        {
+            Assert.Equal(4, terminal.Lookups.Count);
+            Assert.Equal(new[] { typeof(Native), typeof(Native), typeof(Native), typeof(Stream) },
+                terminal.Lookups.Select(static lookup => lookup.serviceType));
+            Assert.Null(terminal.Lookups[0].serviceKey);
+            Assert.Same(supportedKey, terminal.Lookups[1].serviceKey);
+            Assert.Same(unsupportedKey, terminal.Lookups[2].serviceKey);
+            Assert.Same(supportedKey, terminal.Lookups[3].serviceKey);
+        }
+
+        AssertLookups();
+        Assert.Equal(0, terminal.CallCount);
+        Assert.Empty(events);
+        Assert.Equal(0, logs.Count);
+        Assert.Equal(0, terminal.DisposeCount);
+        Assert.Equal(0, native.DisposeCount);
+        Assert.Equal(0, native.ToStringCount);
+        DocumentExtractionOptions options = new() { ExtractorName = "OPTIONS_ONLY_93" };
+        options.AdditionalProperties.Add("native", native);
+        options.AdditionalProperties.Add("body", body);
+        options.AdditionalProperties.Add("Setting", null);
+
+        Task<ExtractionDocument> pending = pipeline.ExtractAsync(input, "secret/path", "application/pdf", options, cancellation.Token);
+
+        Assert.False(pending.IsCompleted);
+        Assert.Equal(new[] { "first-enter", "second-enter", "terminal" }, events);
+        Assert.Equal(new[] { "Document extraction invoked." }, logs.GetSnapshot().Select(static entry => entry.Message));
+        Assert.Equal(1, terminal.CallCount);
+        Assert.Same(input, first.Source);
+        Assert.Same(input, second.Source);
+        Assert.Same(input, terminal.Source);
+        Assert.Equal("secret/path", first.Identifier);
+        Assert.Equal("secret/path", second.Identifier);
+        Assert.Equal("secret/path", terminal.Identifier);
+        Assert.Equal("application/pdf", first.MediaType);
+        Assert.Equal("application/pdf", second.MediaType);
+        Assert.Equal("application/pdf", terminal.MediaType);
+        Assert.Equal(cancellation.Token, first.Token);
+        Assert.Equal(cancellation.Token, second.Token);
+        Assert.Equal(cancellation.Token, terminal.Token);
+        Assert.Same(options, first.Options);
+        DocumentExtractionOptions secondOptions = Assert.IsType<DocumentExtractionOptions>(second.Options);
+        DocumentExtractionOptions terminalOptions = Assert.IsType<DocumentExtractionOptions>(terminal.Options);
+        Assert.NotSame(options, secondOptions);
+        Assert.NotSame(options, terminalOptions);
+        Assert.NotSame(secondOptions, terminalOptions);
+        Assert.NotSame(options.AdditionalProperties, secondOptions.AdditionalProperties);
+        Assert.NotSame(options.AdditionalProperties, terminalOptions.AdditionalProperties);
+        Assert.NotSame(secondOptions.AdditionalProperties, terminalOptions.AdditionalProperties);
+        foreach (DocumentExtractionOptions snapshot in new[] { options, secondOptions, terminalOptions })
+        {
+            Assert.Equal("OPTIONS_ONLY_93", snapshot.ExtractorName);
+            Assert.Equal(3, snapshot.AdditionalProperties.Count);
+            Assert.Same(native, snapshot.AdditionalProperties["native"]);
+            Assert.Same(body, snapshot.AdditionalProperties["body"]);
+            Assert.True(snapshot.AdditionalProperties.TryGetValue("Setting", out object? presentNull));
+            Assert.Null(presentNull);
+            Assert.False(snapshot.AdditionalProperties.ContainsKey("SETTING"));
+        }
+
+        options.ExtractorName = "caller changed";
+        options.AdditionalProperties.Clear();
+        Assert.Equal("OPTIONS_ONLY_93", secondOptions.ExtractorName);
+        Assert.Equal("OPTIONS_ONLY_93", terminalOptions.ExtractorName);
+        Assert.Equal(3, secondOptions.AdditionalProperties.Count);
+        Assert.Equal(3, terminalOptions.AdditionalProperties.Count);
+        terminalOptions.ExtractorName = "terminal changed";
+        terminalOptions.AdditionalProperties.Clear();
+        Assert.Equal("OPTIONS_ONLY_93", secondOptions.ExtractorName);
+        Assert.Same(native, secondOptions.AdditionalProperties["native"]);
+        Assert.Same(body, secondOptions.AdditionalProperties["body"]);
+        Assert.Equal("caller changed", options.ExtractorName);
+        Assert.Empty(options.AdditionalProperties);
+        terminal.SetResult(expected);
+
+        ExtractionDocument actual = await pending;
+
+        Assert.Same(expected, actual);
+        Assert.Equal(new[] { "first-enter", "second-enter", "terminal", "second-exit", "first-exit" }, events);
+        Assert.Equal(5, events.Count);
+        Assert.All(new[] { "first-enter", "second-enter", "terminal", "second-exit", "first-exit" },
+            entry => Assert.Equal(1, events.Count(recorded => recorded == entry)));
+        Assert.Equal(1, terminal.CallCount);
+        AssertLifecycle(logs, "completed");
+        AssertLookups();
+        pipeline.Dispose();
+        pipeline.Dispose();
+        Assert.Equal(1, terminal.DisposeCount);
+        Assert.Same(native, actual.RawRepresentation);
+        Assert.Same(image, Assert.Single(actual.EnumerateContent()));
+        Assert.Same(reference, Assert.Single(image.Sources));
+        Assert.Same(native, reference.GetRawRepresentation());
+        Assert.Equal("visible **text**", Assert.IsType<TextContent>(actual.Content).Text);
+        Assert.Equal("visible text", Assert.IsType<TextContent>(image.Content).Text);
+        Assert.Equal(OriginalBytes(), body.ToArray());
+        Assert.Equal(0, body.DisposeCount);
+        Assert.Equal(0, native.DisposeCount);
+        Assert.Equal(0, native.ToStringCount);
+        Assert.Equal(42, input.ReadByte());
+    }
+
+    private sealed class ExtractionRecordingMiddleware(DocumentExtractionClient inner, string name, List<string> events)
+        : DelegatingDocumentExtractionClient(inner)
+    {
+        internal DocumentExtractionClient Inner => InnerClient;
+        internal Stream? Source { get; private set; }
+        internal string? Identifier { get; private set; }
+        internal string? MediaType { get; private set; }
+        internal DocumentExtractionOptions? Options { get; private set; }
+        internal CancellationToken Token { get; private set; }
+
+        public override async Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
+            DocumentExtractionOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            Source = document;
+            Identifier = identifier;
+            MediaType = mediaType;
+            Options = options;
+            Token = cancellationToken;
+            events.Add(name + "-enter");
+            ExtractionDocument result = await base.ExtractAsync(document, identifier, mediaType, options, cancellationToken);
+            events.Add(name + "-exit");
+            return result;
+        }
+    }
+
+    private sealed class PipelineTerminal(Native native, object supportedKey, List<string> events)
+        : DocumentExtractionClient
+    {
+        private TaskCompletionSource<ExtractionDocument>? _completion;
+
+        internal List<(Type serviceType, object? serviceKey)> Lookups { get; } = [];
+        internal Stream? Source { get; private set; }
+        internal string? Identifier { get; private set; }
+        internal string? MediaType { get; private set; }
+        internal DocumentExtractionOptions? Options { get; private set; }
+        internal CancellationToken Token { get; private set; }
+        internal int CallCount { get; private set; }
+        internal int DisposeCount { get; private set; }
+
+        internal void SetResult(ExtractionDocument result) => _completion!.SetResult(result);
+
+        public override Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
+            DocumentExtractionOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            Source = document;
+            Identifier = identifier;
+            MediaType = mediaType;
+            Options = options;
+            Token = cancellationToken;
+            CallCount++;
+            events.Add("terminal");
+            TaskCompletionSource<ExtractionDocument> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _completion = completion;
+            return completion.Task;
+        }
+
+        public override object? GetService(Type serviceType, object? serviceKey = null)
+        {
+            Lookups.Add((serviceType, serviceKey));
+            return serviceType == typeof(Native) && (serviceKey is null || ReferenceEquals(supportedKey, serviceKey))
+                ? native
+                : base.GetService(serviceType, serviceKey);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                DisposeCount++;
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+
     private sealed class ThrowingLogger(string terminal, Exception failure) : ILogger
     {
         internal List<string> Messages { get; } = [];
@@ -506,7 +772,7 @@ public sealed class DocumentExtractionMiddlewareTests
     private static byte[] OriginalBytes() => System.Text.Encoding.UTF8.GetBytes(
         " {\r\n \"unknown\" : {\"z\":[3,1]}, \"marker\":\"RAW_BODY_ONLY_91\" \r\n}\n");
 
-    private sealed class TestClient(ExtractionDocument? result = null) : IDocumentExtractionClient
+    private sealed class TestClient(ExtractionDocument? result = null) : DocumentExtractionClient
     {
         internal Func<Task<ExtractionDocument>>? Extract { get; set; }
         internal Stream? Source { get; private set; }
@@ -516,7 +782,7 @@ public sealed class DocumentExtractionMiddlewareTests
         internal CancellationToken Token { get; private set; }
         internal int CallCount { get; private set; }
         internal int DisposeCount { get; private set; }
-        public Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
+        public override Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
             DocumentExtractionOptions? options = null, CancellationToken cancellationToken = default)
         {
             Source = document;
@@ -534,13 +800,20 @@ public sealed class DocumentExtractionMiddlewareTests
                 Task.FromException<ExtractionDocument>(new InvalidOperationException("No fake result configured."));
         }
 
-        public object? GetService(Type serviceType, object? serviceKey = null) => null;
-        public void Dispose() => DisposeCount++;
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                DisposeCount++;
+            }
+
+            base.Dispose(disposing);
+        }
     }
 
-    private sealed class RecordingMiddleware(IDocumentExtractionClient inner, Action disposed) : DelegatingDocumentExtractionClient(inner)
+    private sealed class RecordingMiddleware(DocumentExtractionClient inner, Action disposed) : DelegatingDocumentExtractionClient(inner)
     {
-        internal IDocumentExtractionClient Inner => InnerClient;
+        internal DocumentExtractionClient Inner => InnerClient;
         protected override void Dispose(bool disposing)
         {
             try

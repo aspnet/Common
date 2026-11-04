@@ -6,23 +6,23 @@
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.DocumentExtractionClientBuilder(Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient innerClient);",
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.DocumentExtractionClientBuilder(Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient innerClient);",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.DocumentExtractionClientBuilder(System.Func<System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient> innerClientFactory);",
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.DocumentExtractionClientBuilder(System.Func<System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient> innerClientFactory);",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.Build(System.IServiceProvider? services = null);",
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.Build(System.IServiceProvider? services = null);",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.Use(System.Func<Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient, System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient> factory);",
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.Use(System.Func<Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient, System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient> factory);",
           "Stage": "Experimental"
         },
         {
-          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.Use(System.Func<Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient, Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient> factory);",
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.Use(System.Func<Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient> factory);",
           "Stage": "Experimental"
         }
       ]
@@ -32,15 +32,15 @@
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DependencyInjection.DocumentExtractionClientBuilderServiceCollectionExtensions.AddDocumentExtractionClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient innerClient, Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime.Singleton);",
+          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DependencyInjection.DocumentExtractionClientBuilderServiceCollectionExtensions.AddDocumentExtractionClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient innerClient, Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime.Singleton);",
           "Stage": "Experimental"
         },
         {
-          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DependencyInjection.DocumentExtractionClientBuilderServiceCollectionExtensions.AddDocumentExtractionClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Func<System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient> innerClientFactory, Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime.Singleton);",
+          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DependencyInjection.DocumentExtractionClientBuilderServiceCollectionExtensions.AddDocumentExtractionClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Func<System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient> innerClientFactory, Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime.Singleton);",
           "Stage": "Experimental"
         },
         {
-          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DependencyInjection.DocumentExtractionClientBuilderServiceCollectionExtensions.AddKeyedDocumentExtractionClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, object? serviceKey, System.Func<System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient> innerClientFactory, Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime.Singleton);",
+          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DependencyInjection.DocumentExtractionClientBuilderServiceCollectionExtensions.AddKeyedDocumentExtractionClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, object? serviceKey, System.Func<System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient> innerClientFactory, Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime.Singleton);",
           "Stage": "Experimental"
         }
       ]
@@ -50,7 +50,7 @@
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.DocumentExtraction.LoggingDocumentExtractionClient.LoggingDocumentExtractionClient(Microsoft.Extensions.DocumentExtraction.IDocumentExtractionClient innerClient, Microsoft.Extensions.Logging.ILogger logger);",
+          "Member": "Microsoft.Extensions.DocumentExtraction.LoggingDocumentExtractionClient.LoggingDocumentExtractionClient(Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient innerClient, Microsoft.Extensions.Logging.ILogger logger);",
           "Stage": "Experimental"
         },
         {
@@ -64,7 +64,7 @@
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DocumentExtraction.LoggingDocumentExtractionClientBuilderExtensions.UseLogging(this Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder builder, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory = null, System.Action<Microsoft.Extensions.DocumentExtraction.LoggingDocumentExtractionClient>? configure = null);",
+          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DocumentExtraction.LoggingDocumentExtractionClientBuilderExtensions.UseLogging(this Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder builder, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory = null);",
           "Stage": "Experimental"
         }
       ]

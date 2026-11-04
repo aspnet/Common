@@ -4,16 +4,49 @@ This experimental package defines a small extraction capability over the standal
 `Microsoft.Extensions.Documents.Abstractions` exchange model. It does not define a
 second document tree or require an authoring, page-streaming or observation protocol.
 
-The primary operation is:
+The single client contract is the abstract `DocumentExtractionClient` class.
+Its primary operation is:
 
 ```csharp
-Task<ExtractionDocument> ExtractAsync(
+public abstract Task<ExtractionDocument> ExtractAsync(
     Stream document,
     string identifier,
     string mediaType,
     DocumentExtractionOptions? options = null,
     CancellationToken cancellationToken = default);
 ```
+
+For example, a provider that needs no special service lookup or cleanup can
+implement only the operation:
+
+```csharp
+sealed class MyClient : DocumentExtractionClient
+{
+    public override Task<ExtractionDocument> ExtractAsync(
+        Stream document, string identifier, string mediaType,
+        DocumentExtractionOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(new ExtractionDocument(identifier));
+    }
+}
+```
+
+This replaces the previous `IDocumentExtractionClient` interface, not an
+additional compatibility layer. Existing providers must derive from the class
+and override `ExtractAsync`; callers, factory signatures and keyed/unkeyed DI
+lookups must use `DocumentExtractionClient`. Previously compiled interface-based
+consumers must be rebuilt. The root has a protected parameterless constructor,
+virtual `GetService` that returns itself for assignable unkeyed requests, and
+public `Dispose` that invokes the optional protected virtual `Dispose(bool)`
+hook. It neither owns the input nor adds automatic validation, option cloning,
+a finalizer or a global disposed flag. Providers retain those responsibilities.
+
+The class is an evolution seam for future operations with useful virtual defaults,
+not a claim that every future member is semantically compatible. Such operations
+must define ownership, failure and interception by configured middleware before
+being added. This migration adds no pipe, streaming, batching or other operation.
 
 An adapter returns the canonical `Microsoft.Extensions.Documents.ExtractionDocument` directly.
 The caller owns the input stream. The returned document is non-disposable data.

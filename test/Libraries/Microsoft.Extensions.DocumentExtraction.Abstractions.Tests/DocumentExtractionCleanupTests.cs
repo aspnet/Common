@@ -112,14 +112,14 @@ public sealed class DocumentExtractionCleanupTests
 
     // This fake models an adapter's responsibility, not middleware or a core body collector.
     // Resources belong to the adapter's operation, never to the data result.
-    private sealed class PartialAdapter(CleanupStream[] bodies, Native native, Exception primary, SemaphoreSlim acquired, SemaphoreSlim release) : IDocumentExtractionClient
+    private sealed class PartialAdapter(CleanupStream[] bodies, Native native, Exception primary, SemaphoreSlim acquired, SemaphoreSlim release) : DocumentExtractionClient
     {
         internal int AcquireCount { get; private set; }
         internal CancellationToken Token { get; private set; }
 
         [SuppressMessage("Design", "CA1031:Do not catch general exception types",
             Justification = "Attempts cleanup of every resource before reporting primary and cleanup failures together.")]
-        public async Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
+        public override async Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
             DocumentExtractionOptions? options = null, CancellationToken cancellationToken = default)
         {
             Token = cancellationToken;
@@ -163,11 +163,6 @@ public sealed class DocumentExtractionCleanupTests
 
                 throw;
             }
-        }
-
-        public object? GetService(Type serviceType, object? serviceKey = null) => null;
-        public void Dispose()
-        {
         }
     }
 

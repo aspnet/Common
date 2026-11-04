@@ -20,7 +20,7 @@ public partial class LoggingDocumentExtractionClient : DelegatingDocumentExtract
     /// <summary>
     /// Initializes a new instance of the <see cref="LoggingDocumentExtractionClient"/> class.
     /// </summary>
-    public LoggingDocumentExtractionClient(IDocumentExtractionClient innerClient, ILogger logger)
+    public LoggingDocumentExtractionClient(DocumentExtractionClient innerClient, ILogger logger)
         : base(innerClient)
     {
         _logger = Throw.IfNull(logger);

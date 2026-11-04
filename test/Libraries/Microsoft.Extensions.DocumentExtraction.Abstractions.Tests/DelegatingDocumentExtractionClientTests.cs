@@ -187,7 +187,7 @@ public sealed class DelegatingDocumentExtractionClientTests
     {
         using Client inner = new((_, _, _, _, _) => throw new NotSupportedException());
         using Delegating wrapper = new(inner);
-        Assert.Same(wrapper, wrapper.GetService(typeof(IDocumentExtractionClient)));
+        Assert.Same(wrapper, wrapper.GetService(typeof(DocumentExtractionClient)));
         Assert.Same(wrapper, wrapper.GetService(typeof(Delegating)));
         Assert.Equal(0, inner.ServiceCount);
         object key = new();
@@ -206,7 +206,7 @@ public sealed class DelegatingDocumentExtractionClientTests
         Assert.Equal(1, inner.DisposeCount);
     }
 
-    private sealed class Delegating(IDocumentExtractionClient inner) : DelegatingDocumentExtractionClient(inner);
+    private sealed class Delegating(DocumentExtractionClient inner) : DelegatingDocumentExtractionClient(inner);
 
     private sealed class Native : IDisposable
     {
@@ -215,7 +215,7 @@ public sealed class DelegatingDocumentExtractionClientTests
     }
 
     private sealed class Client(Func<Stream, string, string, DocumentExtractionOptions?, CancellationToken, Task<ExtractionDocument>> extract)
-        : IDocumentExtractionClient
+        : DocumentExtractionClient
     {
         internal int CallCount { get; private set; }
         internal Stream? Source { get; private set; }
@@ -229,7 +229,7 @@ public sealed class DelegatingDocumentExtractionClientTests
         internal Type? ServiceType { get; private set; }
         internal object? ServiceKey { get; private set; }
 
-        public Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
+        public override Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
             DocumentExtractionOptions? options = null, CancellationToken cancellationToken = default)
         {
             CallCount++;
@@ -241,7 +241,7 @@ public sealed class DelegatingDocumentExtractionClientTests
             return extract(document, identifier, mediaType, options, cancellationToken);
         }
 
-        public object? GetService(Type serviceType, object? serviceKey = null)
+        public override object? GetService(Type serviceType, object? serviceKey = null)
         {
             ServiceCount++;
             ServiceType = serviceType;
@@ -249,6 +249,14 @@ public sealed class DelegatingDocumentExtractionClientTests
             return Service;
         }
 
-        public void Dispose() => DisposeCount++;
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                DisposeCount++;
+            }
+
+            base.Dispose(disposing);
+        }
     }
 }

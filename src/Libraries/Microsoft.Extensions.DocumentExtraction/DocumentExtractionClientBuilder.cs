@@ -12,13 +12,13 @@ namespace Microsoft.Extensions.DocumentExtraction;
 /// </summary>
 public sealed class DocumentExtractionClientBuilder
 {
-    private readonly Func<IServiceProvider, IDocumentExtractionClient> _innerClientFactory;
-    private readonly List<Func<IDocumentExtractionClient, IServiceProvider, IDocumentExtractionClient>> _factories = [];
+    private readonly Func<IServiceProvider, DocumentExtractionClient> _innerClientFactory;
+    private readonly List<Func<DocumentExtractionClient, IServiceProvider, DocumentExtractionClient>> _factories = [];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DocumentExtractionClientBuilder"/> class around an existing client.
     /// </summary>
-    public DocumentExtractionClientBuilder(IDocumentExtractionClient innerClient)
+    public DocumentExtractionClientBuilder(DocumentExtractionClient innerClient)
     {
         _ = Throw.IfNull(innerClient);
         _innerClientFactory = _ => innerClient;
@@ -27,7 +27,7 @@ public sealed class DocumentExtractionClientBuilder
     /// <summary>
     /// Initializes a new instance of the <see cref="DocumentExtractionClientBuilder"/> class around a service-provider-aware factory.
     /// </summary>
-    public DocumentExtractionClientBuilder(Func<IServiceProvider, IDocumentExtractionClient> innerClientFactory)
+    public DocumentExtractionClientBuilder(Func<IServiceProvider, DocumentExtractionClient> innerClientFactory)
     {
         _innerClientFactory = Throw.IfNull(innerClientFactory);
     }
@@ -37,7 +37,7 @@ public sealed class DocumentExtractionClientBuilder
     /// </summary>
     /// <returns>The updated builder.</returns>
     public DocumentExtractionClientBuilder Use(
-        Func<IDocumentExtractionClient, IServiceProvider, IDocumentExtractionClient> factory)
+        Func<DocumentExtractionClient, IServiceProvider, DocumentExtractionClient> factory)
     {
         _factories.Add(Throw.IfNull(factory));
         return this;
@@ -47,7 +47,7 @@ public sealed class DocumentExtractionClientBuilder
     /// Adds middleware to the pipeline.
     /// </summary>
     /// <returns>The updated builder.</returns>
-    public DocumentExtractionClientBuilder Use(Func<IDocumentExtractionClient, IDocumentExtractionClient> factory)
+    public DocumentExtractionClientBuilder Use(Func<DocumentExtractionClient, DocumentExtractionClient> factory)
     {
         _ = Throw.IfNull(factory);
         return Use((inner, _) => factory(inner));
@@ -58,10 +58,10 @@ public sealed class DocumentExtractionClientBuilder
     /// </summary>
     /// <param name="services">The service provider used by middleware factories.</param>
     /// <returns>The composed extraction client.</returns>
-    public IDocumentExtractionClient Build(IServiceProvider? services = null)
+    public DocumentExtractionClient Build(IServiceProvider? services = null)
     {
         services ??= EmptyServiceProvider.Instance;
-        IDocumentExtractionClient client = _innerClientFactory(services)
+        DocumentExtractionClient client = _innerClientFactory(services)
             ?? throw new InvalidOperationException("The inner client factory returned null.");
 
         try
