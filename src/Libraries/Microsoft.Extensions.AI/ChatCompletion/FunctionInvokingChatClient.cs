@@ -1552,7 +1552,7 @@ public class FunctionInvokingChatClient : DelegatingChatClient
             {
                 LogFunctionRejected(m.ResponseFunctionCallContent.Name, m.Response.Reason);
 
-                string result = "Tool call invocation was rejected by the approver and must not be retried.";
+                string result = "Tool call invocation rejected.";
                 if (!string.IsNullOrWhiteSpace(m.Response.Reason))
                 {
                     result = $"{result} {m.Response.Reason}";
