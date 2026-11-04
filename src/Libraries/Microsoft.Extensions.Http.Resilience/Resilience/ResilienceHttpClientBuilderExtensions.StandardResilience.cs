@@ -70,7 +70,7 @@ public static partial class ResilienceHttpClientBuilderExtensions
         var optionsName = PipelineNameHelper.GetName(builder.Name, StandardIdentifier);
 
         _ = builder.Services.AddOptionsWithValidateOnStart<HttpStandardResilienceOptions, HttpStandardResilienceOptionsCustomValidator>(optionsName);
-        _ = builder.Services.AddOptionsWithValidateOnStart<HttpStandardResilienceOptions, HttpStandardResilienceOptionsValidator>(optionsName);
+        _ = builder.Services.AddOptionsWithValidateOnStart<HttpStandardResilienceOptions, HttpStandardResilienceOptionsBudgetAwareValidator>(optionsName);
 
         _ = builder.AddResilienceHandler(StandardIdentifier, (builder, context) =>
         {
@@ -82,7 +82,7 @@ public static partial class ResilienceHttpClientBuilderExtensions
             _ = builder
                 .AddRateLimiter(options.RateLimiter)
                 .AddTimeout(options.TotalRequestTimeout)
-                .AddRetry(options.Retry)
+                .AddRetryWithOptionalBudget(options.Retry)
                 .AddCircuitBreaker(options.CircuitBreaker)
                 .AddTimeout(options.AttemptTimeout);
         });

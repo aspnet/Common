@@ -96,6 +96,26 @@ public class HttpRequestLatencyListenerTest
     private sealed class DummyListener : EventListener;
 
     [Fact]
+    public void HttpRequestLatencyListener_EventsDuringConstruction_DoNotAddCheckpoints()
+    {
+        var lcti = HttpMockProvider.GetTokenIssuer();
+        var lc = HttpMockProvider.GetLatencyContext();
+        var context = new HttpClientLatencyContext();
+        context.Set(lc.Object);
+
+        using var es = new HttpMockProvider.MockEventSource();
+        using var dummyListener = new DummyListener();
+        dummyListener.EnableEvents(es, EventLevel.LogAlways);
+        lcti.Setup(a => a.GetCheckpointToken(It.IsAny<string>()))
+            .Callback(() => es.Write("Dummy"))
+            .Returns((string name) => new CheckpointToken(name, 0));
+
+        using var listener = HttpMockProvider.GetListener(context, lcti.Object);
+
+        lc.Verify(a => a.AddCheckpoint(It.IsAny<CheckpointToken>()), Times.Never);
+    }
+
+    [Fact]
     public void HttpRequestLatencyListener_OnEventSourceCreated_HttpSources()
     {
         var lcti = HttpMockProvider.GetTokenIssuer();
