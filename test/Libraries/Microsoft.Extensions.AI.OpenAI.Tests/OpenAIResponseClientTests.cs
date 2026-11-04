@@ -6140,6 +6140,57 @@ public class OpenAIResponseClientTests
         Assert.NotEmpty(annotatedUpdate.Contents.First().Annotations!);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task StreamingFunctionCallPreservesNamespaceWhenReplayed(bool namespaced, bool persistHistory)
+    {
+        const string Input = """
+            {"model":"gpt-4o-mini","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"test"}]}],"stream":true}
+            """;
+        string namespaceProperty = namespaced ? ",\"namespace\":\"weather\"" : "";
+        string output = $$$"""
+            event: response.created
+            data: {"type":"response.created","response":{"id":"resp_001","object":"response","created_at":1741892091,"status":"in_progress","model":"gpt-4o-mini","output":[]}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","output_index":0,"item":{"id":"fc_001","type":"function_call","call_id":"call_001","name":"GetWeather","arguments":"","status":"in_progress"{{{namespaceProperty}}}}}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","output_index":0,"item":{"id":"fc_001","type":"function_call","call_id":"call_001","name":"GetWeather","arguments":"{\"city\":\"Tbilisi\"}","status":"completed"{{{namespaceProperty}}}}}
+
+
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
+        ChatResponse response = await client.GetStreamingResponseAsync("test").ToChatResponseAsync();
+        ChatMessage message = Assert.Single(response.Messages);
+        if (persistHistory)
+        {
+            string json = JsonSerializer.Serialize(message, AIJsonUtilities.DefaultOptions);
+            message = JsonSerializer.Deserialize<ChatMessage>(json, AIJsonUtilities.DefaultOptions)!;
+        }
+
+        var call = Assert.IsType<FunctionCallContent>(Assert.Single(message.Contents));
+        Assert.Equal("call_001", call.CallId);
+        Assert.Equal("GetWeather", call.Name);
+        ResponseItem item = Assert.Single(new[] { message }.AsOpenAIResponseItems());
+        using var replay = JsonDocument.Parse(ModelReaderWriter.Write(item, new ModelReaderWriterOptions("W")).ToMemory());
+        Assert.Equal("call_001", replay.RootElement.GetProperty("call_id").GetString());
+        Assert.Equal("GetWeather", replay.RootElement.GetProperty("name").GetString());
+        using var arguments = JsonDocument.Parse(replay.RootElement.GetProperty("arguments").GetString()!);
+        Assert.Equal("Tbilisi", arguments.RootElement.GetProperty("city").GetString());
+        Assert.Equal(namespaced, replay.RootElement.TryGetProperty("namespace", out var toolNamespace));
+        if (namespaced)
+        {
+            Assert.Equal("weather", toolNamespace.GetString());
+        }
+    }
+
     [Fact]
     public async Task StreamingResponseWithFunctionCallOutput_YieldsFunctionResultContent()
     {
