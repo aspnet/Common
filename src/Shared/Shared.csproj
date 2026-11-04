@@ -33,8 +33,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Bcl.HashCode" Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net11.0'))" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net11.0'))" />
     <PackageReference Include="Microsoft.Extensions.ObjectPool" />
     <PackageReference Include="System.ComponentModel.Annotations" Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))" NoWarn="RT0003" />
     <PackageReference Include="System.Memory" Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net6.0'))" />

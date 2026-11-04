@@ -35,6 +35,13 @@ their dependency bands intact when adding the next one.
    darc-managed primary band in `Version.Details.xml` separate from older/newer
    overlays in `Versions.props`; the internal release process uses BAR IDs and
    `darc update-dependencies` to advance them.
+   Check the new framework's `PackageOverrides.txt` for packages now supplied by
+   the framework. For example, .NET 11 includes `Microsoft.Extensions` abstraction
+   assemblies such as `Microsoft.Extensions.Options`. Condition redundant
+   `PackageReference` items with `!IsTargetFrameworkCompatible` for the new TFM,
+   retaining them for older targets instead of suppressing NU1510. Check
+   multi-target libraries even when legacy targets prevent NU1510 from being
+   reported, as well as tests, shared code, and engineering tools.
 4. **Source, tools, and templates.** Search for TFM-specific MSBuild conditions
    and `#if NET<N>_0[_OR_GREATER]` checks. Only change guards where a runtime API
    or behavior actually changes. Retire polyfills that now collide with framework

@@ -23,7 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Bcl.Memory" Condition="'$(TargetFrameworkIdentifier)' != '.NETCoreApp'" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net11.0'))" />
     <PackageReference Include="Microsoft.Extensions.VectorData.Abstractions" />
     <PackageReference Include="Microsoft.ML.Tokenizers" />
     <PackageReference Include="System.Diagnostics.DiagnosticSource" />
