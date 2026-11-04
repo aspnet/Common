@@ -5,6 +5,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.TestUtilities;
 using Xunit;
 
@@ -12,6 +14,43 @@ namespace Microsoft.Extensions.DataIngestion.Readers.Tests;
 
 public class MarkdownReaderTests : DocumentReaderConformanceTests
 {
+    [Fact]
+    public async Task PreservesRawMarkdownHeadingFooterAndExplicitTableHeaderRoles()
+    {
+        IngestionDocument document = await ReadAsync("""
+            ## **Actual heading**
+
+            A *formatted* paragraph.
+
+            | **Header** | Value |
+            | --- | --- |
+            | first | second |
+
+            ---
+
+            Footer text.
+            """);
+
+        ExtractionDocumentElement[] elements = document.EnumerateContent().ToArray();
+        ExtractionDocumentTextElement heading = Assert.IsType<ExtractionDocumentTextElement>(elements[0]);
+        Assert.Equal("heading", heading.Role);
+        Assert.Equal(2, heading.HeadingLevel);
+        Assert.Equal("## **Actual heading**", Assert.IsType<TextContent>(heading.Content).Text);
+        ExtractionDocumentTextElement paragraph = Assert.IsType<ExtractionDocumentTextElement>(elements[1]);
+        Assert.Null(paragraph.Role);
+        Assert.Equal("A *formatted* paragraph.", Assert.IsType<TextContent>(paragraph.Content).Text);
+        ExtractionDocumentTableElement table = Assert.IsType<ExtractionDocumentTableElement>(elements[2]);
+        Assert.Null(table.Content);
+        Assert.Equal("columnHeader", table.Cells[0, 0]!.Role);
+        Assert.Null(table.Cells[1, 0]!.Role);
+        Assert.Equal("**Header**", Assert.IsType<TextContent>(table.Cells[0, 0]!.Content!.Content).Text.Trim());
+        ExtractionDocumentTextElement footer = Assert.IsType<ExtractionDocumentTextElement>(elements[3]);
+        Assert.Equal("pageFooter", footer.Role);
+        Assert.Null(footer.HeadingLevel);
+        Assert.Equal("Footer text.", Assert.IsType<TextContent>(footer.Content).Text);
+        Assert.Equal(4, elements.Length);
+    }
+
     protected override IngestionDocumentReader CreateDocumentReader(bool extractImages = false) => new MarkdownReader();
 
     public static new TheoryData<string> Links =>
@@ -43,9 +82,9 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
 
         IngestionDocument document = await ReadAsync(markdownContent);
 
-        IngestionDocumentTable documentTable = Assert.Single(document.EnumerateContent().OfType<IngestionDocumentTable>());
-        Assert.Equal(5, documentTable.Cells.GetLength(0));
-        Assert.Equal(4, documentTable.Cells.GetLength(1));
+        ExtractionDocumentTableElement documentTable = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTableElement>());
+        Assert.Equal(5, documentTable.Cells.RowCount);
+        Assert.Equal(4, documentTable.Cells.ColumnCount);
 
         string[,] expected =
         {
@@ -56,7 +95,13 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
             { "Emissions Review", "Dec 2029", "All", "25% Emissions Cut" }
         };
 
-        Assert.Equal(expected, documentTable.Cells.Map(element => element!.GetMarkdown().Trim()));
+        for (int row = 0; row < documentTable.Cells.RowCount; row++)
+        {
+            for (int column = 0; column < documentTable.Cells.ColumnCount; column++)
+            {
+                Assert.Equal(expected[row, column], Assert.IsType<TextContent>(documentTable.Cells[row, column]!.Content!.Content).Text.Trim());
+            }
+        }
     }
 
     [ConditionalFact]
@@ -82,21 +127,21 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
 
         IngestionDocument document = await ReadAsync(markdownContent);
 
-        IngestionDocumentTable documentTable = Assert.Single(document.EnumerateContent().OfType<IngestionDocumentTable>());
-        Assert.Equal(10, documentTable.Cells.GetLength(0)); // 10 rows (1 header + 9 data rows)
-        Assert.Equal(3, documentTable.Cells.GetLength(1));  // 3 columns
+        ExtractionDocumentTableElement documentTable = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTableElement>());
+        Assert.Equal(10, documentTable.Cells.RowCount); // 10 rows (1 header + 9 data rows)
+        Assert.Equal(3, documentTable.Cells.ColumnCount);  // 3 columns
 
         // Verify a few key cells
-        Assert.Equal("Flag", documentTable.Cells[0, 0]!.GetMarkdown().Trim());
-        Assert.Equal("Value", documentTable.Cells[0, 1]!.GetMarkdown().Trim());
-        Assert.Equal("Description", documentTable.Cells[0, 2]!.GetMarkdown().Trim());
+        Assert.Equal("Flag", Assert.IsType<TextContent>(documentTable.Cells[0, 0]!.Content!.Content).Text.Trim());
+        Assert.Equal("Value", Assert.IsType<TextContent>(documentTable.Cells[0, 1]!.Content!.Content).Text.Trim());
+        Assert.Equal("Description", Assert.IsType<TextContent>(documentTable.Cells[0, 2]!.Content!.Content).Text.Trim());
 
-        Assert.Equal("READYTORUN_FLAG_PLATFORM_NEUTRAL_SOURCE", documentTable.Cells[1, 0]!.GetMarkdown().Trim());
-        Assert.Equal("0x00000001", documentTable.Cells[1, 1]!.GetMarkdown().Trim());
-        Assert.Contains("platform neutral", documentTable.Cells[1, 2]!.GetMarkdown().Trim());
+        Assert.Equal("READYTORUN_FLAG_PLATFORM_NEUTRAL_SOURCE", Assert.IsType<TextContent>(documentTable.Cells[1, 0]!.Content!.Content).Text.Trim());
+        Assert.Equal("0x00000001", Assert.IsType<TextContent>(documentTable.Cells[1, 1]!.Content!.Content).Text.Trim());
+        Assert.Contains("platform neutral", Assert.IsType<TextContent>(documentTable.Cells[1, 2]!.Content!.Content).Text.Trim());
 
-        Assert.Equal("READYTORUN_FLAG_PARTIAL", documentTable.Cells[3, 0]!.GetMarkdown().Trim());
-        Assert.Equal("0x00000004", documentTable.Cells[3, 1]!.GetMarkdown().Trim());
+        Assert.Equal("READYTORUN_FLAG_PARTIAL", Assert.IsType<TextContent>(documentTable.Cells[3, 0]!.Content!.Content).Text.Trim());
+        Assert.Equal("0x00000004", Assert.IsType<TextContent>(documentTable.Cells[3, 1]!.Content!.Content).Text.Trim());
         Assert.Null(documentTable.Cells[3, 2]); // Empty description cell is null
     }
 
@@ -129,18 +174,21 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         IngestionDocument document = await ReadAsync(markdownContent);
 
         Assert.NotNull(document);
-        var images = document.EnumerateContent().OfType<IngestionDocumentImage>().ToArray();
+        var images = document.EnumerateContent().OfType<ExtractionDocumentImageElement>().ToArray();
         Assert.Equal(3, images.Length);
-        Assert.Equal(contentType1, images[0].MediaType);
-        Assert.Equal(imageBytes1, images[0].Content?.ToArray());
+        DataContent data1 = Assert.IsType<DataContent>(images[0].Content);
+        Assert.Equal(contentType1, data1.MediaType);
+        Assert.Equal(imageBytes1, data1.Data.ToArray());
         Assert.Equal("One", images[0].AlternativeText);
         Assert.Null(images[0].Source);
-        Assert.Equal(contentType2, images[1].MediaType);
-        Assert.Equal(imageBytes2, images[1].Content?.ToArray());
+        DataContent data2 = Assert.IsType<DataContent>(images[1].Content);
+        Assert.Equal(contentType2, data2.MediaType);
+        Assert.Equal(imageBytes2, data2.Data.ToArray());
         Assert.Equal("Two", images[1].AlternativeText);
         Assert.Null(images[1].Source);
-        Assert.Equal(contentType3, images[2].MediaType);
-        Assert.Equal(imageBytes3, images[2].Content?.ToArray());
+        DataContent data3 = Assert.IsType<DataContent>(images[2].Content);
+        Assert.Equal(contentType3, data3.MediaType);
+        Assert.Equal(imageBytes3, data3.Data.ToArray());
         Assert.Equal("Three", images[2].AlternativeText);
         Assert.Null(images[2].Source);
     }
@@ -161,15 +209,14 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         IngestionDocument document = await ReadAsync(markdownContent);
 
         Assert.NotNull(document);
-        var images = document.EnumerateContent().OfType<IngestionDocumentImage>().ToArray();
+        var images = document.EnumerateContent().OfType<ExtractionDocumentImageElement>().ToArray();
         Assert.Equal(3, images.Length);
 
         // Image with absolute URL and alt text
         Assert.Equal("A smiling octocat", images[0].AlternativeText);
         Assert.Equal(new Uri("https://myoctocat.com/assets/images/base-octocat.svg"), images[0].Source);
         Assert.Null(images[0].Content);
-        Assert.Null(images[0].MediaType);
-        Assert.Equal("![A smiling octocat](https://myoctocat.com/assets/images/base-octocat.svg)", images[0].GetMarkdown());
+        Assert.Null(images[0].Text);
 
         // Image with relative URL and no alt text
         Assert.Null(images[1].AlternativeText);
@@ -179,7 +226,8 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         // Image with absolute URL and alt text
         Assert.Equal("Logo", images[2].AlternativeText);
         Assert.Equal(new Uri("https://example.com/logo.png"), images[2].Source);
-        Assert.Equal("![Logo](https://example.com/logo.png)", images[2].GetMarkdown());
+        Assert.Null(images[2].Content);
+        Assert.Null(images[2].Text);
     }
 
     [ConditionalFact]
@@ -196,21 +244,21 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
 
         IngestionDocument document = await ReadAsync(markdownContent);
 
-        var table = Assert.Single(document.EnumerateContent().OfType<IngestionDocumentTable>());
-        Assert.Equal(2, table.Cells.GetLength(0));
-        Assert.Equal(2, table.Cells.GetLength(1));
+        var table = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTableElement>());
+        Assert.Equal(2, table.Cells.RowCount);
+        Assert.Equal(2, table.Cells.ColumnCount);
 
         // Each reader properly recognizes the text from the first column.
         // When it comes to the images, MarkItDown extracts them as images, while
         // other readers return nothing or ORCed text.
-        Assert.Equal("**Years**", table.Cells[0, 0]!.GetMarkdown().Trim());
-        Assert.Equal("**Logo**", table.Cells[0, 1]!.GetMarkdown().Trim());
-        Assert.Equal("2020-2025", table.Cells[1, 0]!.GetMarkdown().Trim());
+        Assert.Equal("**Years**", Assert.IsType<TextContent>(table.Cells[0, 0]!.Content!.Content).Text.Trim());
+        Assert.Equal("**Logo**", Assert.IsType<TextContent>(table.Cells[0, 1]!.Content!.Content).Text.Trim());
+        Assert.Equal("2020-2025", Assert.IsType<TextContent>(table.Cells[1, 0]!.Content!.Content).Text.Trim());
 
-        IngestionDocumentImage img = Assert.IsType<IngestionDocumentImage>(table.Cells[1, 1]);
-        Assert.Equal("image/png", img.MediaType);
-        Assert.NotNull(img.Content);
-        Assert.False(img.Content.Value.IsEmpty);
+        ExtractionDocumentImageElement img = Assert.IsType<ExtractionDocumentImageElement>(table.Cells[1, 1]!.Content);
+        DataContent data = Assert.IsType<DataContent>(img.Content);
+        Assert.Equal("image/png", data.MediaType);
+        Assert.Equal(imageBytes, data.Data.ToArray());
         Assert.Equal("Latest logo", img.AlternativeText);
     }
 
@@ -221,9 +269,9 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
 
         IngestionDocument document = await ReadAsync(markdownContent);
 
-        var paragraph = Assert.Single(document.EnumerateContent().OfType<IngestionDocumentParagraph>());
-        Assert.Equal("This has <sup>[1]</sup> inline HTML.", paragraph.Text);
-        Assert.Equal(markdownContent, paragraph.GetMarkdown());
+        var paragraph = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTextElement>(), element => element.Role is null);
+        Assert.Equal(markdownContent, Assert.IsType<TextContent>(paragraph.Content).Text);
+        Assert.Null(paragraph.Role);
     }
 
     [ConditionalFact]
@@ -235,9 +283,9 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
 
         IngestionDocument document = await ReadAsync(markdownContent);
 
-        var paragraph = Assert.Single(document.EnumerateContent().OfType<IngestionDocumentParagraph>());
-        Assert.Equal("Text with <strong>bold</strong>, <em>italic</em>, <sub>subscript</sub>, and <sup>superscript</sup> tags.", paragraph.Text);
-        Assert.Equal(markdownContent, paragraph.GetMarkdown());
+        var paragraph = Assert.Single(document.EnumerateContent().OfType<ExtractionDocumentTextElement>(), element => element.Role is null);
+        Assert.Equal(markdownContent, Assert.IsType<TextContent>(paragraph.Content).Text);
+        Assert.Null(paragraph.Role);
     }
 
     private async Task<IngestionDocument> ReadAsync(string content)

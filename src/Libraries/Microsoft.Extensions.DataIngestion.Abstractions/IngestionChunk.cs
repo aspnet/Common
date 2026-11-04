@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.DataIngestion;
@@ -28,7 +29,7 @@ public class IngestionChunk
     /// <paramref name="content"/> or <paramref name="document"/> is <see langword="null"/>.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// <paramref name="tokenCount"/> is negative.
+    /// <paramref name="tokenCount"/> is zero or negative.
     /// </exception>
     public IngestionChunk(AIContent content, IngestionDocument document, int tokenCount, string? context = null)
     {
@@ -47,6 +48,15 @@ public class IngestionChunk
     /// Gets the document from which this chunk was extracted.
     /// </summary>
     public IngestionDocument Document { get; }
+
+    /// <summary>
+    /// Gets the document elements contributing content or context to this chunk.
+    /// </summary>
+    /// <remarks>
+    /// Elements retain their identity in <see cref="Document"/>, including source references and table cell addresses.
+    /// An empty collection means source associations were not supplied. Source frame identifiers are not durable citation keys.
+    /// </remarks>
+    public IReadOnlyList<ExtractionDocumentElement> SourceElements { get; init; } = Array.Empty<ExtractionDocumentElement>();
 
     /// <summary>
     /// Gets additional context for the chunk.

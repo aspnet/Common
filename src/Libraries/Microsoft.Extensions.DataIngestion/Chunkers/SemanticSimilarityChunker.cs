@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.DataIngestion.Chunkers;
@@ -49,24 +50,33 @@ public sealed class SemanticSimilarityChunker : IngestionChunker
     {
         _ = Throw.IfNull(document);
 
-        List<(IngestionDocumentElement, float)> distances = await CalculateDistancesAsync(document, cancellationToken).ConfigureAwait(false);
-        foreach (var chunk in MakeChunks(document, distances))
+        foreach (var chunk in _elementsChunker.Process(document, string.Empty, [],
+            localContent: IngestionDocumentElementExtensions.GetSemanticContent(document.ExtractedDocument.Content)))
+        {
+            yield return chunk;
+        }
+
+        Dictionary<ExtractionDocumentElement, IReadOnlyList<ExtractionDocumentElement>> sources = [];
+        List<(ExtractionDocumentElement, float)> distances = await CalculateDistancesAsync(document, sources, cancellationToken).ConfigureAwait(false);
+        foreach (var chunk in MakeChunks(document, distances, sources))
         {
             yield return chunk;
         }
     }
 
-    private async Task<List<(IngestionDocumentElement element, float distance)>> CalculateDistancesAsync(IngestionDocument documents, CancellationToken cancellationToken)
+    private async Task<List<(ExtractionDocumentElement element, float distance)>> CalculateDistancesAsync(
+        IngestionDocument document, Dictionary<ExtractionDocumentElement, IReadOnlyList<ExtractionDocumentElement>> sources, CancellationToken cancellationToken)
     {
-        List<(IngestionDocumentElement element, float distance)> elementDistances = [];
+        List<(ExtractionDocumentElement element, float distance)> elementDistances = [];
         List<TextContent> semanticContents = [];
 
-        foreach (IngestionDocumentElement element in documents.EnumerateContent())
+        foreach (var (element, semanticContent, provenance) in IngestionDocumentElementExtensions.EnumerateSemanticContent(document))
         {
-            string? semanticContent = element.GetSemanticContent();
+            cancellationToken.ThrowIfCancellationRequested();
 
-            if (!string.IsNullOrEmpty(semanticContent))
+            if (element is not null && !string.IsNullOrEmpty(semanticContent))
             {
+                sources[element] = provenance;
                 elementDistances.Add((element, default));
                 semanticContents.Add(new TextContent(semanticContent!));
             }
@@ -91,11 +101,12 @@ public sealed class SemanticSimilarityChunker : IngestionChunker
         return elementDistances;
     }
 
-    private IEnumerable<IngestionChunk> MakeChunks(IngestionDocument document, List<(IngestionDocumentElement element, float distance)> elementDistances)
+    private IEnumerable<IngestionChunk> MakeChunks(IngestionDocument document, List<(ExtractionDocumentElement element, float distance)> elementDistances,
+        IReadOnlyDictionary<ExtractionDocumentElement, IReadOnlyList<ExtractionDocumentElement>> sources)
     {
         float distanceThreshold = Percentile(elementDistances);
 
-        List<IngestionDocumentElement> elementAccumulator = [];
+        List<ExtractionDocumentElement> elementAccumulator = [];
         string context = string.Empty;
         for (int i = 0; i < elementDistances.Count; i++)
         {
@@ -104,7 +115,7 @@ public sealed class SemanticSimilarityChunker : IngestionChunker
             elementAccumulator.Add(element);
             if (distance > distanceThreshold || i == elementDistances.Count - 1)
             {
-                foreach (var chunk in _elementsChunker.Process(document, context, elementAccumulator))
+                foreach (var chunk in _elementsChunker.Process(document, context, elementAccumulator, elementSources: sources))
                 {
                     yield return chunk;
                 }
@@ -113,7 +124,7 @@ public sealed class SemanticSimilarityChunker : IngestionChunker
         }
     }
 
-    private float Percentile(List<(IngestionDocumentElement element, float distance)> elementDistances)
+    private float Percentile(List<(ExtractionDocumentElement element, float distance)> elementDistances)
     {
         if (elementDistances.Count == 0)
         {

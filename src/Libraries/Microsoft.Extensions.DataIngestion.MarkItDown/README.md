@@ -2,6 +2,8 @@
 
 Provides an implementation of the `IngestionDocumentReader` class for the [MarkItDown](https://github.com/microsoft/markitdown/) utility.
 
+Both readers return an `IngestionDocument` envelope. Its `ExtractedDocument` owns the shared document graph; `Sections` forwards the exact shared list. Markdown conversion populates shared text, section, table-cell, and image primitives rather than a separate ingestion element hierarchy. The envelope retains the requested ingestion persistence key.
+
 ## Install the package
 
 From the command-line:
@@ -30,7 +32,7 @@ using Microsoft.Extensions.DataIngestion;
 IngestionDocumentReader reader =
     new MarkItDownReader(new FileInfo(@"pathToMarkItDown.exe"), extractImages: true);
 
-using IngestionPipeline<string> pipeline = new(reader, CreateChunker(), CreateWriter());
+using IngestionPipeline pipeline = new(reader, CreateChunker(), CreateWriter());
 ```
 
 ### Creating a MarkItDownMcpReader for Data Ingestion (MCP Server)
@@ -44,7 +46,7 @@ using Microsoft.Extensions.DataIngestion;
 IngestionDocumentReader reader =
     new MarkItDownMcpReader(new Uri("http://localhost:3001/mcp"));
 
-using IngestionPipeline<string> pipeline = new(reader, CreateChunker(), CreateWriter());
+using IngestionPipeline pipeline = new(reader, CreateChunker(), CreateWriter());
 ```
 
 The MarkItDown MCP server can be run using Docker:

@@ -4,6 +4,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Microsoft.ML.Tokenizers;
 using Xunit;
 
@@ -22,11 +24,11 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         {
             string text = string.Join(" ", Enumerable.Repeat("word", 600)); // each word is 1 token
             IngestionDocument doc = new IngestionDocument("twoChunksNoOverlapDoc");
-            doc.Sections.Add(new IngestionDocumentSection
+            doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
                 {
-                    new IngestionDocumentParagraph(text)
+                    new ExtractionDocumentTextElement(new TextContent(text))
                 }
             });
             IngestionChunker chunker = CreateDocumentChunker(maxTokensPerChunk: 512);
@@ -42,11 +44,11 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         {
             string text = string.Join(" ", Enumerable.Repeat("word", 1500)); // each word is 1 token
             IngestionDocument doc = new IngestionDocument("smallChunksNoOverlapDoc");
-            doc.Sections.Add(new IngestionDocumentSection
+            doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
                 {
-                    new IngestionDocumentParagraph(text)
+                    new ExtractionDocumentTextElement(new TextContent(text))
                 }
             });
 
@@ -66,11 +68,11 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         {
             string text = string.Join(" ", Enumerable.Repeat("word", 600)); // each word is 1 token
             IngestionDocument doc = new IngestionDocument("verifyTokenCountDoc");
-            doc.Sections.Add(new IngestionDocumentSection
+            doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
                 {
-                    new IngestionDocumentParagraph(text)
+                    new ExtractionDocumentTextElement(new TextContent(text))
                 }
             });
 

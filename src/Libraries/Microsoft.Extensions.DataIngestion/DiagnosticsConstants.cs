@@ -24,6 +24,7 @@ internal static class DiagnosticsConstants
 
     internal static class ProcessSource
     {
+        internal const string ActivityName = "ProcessDocument";
         internal const string DocumentIdTagName = "rag.document.id";
     }
 

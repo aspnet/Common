@@ -4,6 +4,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Documents;
 using Xunit;
 
 namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
@@ -15,11 +17,11 @@ namespace Microsoft.Extensions.DataIngestion.Chunkers.Tests
         {
             string text = "This is a short document that fits within a single chunk.";
             IngestionDocument doc = new IngestionDocument("singleChunkDoc");
-            doc.Sections.Add(new IngestionDocumentSection
+            doc.Sections.Add(new ExtractionDocumentSection
             {
                 Elements =
                 {
-                    new IngestionDocumentParagraph(text)
+                    new ExtractionDocumentTextElement(new TextContent(text))
                 }
             });
 

@@ -1,68 +1,61 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Documents;
 using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.DataIngestion;
 
 /// <summary>
-/// A format-agnostic container that normalizes diverse input formats into a structured hierarchy.
+/// Associates an ingestion identifier with a shared document graph.
 /// </summary>
 public sealed class IngestionDocument
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="IngestionDocument"/> class.
+    /// Initializes a new instance of the <see cref="IngestionDocument"/> class with an empty shared document.
     /// </summary>
-    /// <param name="identifier">The unique identifier for the document.</param>
+    /// <param name="identifier">The identifier used to persist the ingested document.</param>
     /// <exception cref="ArgumentNullException"><paramref name="identifier"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="identifier"/> is empty.</exception>
     public IngestionDocument(string identifier)
+        : this(identifier, new ExtractionDocument(identifier))
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="IngestionDocument"/> class around an existing shared document.
+    /// </summary>
+    /// <param name="identifier">The identifier used to persist the ingested document.</param>
+    /// <param name="extractedDocument">The shared document, retained by reference without copying its graph.</param>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="identifier"/> or <paramref name="extractedDocument"/> is <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ArgumentException"><paramref name="identifier"/> is empty.</exception>
+    public IngestionDocument(string identifier, ExtractionDocument extractedDocument)
     {
         Identifier = Throw.IfNullOrEmpty(identifier);
+        ExtractedDocument = Throw.IfNull(extractedDocument);
     }
 
-    /// <summary>
-    /// Gets the unique identifier for the document.
-    /// </summary>
+    /// <summary>Gets the identifier used to persist the ingested document.</summary>
+    /// <remarks>This identifier is independent of <see cref="ExtractionDocument.Identifier"/>.</remarks>
     public string Identifier { get; }
 
-    /// <summary>
-    /// Gets the sections of the document.
-    /// </summary>
-    public IList<IngestionDocumentSection> Sections { get; } = [];
+    /// <summary>Gets the shared document that owns all content, metadata, source pages, and native state.</summary>
+    public ExtractionDocument ExtractedDocument { get; }
 
-    /// <summary>
-    /// Iterate over all elements in the document, including those in nested sections.
-    /// </summary>
-    /// <returns>An enumerable collection of elements.</returns>
+    /// <summary>Gets the shared document's ordered root sections.</summary>
+    [SuppressMessage("Design", "CA1002:Do not expose generic lists", Justification = "The envelope exposes the exact mutable list owned by the shared document.")]
+    public List<ExtractionDocumentSection> Sections => ExtractedDocument.Sections;
+
+    /// <summary>Enumerates non-section content in the shared document's depth-first order.</summary>
     /// <remarks>
-    /// Sections themselves are not included.
+    /// This forwards the shared structural traversal. It does not flatten table cells or return
+    /// document/section-local payloads.
     /// </remarks>
-    public IEnumerable<IngestionDocumentElement> EnumerateContent()
-    {
-        Stack<IngestionDocumentElement> elementsToProcess = new();
-
-        for (int sectionIndex = Sections.Count - 1; sectionIndex >= 0; sectionIndex--)
-        {
-            elementsToProcess.Push(Sections[sectionIndex]);
-        }
-
-        while (elementsToProcess.Count > 0)
-        {
-            IngestionDocumentElement currentElement = elementsToProcess.Pop();
-
-            if (currentElement is not IngestionDocumentSection nestedSection)
-            {
-                yield return currentElement;
-            }
-            else
-            {
-                for (int i = nestedSection.Elements.Count - 1; i >= 0; i--)
-                {
-                    elementsToProcess.Push(nestedSection.Elements[i]);
-                }
-            }
-        }
-    }
+    /// <returns>The shared content elements in document order.</returns>
+    public IEnumerable<ExtractionDocumentElement> EnumerateContent() => ExtractedDocument.EnumerateContent();
 }

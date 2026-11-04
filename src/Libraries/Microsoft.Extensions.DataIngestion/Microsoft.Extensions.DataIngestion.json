@@ -1,0 +1,393 @@
+{
+  "Name": "Microsoft.Extensions.DataIngestion, Version=10.8.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+  "Types": [
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.ClassificationEnricher : Microsoft.Extensions.DataIngestion.IngestionChunkProcessor",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.ClassificationEnricher.ClassificationEnricher(Microsoft.Extensions.DataIngestion.EnricherOptions options, System.ReadOnlySpan<string> predefinedClasses, string? fallbackClass = null);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.ClassificationEnricher.ProcessAsync(System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> chunks, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "static string Microsoft.Extensions.DataIngestion.ClassificationEnricher.MetadataKey { get; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.Chunkers.DocumentTokenChunker : Microsoft.Extensions.DataIngestion.IngestionChunker",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.Chunkers.DocumentTokenChunker.DocumentTokenChunker(Microsoft.Extensions.DataIngestion.IngestionChunkerOptions options);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.Chunkers.DocumentTokenChunker.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "static class Microsoft.Extensions.DataIngestion.EmbeddingGeneratorExtensions",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "static Microsoft.Extensions.AI.IEmbeddingGenerator<Microsoft.Extensions.AI.TextContent, TEmbedding> Microsoft.Extensions.DataIngestion.EmbeddingGeneratorExtensions.AsTextContentEmbeddingGenerator<TEmbedding>(this Microsoft.Extensions.AI.IEmbeddingGenerator<string, TEmbedding> stringGenerator);",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "class Microsoft.Extensions.DataIngestion.EnricherOptions",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.EnricherOptions.EnricherOptions(Microsoft.Extensions.AI.IChatClient chatClient);",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "int Microsoft.Extensions.DataIngestion.EnricherOptions.BatchSize { get; set; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "Microsoft.Extensions.AI.IChatClient Microsoft.Extensions.DataIngestion.EnricherOptions.ChatClient { get; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "Microsoft.Extensions.AI.ChatOptions? Microsoft.Extensions.DataIngestion.EnricherOptions.ChatOptions { get; set; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "Microsoft.Extensions.Logging.ILoggerFactory? Microsoft.Extensions.DataIngestion.EnricherOptions.LoggerFactory { get; set; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.HeaderChunker : Microsoft.Extensions.DataIngestion.IngestionChunker",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.HeaderChunker.HeaderChunker(Microsoft.Extensions.DataIngestion.IngestionChunkerOptions options);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.HeaderChunker.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.ImageAlternativeTextEnricher : Microsoft.Extensions.DataIngestion.IngestionDocumentProcessor",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.ImageAlternativeTextEnricher.ImageAlternativeTextEnricher(Microsoft.Extensions.DataIngestion.EnricherOptions options);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Threading.Tasks.Task<Microsoft.Extensions.DataIngestion.IngestionDocument> Microsoft.Extensions.DataIngestion.ImageAlternativeTextEnricher.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "class Microsoft.Extensions.DataIngestion.IngestionChunkerOptions",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionChunkerOptions.IngestionChunkerOptions(Microsoft.ML.Tokenizers.Tokenizer tokenizer);",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "int Microsoft.Extensions.DataIngestion.IngestionChunkerOptions.MaxTokensPerChunk { get; set; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "int Microsoft.Extensions.DataIngestion.IngestionChunkerOptions.OverlapTokens { get; set; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "Microsoft.ML.Tokenizers.Tokenizer Microsoft.Extensions.DataIngestion.IngestionChunkerOptions.Tokenizer { get; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "class Microsoft.Extensions.DataIngestion.IngestionChunkVectorRecord",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionChunkVectorRecord.IngestionChunkVectorRecord();",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "virtual Microsoft.Extensions.AI.AIContent? Microsoft.Extensions.DataIngestion.IngestionChunkVectorRecord.Content { get; set; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "virtual string? Microsoft.Extensions.DataIngestion.IngestionChunkVectorRecord.Context { get; set; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "virtual string Microsoft.Extensions.DataIngestion.IngestionChunkVectorRecord.DocumentId { get; set; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "virtual Microsoft.Extensions.AI.AIContent? Microsoft.Extensions.DataIngestion.IngestionChunkVectorRecord.Embedding { get; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "virtual System.Guid Microsoft.Extensions.DataIngestion.IngestionChunkVectorRecord.Key { get; set; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "virtual string? Microsoft.Extensions.DataIngestion.IngestionChunkVectorRecord.SerializedContent { get; set; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.IngestionPipeline : System.IDisposable",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionPipeline.IngestionPipeline(Microsoft.Extensions.DataIngestion.IngestionDocumentReader reader, Microsoft.Extensions.DataIngestion.IngestionChunker chunker, Microsoft.Extensions.DataIngestion.IngestionChunkWriter writer, Microsoft.Extensions.DataIngestion.IngestionPipelineOptions? options = null, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory = null);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionPipeline.IngestionPipeline(Microsoft.Extensions.DataIngestion.IngestionChunker chunker, Microsoft.Extensions.DataIngestion.IngestionChunkWriter writer, Microsoft.Extensions.DataIngestion.IngestionPipelineOptions? options = null, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory = null);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "void Microsoft.Extensions.DataIngestion.IngestionPipeline.Dispose();",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "System.Threading.Tasks.Task<Microsoft.Extensions.DataIngestion.IngestionDocument> Microsoft.Extensions.DataIngestion.IngestionPipeline.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionResult> Microsoft.Extensions.DataIngestion.IngestionPipeline.ProcessAsync(System.IO.DirectoryInfo directory, string searchPattern = \"*.*\", System.IO.SearchOption searchOption = System.IO.SearchOption.TopDirectoryOnly, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionResult> Microsoft.Extensions.DataIngestion.IngestionPipeline.ProcessAsync(System.Collections.Generic.IEnumerable<System.IO.FileInfo> files, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "System.Collections.Generic.List<Microsoft.Extensions.DataIngestion.IngestionChunkProcessor> Microsoft.Extensions.DataIngestion.IngestionPipeline.ChunkProcessors { get; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "System.Collections.Generic.List<Microsoft.Extensions.DataIngestion.IngestionDocumentProcessor> Microsoft.Extensions.DataIngestion.IngestionPipeline.DocumentProcessors { get; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.IngestionPipelineOptions",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionPipelineOptions.IngestionPipelineOptions();",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "string Microsoft.Extensions.DataIngestion.IngestionPipelineOptions.ActivitySourceName { get; set; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.IngestionResult",
+      "Stage": "Stable",
+      "Properties": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.IngestionDocument? Microsoft.Extensions.DataIngestion.IngestionResult.Document { get; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "string Microsoft.Extensions.DataIngestion.IngestionResult.DocumentId { get; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "System.Exception? Microsoft.Extensions.DataIngestion.IngestionResult.Exception { get; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "bool Microsoft.Extensions.DataIngestion.IngestionResult.Succeeded { get; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.KeywordEnricher : Microsoft.Extensions.DataIngestion.IngestionChunkProcessor",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.KeywordEnricher.KeywordEnricher(Microsoft.Extensions.DataIngestion.EnricherOptions options, System.ReadOnlySpan<string> predefinedKeywords, int? maxKeywords = null, double? confidenceThreshold = null);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.KeywordEnricher.ProcessAsync(System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> chunks, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "static string Microsoft.Extensions.DataIngestion.KeywordEnricher.MetadataKey { get; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.Chunkers.SectionChunker : Microsoft.Extensions.DataIngestion.IngestionChunker",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.Chunkers.SectionChunker.SectionChunker(Microsoft.Extensions.DataIngestion.IngestionChunkerOptions options);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.Chunkers.SectionChunker.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.Chunkers.SemanticSimilarityChunker : Microsoft.Extensions.DataIngestion.IngestionChunker",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.Chunkers.SemanticSimilarityChunker.SemanticSimilarityChunker(Microsoft.Extensions.AI.IEmbeddingGenerator<Microsoft.Extensions.AI.TextContent, Microsoft.Extensions.AI.Embedding<float>> embeddingGenerator, Microsoft.Extensions.DataIngestion.IngestionChunkerOptions options, float? thresholdPercentile = null);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.Chunkers.SemanticSimilarityChunker.ProcessAsync(Microsoft.Extensions.DataIngestion.IngestionDocument document, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.SentimentEnricher : Microsoft.Extensions.DataIngestion.IngestionChunkProcessor",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.SentimentEnricher.SentimentEnricher(Microsoft.Extensions.DataIngestion.EnricherOptions options, double? confidenceThreshold = null);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.SentimentEnricher.ProcessAsync(System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> chunks, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "static string Microsoft.Extensions.DataIngestion.SentimentEnricher.MetadataKey { get; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.SummaryEnricher : Microsoft.Extensions.DataIngestion.IngestionChunkProcessor",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.SummaryEnricher.SummaryEnricher(Microsoft.Extensions.DataIngestion.EnricherOptions options, int? maxWordCount = null);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> Microsoft.Extensions.DataIngestion.SummaryEnricher.ProcessAsync(System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> chunks, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "static string Microsoft.Extensions.DataIngestion.SummaryEnricher.MetadataKey { get; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "static class Microsoft.Extensions.DataIngestion.VectorStoreExtensions",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "static Microsoft.Extensions.VectorData.VectorStoreCollection<System.Guid, Microsoft.Extensions.DataIngestion.IngestionChunkVectorRecord> Microsoft.Extensions.DataIngestion.VectorStoreExtensions.GetIngestionRecordCollection(this Microsoft.Extensions.VectorData.VectorStore vectorStore, string collectionName, int dimensionCount, string? distanceFunction = null, string? indexKind = null);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "static Microsoft.Extensions.VectorData.VectorStoreCollection<System.Guid, TRecord> Microsoft.Extensions.DataIngestion.VectorStoreExtensions.GetIngestionRecordCollection<TRecord>(this Microsoft.Extensions.VectorData.VectorStore vectorStore, string collectionName, int dimensionCount, string? distanceFunction = null, string? indexKind = null);",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "class Microsoft.Extensions.DataIngestion.VectorStoreWriter<TRecord> : Microsoft.Extensions.DataIngestion.IngestionChunkWriter where TRecord : Microsoft.Extensions.DataIngestion.IngestionChunkVectorRecord, new()",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.VectorStoreWriter<TRecord>.VectorStoreWriter(Microsoft.Extensions.VectorData.VectorStoreCollection<System.Guid, TRecord> collection, Microsoft.Extensions.DataIngestion.VectorStoreWriterOptions? options = null);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "virtual TRecord Microsoft.Extensions.DataIngestion.VectorStoreWriter<TRecord>.CreateRecord(Microsoft.Extensions.DataIngestion.IngestionChunk chunk);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "virtual void Microsoft.Extensions.DataIngestion.VectorStoreWriter<TRecord>.SetMetadata(TRecord record, string key, object? value);",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "override System.Threading.Tasks.Task Microsoft.Extensions.DataIngestion.VectorStoreWriter<TRecord>.WriteAsync(System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.DataIngestion.IngestionChunk> chunks, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "Microsoft.Extensions.VectorData.VectorStoreCollection<System.Guid, TRecord> Microsoft.Extensions.DataIngestion.VectorStoreWriter<TRecord>.VectorStoreCollection { get; }",
+          "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DataIngestion.VectorStoreWriterOptions",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DataIngestion.VectorStoreWriterOptions.VectorStoreWriterOptions();",
+          "Stage": "Stable"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "int Microsoft.Extensions.DataIngestion.VectorStoreWriterOptions.BatchTokenCount { get; set; }",
+          "Stage": "Stable"
+        },
+        {
+          "Member": "bool Microsoft.Extensions.DataIngestion.VectorStoreWriterOptions.IncrementalIngestion { get; set; }",
+          "Stage": "Stable"
+        }
+      ]
+    }
+  ]
+}

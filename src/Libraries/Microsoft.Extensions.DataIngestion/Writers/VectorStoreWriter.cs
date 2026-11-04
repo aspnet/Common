@@ -73,12 +73,7 @@ public class VectorStoreWriter<TRecord> : IngestionChunkWriter
             // to avoid a situation where we delete the chunks and then fail to insert the new ones.
             preExistingKeys ??= await GetPreExistingChunksIdsAsync(document!, cancellationToken).ConfigureAwait(false);
 
-            TRecord record = new()
-            {
-                Content = chunk.Content,
-                Context = chunk.Context,
-                DocumentId = chunk.Document.Identifier,
-            };
+            TRecord record = CreateRecord(chunk);
 
             if (chunk.HasMetadata)
             {
@@ -114,6 +109,27 @@ public class VectorStoreWriter<TRecord> : IngestionChunkWriter
         {
             await VectorStoreCollection.DeleteAsync(preExistingKeys, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Creates a record from a chunk, including application-defined durable source references.
+    /// </summary>
+    /// <param name="chunk">The chunk to persist.</param>
+    /// <returns>The record to insert.</returns>
+    /// <remarks>
+    /// The collection's auto-generated key schema assigns fresh keys when inserting default records.
+    /// Incremental ingestion inserts new records before deleting old keys.
+    /// Overrides must not reuse pre-existing keys, since those keys are deleted after all inserts succeed.
+    /// </remarks>
+    protected virtual TRecord CreateRecord(IngestionChunk chunk)
+    {
+        _ = Throw.IfNull(chunk);
+        return new()
+        {
+            Content = chunk.Content,
+            Context = chunk.Context,
+            DocumentId = chunk.Document.Identifier,
+        };
     }
 
     /// <summary>
