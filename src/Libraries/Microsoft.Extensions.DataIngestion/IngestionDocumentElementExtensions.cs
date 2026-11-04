@@ -22,6 +22,24 @@ internal static class IngestionDocumentElementExtensions
     internal static string GetSemanticRow(ExtractionDocumentTableElement table, int row)
         => GetSemanticRow(table, row, [table]);
 
+    internal static IEnumerable<ExtractionDocumentElement> EnumerateCellSources(ExtractionDocumentTableElement table, int firstRow, int endRow)
+    {
+        HashSet<ExtractionDocumentElement> path = [table];
+        for (int row = firstRow; row < endRow; row++)
+        {
+            for (int column = 0; column < table.Cells.ColumnCount; column++)
+            {
+                if (table.Cells[row, column]?.Content is { } content)
+                {
+                    foreach (var source in EnumerateSources(content, path))
+                    {
+                        yield return source;
+                    }
+                }
+            }
+        }
+    }
+
     internal static IEnumerable<(ExtractionDocumentElement? Element, string? Content, IReadOnlyList<ExtractionDocumentElement> Sources)> EnumerateSemanticContent(IngestionDocument document)
     {
         yield return (null, GetSemanticContent(document.ExtractedDocument.Content), Array.Empty<ExtractionDocumentElement>());
@@ -34,7 +52,7 @@ internal static class IngestionDocumentElementExtensions
         }
     }
 
-    private static string? GetSemanticContent(ExtractionDocumentElement element, HashSet<ExtractionDocumentTableElement> path)
+    private static string? GetSemanticContent(ExtractionDocumentElement element, HashSet<ExtractionDocumentElement> path)
     {
         if (element is ExtractionDocumentImageElement image)
         {
@@ -50,10 +68,7 @@ internal static class IngestionDocumentElementExtensions
             return localContent;
         }
 
-        if (!path.Add(table))
-        {
-            throw new InvalidOperationException("Cyclic table relationships are not supported.");
-        }
+        Enter(table, path);
 
         try
         {
@@ -76,7 +91,7 @@ internal static class IngestionDocumentElementExtensions
         }
     }
 
-    private static string GetSemanticRow(ExtractionDocumentTableElement table, int row, HashSet<ExtractionDocumentTableElement> path)
+    private static string GetSemanticRow(ExtractionDocumentTableElement table, int row, HashSet<ExtractionDocumentElement> path)
     {
         StringBuilder text = new();
         for (int column = 0; column < table.Cells.ColumnCount; column++)
@@ -88,20 +103,106 @@ internal static class IngestionDocumentElementExtensions
 
             if (table.Cells[row, column]?.Content is { } content)
             {
-                _ = text.Append(GetSemanticContent(content, path));
+                _ = text.Append(GetCellContent(content, path));
             }
         }
 
         return text.ToString();
     }
 
-    private static IEnumerable<(ExtractionDocumentElement? Element, string? Content, IReadOnlyList<ExtractionDocumentElement> Sources)> EnumerateSectionContent(
-        ExtractionDocumentSection section, List<ExtractionDocumentElement> ancestors, HashSet<ExtractionDocumentSection> path)
+    private static string? GetCellContent(ExtractionDocumentElement element, HashSet<ExtractionDocumentElement> path)
     {
-        if (section is null || !path.Add(section))
+        if (element is not ExtractionDocumentSection section)
         {
-            throw new InvalidOperationException("Null entries and cyclic relationships are not supported in the hierarchy.");
+            return GetSemanticContent(element, path);
         }
+
+        Enter(section, path);
+        try
+        {
+            StringBuilder text = new();
+            Append(GetSemanticContent(section.Content));
+            foreach (var child in section.Elements)
+            {
+                if (child is null)
+                {
+                    throw new InvalidOperationException("The hierarchy contains a null entry.");
+                }
+
+                Append(GetCellContent(child, path));
+            }
+
+            return text.ToString();
+
+            void Append(string? content)
+            {
+                if (!string.IsNullOrEmpty(content))
+                {
+                    if (text.Length > 0)
+                    {
+                        _ = text.AppendLine();
+                    }
+
+                    _ = text.Append(content);
+                }
+            }
+        }
+        finally
+        {
+            _ = path.Remove(section);
+        }
+    }
+
+    private static IEnumerable<ExtractionDocumentElement> EnumerateSources(ExtractionDocumentElement element, HashSet<ExtractionDocumentElement> path)
+    {
+        Enter(element, path);
+        try
+        {
+            yield return element;
+            if (element is ExtractionDocumentSection section)
+            {
+                foreach (var child in section.Elements)
+                {
+                    foreach (var source in EnumerateSources(child, path))
+                    {
+                        yield return source;
+                    }
+                }
+            }
+            else if (element is ExtractionDocumentTableElement table && UsesTableCells(table))
+            {
+                foreach (var cell in table.Cells)
+                {
+                    if (cell?.Content is { } content)
+                    {
+                        foreach (var source in EnumerateSources(content, path))
+                        {
+                            yield return source;
+                        }
+                    }
+                }
+            }
+        }
+        finally
+        {
+            _ = path.Remove(element);
+        }
+    }
+
+    private static void Enter(ExtractionDocumentElement element, HashSet<ExtractionDocumentElement> path)
+    {
+        if (element is null || !path.Add(element))
+        {
+            throw new InvalidOperationException(element is ExtractionDocumentTableElement
+                ? "Cyclic table relationships are not supported."
+                : "Null entries and cyclic relationships are not supported in the hierarchy.");
+        }
+    }
+
+    private static IEnumerable<(ExtractionDocumentElement? Element, string? Content, IReadOnlyList<ExtractionDocumentElement> Sources)> EnumerateSectionContent(
+        ExtractionDocumentSection section, List<ExtractionDocumentElement> ancestors, HashSet<ExtractionDocumentElement> path)
+    {
+        Enter(section, path);
 
         ancestors.Add(section);
         try
@@ -126,11 +227,11 @@ internal static class IngestionDocumentElementExtensions
                     List<ExtractionDocumentElement> sources = new(ancestors) { element };
                     if (element is ExtractionDocumentTableElement table && UsesTableCells(table))
                     {
-                        foreach (var cell in table.Cells)
+                        foreach (var source in EnumerateSources(table, path))
                         {
-                            if (cell?.Content is { } cellElement)
+                            if (!sources.Contains(source))
                             {
-                                sources.Add(cellElement);
+                                sources.Add(source);
                             }
                         }
                     }

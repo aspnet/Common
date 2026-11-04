@@ -167,19 +167,26 @@ public class DocumentExtractionReaderTests
     }
 
     private sealed class FakeExtractionClient(
-        Func<Stream, string, string, DocumentExtractionOptions?, CancellationToken, Task<ExtractionDocument>> callback) : IDocumentExtractionClient
+        Func<Stream, string, string, DocumentExtractionOptions?, CancellationToken, Task<ExtractionDocument>> callback) : DocumentExtractionClient
     {
         public int Calls { get; private set; }
         public bool Disposed { get; private set; }
 
-        public Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
+        public override Task<ExtractionDocument> ExtractAsync(Stream document, string identifier, string mediaType,
             DocumentExtractionOptions? options = null, CancellationToken cancellationToken = default)
         {
             Calls++;
             return callback(document, identifier, mediaType, options, cancellationToken);
         }
 
-        public object? GetService(Type serviceType, object? serviceKey = null) => null;
-        public void Dispose() => Disposed = true;
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Disposed = true;
+            }
+
+            base.Dispose(disposing);
+        }
     }
 }

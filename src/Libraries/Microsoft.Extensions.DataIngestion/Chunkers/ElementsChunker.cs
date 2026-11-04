@@ -192,11 +192,11 @@ internal sealed class ElementsChunker
 
         void AddCellSources(ExtractionDocumentTableElement table, int firstRow, int endRow)
         {
-            for (int row = firstRow; row < endRow; row++)
+            foreach (var source in IngestionDocumentElementExtensions.EnumerateCellSources(table, firstRow, endRow))
             {
-                for (int column = 0; column < table.Cells.ColumnCount; column++)
+                if (!sources.Contains(source))
                 {
-                    AddSource(table.Cells[row, column]?.Content);
+                    sources.Add(source);
                 }
             }
         }

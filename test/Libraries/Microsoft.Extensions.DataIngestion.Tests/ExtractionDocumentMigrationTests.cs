@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.VectorData.InMemory;
@@ -511,6 +512,508 @@ public class ExtractionDocumentMigrationTests
         Assert.Contains("reader", error.Message);
         Assert.Empty(calls);
         Assert.False(embeddings.WasCalled);
+    }
+
+    [Theory]
+    [InlineData("DocumentToken")]
+    [InlineData("Section")]
+    [InlineData("Header")]
+    [InlineData("SemanticSimilarity")]
+    public async Task MixedCells_AllChunkers_ConsumeOrderedCellSectionAndPreserveEnvelope(string kind)
+    {
+        object native = new();
+        object observation = new();
+        ExtractionDocumentSourcePage unknown = new("canvas", null);
+        ExtractionDocumentSourcePage numbered = new("page-seven", 7, dimensions: new(612, 792),
+            coordinateUnit: ExtractionDocumentCoordinateUnit.Point, coordinateOrigin: ExtractionDocumentCoordinateOrigin.BottomLeft);
+        ExtractionDocumentSourcePage blank = new("blank", 8);
+        ExtractionDocumentSourcePage cellOnly = new("cell-only", 9);
+        ExtractionDocumentPoint[] polygon = [new(12, 24), new(60, 24), new(60, 48)];
+        ExtractionDocumentSourceReference source = new(numbered, polygon, rawRepresentation: observation);
+        ExtractionDocumentTextElement paragraphA = new(new TextContent("paragraphA"), role: "heading") { HeadingLevel = 1 };
+        ExtractionDocumentImageElement image = new(new DataContent(new byte[] { 1, 2, 3 }, "image/png"), "unused OCR");
+        image.Sources.Add(source);
+        ExtractionDocumentTextElement paragraphB = new(new TextContent("paragraphB"));
+        ExtractionDocumentSection cellSection = new(new TextContent("cell-local"))
+        {
+            Elements = { paragraphA, image, paragraphB }
+        };
+        ExtractionDocumentTableElement table = new(null, 1, 1);
+        table.Cells[0, 0] = new(cellSection);
+        ExtractionDocumentSourceReference cellReference = new(cellOnly);
+        table.Cells[0, 0]!.Sources.Add(cellReference);
+        ExtractionDocumentTextElement after = new(new TextContent("after"));
+        ExtractionDocumentSection nested = new(new TextContent("nested")) { Elements = { table, after } };
+        ExtractionDocumentSection section = new(new TextContent("section")) { Elements = { nested } };
+        section.Sources.Add(new(unknown));
+        TextContent documentLocal = new("document");
+        ExtractionDocument graph = new("provider", documentLocal)
+        {
+            Sections = { section },
+            SourcePages = { unknown, numbered, blank, cellOnly },
+            RawRepresentation = native
+        };
+        graph.Metadata.Add("native", native);
+        IngestionDocument document = new("persistence", graph);
+        polygon[0] = new(0, 0);
+        int chatCalls = 0;
+        using TestChatClient client = new()
+        {
+            GetResponseAsyncCallback = (messages, _, _) =>
+            {
+                chatCalls++;
+                Assert.Same(image.Content, Assert.Single(messages.Last().Contents));
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                    JsonSerializer.Serialize(new Envelope<string[]> { data = new[] { "description" } }))));
+            }
+        };
+        ImageAlternativeTextEnricher enricher = new(new(client));
+        Assert.Same(document, await enricher.ProcessAsync(document));
+        List<string> embedded = [];
+        using TestEmbeddingGenerator<TextContent, Embedding<float>> generator = MixedCellsEmbeddings(embedded);
+        Tokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4o");
+        IngestionChunker chunker = MixedCellsChunker(kind, tokenizer, 100, generator);
+
+        List<IngestionChunk> chunks = await chunker.ProcessAsync(document).ToListAsync();
+
+        string cellText = string.Join(Environment.NewLine, "cell-local", "paragraphA", "description", "paragraphB");
+        Assert.Equal(string.Join(Environment.NewLine, "document", "section", "nested", cellText, "after"),
+            string.Join(Environment.NewLine, chunks.Select(Text)));
+        Assert.Equal(1, chatCalls);
+        Assert.Equal("description", image.AlternativeText);
+        Assert.Equal("unused OCR", image.Text);
+        Assert.Equal("cell-local", Assert.IsType<TextContent>(cellSection.Content).Text);
+        Assert.Equal(new ExtractionDocumentElement[] { table, after }, document.EnumerateContent());
+        Assert.Equal(new ExtractionDocumentElement[] { table, after }, graph.EnumerateContent());
+        ExtractionDocumentElement[] expectedSources = [section, nested, table, cellSection, paragraphA, image, paragraphB, after];
+        Assert.Equal(expectedSources, chunks.SelectMany(chunk => chunk.SourceElements).Distinct());
+        Assert.All(chunks, chunk =>
+        {
+            Assert.Same(document, chunk.Document);
+            Assert.Same(graph, chunk.Document.ExtractedDocument);
+            Assert.Equal(string.Empty, chunk.Context);
+            Assert.Equal(tokenizer.CountTokens(Text(chunk), considerNormalization: false), chunk.TokenCount);
+            Assert.InRange(chunk.TokenCount, 1, 100);
+            Assert.Equal(chunk.SourceElements.Distinct().Count(), chunk.SourceElements.Count);
+            Assert.DoesNotContain("unused OCR", Text(chunk));
+        });
+        Assert.Equal(kind == "SemanticSimilarity" ? new[] { "section", "nested", cellText, "after" } : Array.Empty<string>(), embedded);
+        Assert.Same(section, Assert.Single(graph.Sections));
+        Assert.Same(nested, Assert.Single(section.Elements));
+        Assert.Same(cellSection, table.Cells[0, 0]!.Content);
+        Assert.Equal(new ExtractionDocumentElement[] { paragraphA, image, paragraphB }, cellSection.Elements);
+        Assert.Same(documentLocal, graph.Content);
+        Assert.Same(native, graph.RawRepresentation);
+        Assert.Same(native, graph.Metadata["native"]);
+        Assert.Equal("provider", graph.Identifier);
+        Assert.Equal("persistence", document.Identifier);
+        Assert.Equal(new[] { unknown, numbered, blank, cellOnly }, graph.SourcePages);
+        Assert.Null(unknown.PageNumber);
+        Assert.Equal(7, numbered.PageNumber);
+        Assert.Equal(8, blank.PageNumber);
+        Assert.Equal(new ExtractionDocumentPageDimensions(612, 792), numbered.Dimensions);
+        Assert.Equal(ExtractionDocumentCoordinateUnit.Point, numbered.CoordinateUnit);
+        Assert.Equal(ExtractionDocumentCoordinateOrigin.BottomLeft, numbered.CoordinateOrigin);
+        Assert.Same(source, Assert.Single(image.Sources));
+        Assert.Same(numbered, source.Page);
+        Assert.Same(observation, source.GetRawRepresentation());
+        Assert.Equal(new ExtractionDocumentPoint[] { new(12, 24), new(60, 24), new(60, 48) }, source.Polygon);
+        Assert.Same(cellReference, Assert.Single(table.Cells[0, 0]!.Sources));
+
+        // Cells are not ExtractionDocumentElements. Their own Sources have no independent carrier.
+        Assert.DoesNotContain(chunks.SelectMany(chunk => chunk.SourceElements).SelectMany(element => element.Sources),
+            reference => ReferenceEquals(reference, cellReference) || ReferenceEquals(reference.Page, blank));
+        Assert.Contains(source, chunks.SelectMany(chunk => chunk.SourceElements).SelectMany(element => element.Sources));
+
+        ExtractionDocumentElement[][] snapshots = chunks.Select(chunk => chunk.SourceElements.ToArray()).ToArray();
+        cellSection.Elements.Clear();
+        nested.Elements.Clear();
+        graph.Sections.Clear();
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            Assert.Equal(snapshots[i], chunks[i].SourceElements);
+        }
+
+        Assert.Equal(expectedSources, chunks.SelectMany(chunk => chunk.SourceElements).Distinct());
+    }
+
+    [Theory]
+    [InlineData("Section", false)]
+    [InlineData("Section", true)]
+    [InlineData("Header", false)]
+    [InlineData("Header", true)]
+    [InlineData("SemanticSimilarity", false)]
+    [InlineData("SemanticSimilarity", true)]
+    public async Task MixedCells_StructuralChunkers_SplitRowsWithExactBudgetsAndExplicitHeaders(string kind, bool hasHeader)
+    {
+        ExtractionDocumentSection[] cells =
+        [
+            new(new TextContent("alpha")) { Elements = { new ExtractionDocumentTextElement(new TextContent("head"), role: "heading") } },
+            new(new TextContent("beta")) { Elements = { new ExtractionDocumentTextElement(new TextContent("body")) } },
+            new(new TextContent("gamma")) { Elements = { new ExtractionDocumentTextElement(new TextContent("tail")) } }
+        ];
+        ExtractionDocumentTextElement[] neighbors =
+        [
+            new(new TextContent("x")), new(new TextContent("y")), new(new TextContent("z"))
+        ];
+        ExtractionDocumentTableElement table = new(null, 3, 2);
+        for (int row = 0; row < 3; row++)
+        {
+            cells[row].Elements.Add(new ExtractionDocumentImageElement(new DataContent(new byte[] { (byte)row }, "image/png"))
+            {
+                AlternativeText = "image"
+            });
+            cells[row].Elements.Add(new ExtractionDocumentTextElement(new TextContent("end")));
+            string? role = hasHeader && row == 0 ? "CoLuMnHeAdEr" : null;
+            table.Cells[row, 0] = new(cells[row], role: role);
+            table.Cells[row, 1] = new(neighbors[row], role: role);
+        }
+
+        ExtractionDocumentSection section = new() { Elements = { table } };
+        IngestionDocument document = new("split-mixed") { Sections = { section } };
+        string[] rows =
+        [
+            string.Join(Environment.NewLine, "alpha", "head", "image", "end") + "\tx",
+            string.Join(Environment.NewLine, "beta", "body", "image", "end") + "\ty",
+            string.Join(Environment.NewLine, "gamma", "tail", "image", "end") + "\tz"
+        ];
+        string first = rows[0] + Environment.NewLine + rows[1];
+        string second = hasHeader ? rows[0] + Environment.NewLine + rows[2] : rows[2];
+        Tokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4o");
+        int limit = tokenizer.CountTokens(first, considerNormalization: false);
+        Assert.True(tokenizer.CountTokens(string.Join(Environment.NewLine, rows), considerNormalization: false) > limit);
+        List<string> embedded = [];
+        using TestEmbeddingGenerator<TextContent, Embedding<float>> generator = MixedCellsEmbeddings(embedded);
+
+        List<IngestionChunk> chunks = await MixedCellsChunker(kind, tokenizer, limit, generator).ProcessAsync(document).ToListAsync();
+
+        Assert.Equal(new[] { first, second }, chunks.Select(Text));
+        Assert.Equal(limit, chunks[0].TokenCount);
+        Assert.All(chunks, chunk =>
+        {
+            Assert.Equal(string.Empty, chunk.Context);
+            Assert.InRange(chunk.TokenCount, 1, limit);
+            Assert.Equal(tokenizer.CountTokens(Text(chunk), considerNormalization: false), chunk.TokenCount);
+            Assert.Same(document, chunk.Document);
+        });
+        ExtractionDocumentElement[] RowSources(int row) => [cells[row], .. cells[row].Elements, neighbors[row]];
+        Assert.Equal(new ExtractionDocumentElement[] { section, table }.Concat(RowSources(0)).Concat(RowSources(1)), chunks[0].SourceElements);
+        Assert.Contains(section, chunks[1].SourceElements);
+        Assert.Contains(table, chunks[1].SourceElements);
+        Assert.Equal((hasHeader ? RowSources(0) : Array.Empty<ExtractionDocumentElement>()).Concat(RowSources(2)),
+            chunks[1].SourceElements.Where(source => !ReferenceEquals(source, section) && !ReferenceEquals(source, table)));
+        Assert.Equal(hasHeader ? 12 : 7, chunks[1].SourceElements.Count);
+        Assert.DoesNotContain(cells[2], chunks[0].SourceElements);
+        Assert.DoesNotContain(cells[1].Elements[0], chunks[1].SourceElements);
+        Assert.Equal(hasHeader, chunks[1].SourceElements.Contains(cells[0].Elements[0]));
+        Assert.Equal(kind == "SemanticSimilarity" ? new[] { string.Join(Environment.NewLine, rows) } : Array.Empty<string>(), embedded);
+    }
+
+    [Theory]
+    [InlineData("DocumentToken")]
+    [InlineData("Section")]
+    [InlineData("Header")]
+    [InlineData("SemanticSimilarity")]
+    public async Task MixedCells_AllChunkers_ProducerTableTextIsAuthoritative(string kind)
+    {
+        ExtractionDocumentSection cell = new(new TextContent("hidden local"))
+        {
+            Elements =
+            {
+                new ExtractionDocumentTextElement(new TextContent("hidden paragraphA")),
+                new ExtractionDocumentImageElement(new DataContent(new byte[] { 9 }, "image/png"), "hidden OCR"),
+                new ExtractionDocumentTextElement(new TextContent("hidden paragraphB"))
+            }
+        };
+
+        // Malformed hidden descendants must not be interpreted when a table has authoritative text.
+        cell.Elements.Add(cell);
+        ExtractionDocumentTableElement table = new(new TextContent("producer table"), 1, 1);
+        table.Cells[0, 0] = new(cell);
+        ExtractionDocumentSection section = new() { Elements = { table } };
+        IngestionDocument document = new("authoritative") { Sections = { section } };
+        List<string> embedded = [];
+        using TestEmbeddingGenerator<TextContent, Embedding<float>> generator = MixedCellsEmbeddings(embedded);
+
+        IngestionChunk chunk = Assert.Single(await MixedCellsChunker(kind, TiktokenTokenizer.CreateForModel("gpt-4o"), 100, generator)
+            .ProcessAsync(document).ToListAsync());
+
+        Assert.Equal("producer table", Text(chunk));
+        Assert.Equal(new ExtractionDocumentElement[] { section, table }, chunk.SourceElements);
+        Assert.Same(cell, table.Cells[0, 0]!.Content);
+        Assert.Same(cell, cell.Elements[cell.Elements.Count - 1]);
+        Assert.Equal(kind == "SemanticSimilarity" ? new[] { "producer table" } : Array.Empty<string>(), embedded);
+    }
+
+    [Fact]
+    public async Task MixedCells_Enricher_DeduplicatesImageIdentityAcrossSharedSections()
+    {
+        DataContent payload = new(new byte[] { 4, 5, 6 }, "image/png");
+        ExtractionDocumentImageElement first = new(payload, "first OCR");
+        ExtractionDocumentImageElement second = new(payload, "second OCR");
+        ExtractionDocumentSection shared = new(new TextContent("local"))
+        {
+            Elements =
+            {
+                new ExtractionDocumentTextElement(new TextContent("paragraphA")), first, second,
+                new ExtractionDocumentTextElement(new TextContent("paragraphB"))
+            }
+        };
+        ExtractionDocumentTableElement table = new(new TextContent("producer table"), 1, 2);
+        table.Cells[0, 0] = new(shared);
+        table.Cells[0, 1] = new(shared);
+        IngestionDocument document = new("image-dag") { Sections = { new() { Elements = { table, shared, first } } } };
+        int calls = 0;
+        using TestChatClient client = new()
+        {
+            GetResponseAsyncCallback = (messages, _, _) =>
+            {
+                calls++;
+                AIContent[] inputs = messages.Last().Contents.ToArray();
+                Assert.Equal(2, inputs.Length);
+                Assert.All(inputs, input => Assert.Same(payload, input));
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                    JsonSerializer.Serialize(new Envelope<string[]> { data = new[] { "first description", "second description" } }))));
+            }
+        };
+        ImageAlternativeTextEnricher enricher = new(new(client) { BatchSize = 10 });
+
+        Assert.Same(document, await enricher.ProcessAsync(document));
+        Assert.Same(document, await enricher.ProcessAsync(document));
+
+        Assert.Equal(1, calls);
+        Assert.Equal("first description", first.AlternativeText);
+        Assert.Equal("second description", second.AlternativeText);
+        Assert.Equal("first OCR", first.Text);
+        Assert.Equal("second OCR", second.Text);
+        Assert.Same(first, shared.Elements[1]);
+        Assert.Same(second, shared.Elements[2]);
+        Assert.Same(shared, table.Cells[0, 0]!.Content);
+        Assert.Same(shared, table.Cells[0, 1]!.Content);
+        Assert.Equal("producer table", Assert.IsType<TextContent>(table.Content).Text);
+    }
+
+    [Theory]
+    [InlineData("DocumentToken")]
+    [InlineData("Section")]
+    [InlineData("Header")]
+    [InlineData("SemanticSimilarity")]
+    public async Task MixedCells_AllChunkers_AllowSharedCellSectionDag(string kind)
+    {
+        ExtractionDocumentTextElement paragraphA = new(new TextContent("paragraphA"));
+        ExtractionDocumentImageElement image = new(new DataContent(new byte[] { 7 }, "image/png")) { AlternativeText = "description" };
+        ExtractionDocumentTextElement paragraphB = new(new TextContent("paragraphB"));
+        ExtractionDocumentSection shared = new(new TextContent("local")) { Elements = { paragraphA, image, paragraphB } };
+        ExtractionDocumentTableElement nestedTable = new(null, 1, 1);
+        nestedTable.Cells[0, 0] = new(shared);
+        ExtractionDocumentTableElement table = new(null, 1, 2);
+        table.Cells[0, 0] = new(shared);
+        table.Cells[0, 1] = new(nestedTable);
+        ExtractionDocumentSection section = new() { Elements = { table } };
+        IngestionDocument document = new("dag") { Sections = { section } };
+        List<string> embedded = [];
+        using TestEmbeddingGenerator<TextContent, Embedding<float>> generator = MixedCellsEmbeddings(embedded);
+
+        IngestionChunk chunk = Assert.Single(await MixedCellsChunker(kind, TiktokenTokenizer.CreateForModel("gpt-4o"), 100, generator)
+            .ProcessAsync(document).ToListAsync());
+
+        string text = string.Join(Environment.NewLine, "local", "paragraphA", "description", "paragraphB");
+        Assert.Equal(text + "\t" + text, Text(chunk));
+        Assert.Equal(new ExtractionDocumentElement[] { section, table, shared, paragraphA, image, paragraphB, nestedTable }, chunk.SourceElements);
+        Assert.Same(shared, table.Cells[0, 0]!.Content);
+        Assert.Same(shared, nestedTable.Cells[0, 0]!.Content);
+        Assert.Equal(kind == "SemanticSimilarity" ? new[] { text + "\t" + text } : Array.Empty<string>(), embedded);
+    }
+
+    [Theory]
+    [InlineData("DocumentToken", "Section")]
+    [InlineData("DocumentToken", "Table")]
+    [InlineData("DocumentToken", "Mixed")]
+    [InlineData("DocumentToken", "Null")]
+    [InlineData("Section", "Section")]
+    [InlineData("Section", "Table")]
+    [InlineData("Section", "Mixed")]
+    [InlineData("Section", "Null")]
+    [InlineData("Header", "Section")]
+    [InlineData("Header", "Table")]
+    [InlineData("Header", "Mixed")]
+    [InlineData("Header", "Null")]
+    [InlineData("SemanticSimilarity", "Section")]
+    [InlineData("SemanticSimilarity", "Table")]
+    [InlineData("SemanticSimilarity", "Mixed")]
+    [InlineData("SemanticSimilarity", "Null")]
+    public async Task MixedCells_AllChunkers_RejectActivePathCyclesAndNullMutation(string kind, string mutation)
+    {
+        IngestionDocument document = MixedCellsMalformedGraph(mutation);
+        ExtractionDocumentSection root = Assert.Single(document.Sections);
+        ExtractionDocumentElement[] original = root.Elements.ToArray();
+        List<string> embedded = [];
+        using TestEmbeddingGenerator<TextContent, Embedding<float>> generator = MixedCellsEmbeddings(embedded);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await MixedCellsChunker(kind, TiktokenTokenizer.CreateForModel("gpt-4o"), 100, generator).ProcessAsync(document).ToListAsync());
+
+        Assert.Empty(embedded);
+        Assert.Same(root, Assert.Single(document.Sections));
+        Assert.Equal(original, root.Elements);
+    }
+
+    [Theory]
+    [InlineData("Section")]
+    [InlineData("Table")]
+    [InlineData("Mixed")]
+    [InlineData("Null")]
+    public async Task MixedCells_Enricher_RejectsActivePathCyclesAndNullMutation(string mutation)
+    {
+        IngestionDocument document = MixedCellsMalformedGraph(mutation);
+        ExtractionDocumentSection root = Assert.Single(document.Sections);
+        ExtractionDocumentElement[] original = root.Elements.ToArray();
+        int calls = 0;
+        using TestChatClient client = new()
+        {
+            GetResponseAsyncCallback = (_, _, _) =>
+            {
+                calls++;
+                throw new InvalidOperationException("No chat expected.");
+            }
+        };
+        ImageAlternativeTextEnricher enricher = new(new(client));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => enricher.ProcessAsync(document));
+
+        Assert.Equal(0, calls);
+        Assert.Same(root, Assert.Single(document.Sections));
+        Assert.Equal(original, root.Elements);
+    }
+
+    [Fact]
+    public void MixedCells_TableCollection_RejectsDirectSelfCycleWithoutReplacingCell()
+    {
+        ExtractionDocumentSection section = new(new TextContent("local"));
+        ExtractionDocumentTableElement table = new(null, 1, 1);
+        table.Cells[0, 0] = new(section);
+        ExtractionDocumentTableCell original = table.Cells[0, 0]!;
+
+        Assert.Throws<InvalidOperationException>(() => table.Cells[0, 0] = new(table));
+
+        Assert.Same(original, table.Cells[0, 0]);
+        Assert.Same(section, table.Cells[0, 0]!.Content);
+        Assert.Equal("local", Assert.IsType<TextContent>(section.Content).Text);
+    }
+
+    [Fact]
+    public async Task MixedCells_DocumentTokenChunker_CountsSeparatorsWithinTightBudget()
+    {
+        ExtractionDocumentTextElement paragraphA = new(new TextContent("paragraphA"));
+        ExtractionDocumentImageElement image = new(new DataContent(new byte[] { 8 }, "image/png")) { AlternativeText = "description" };
+        ExtractionDocumentTextElement paragraphB = new(new TextContent("paragraphB"));
+        ExtractionDocumentSection cell = new(new TextContent("local")) { Elements = { paragraphA, image, paragraphB } };
+        ExtractionDocumentTextElement neighbor = new(new TextContent("neighbor"));
+        ExtractionDocumentTableElement table = new(null, 1, 2);
+        table.Cells[0, 0] = new(cell);
+        table.Cells[0, 1] = new(neighbor);
+        ExtractionDocumentSection section = new() { Elements = { table } };
+        IngestionDocument document = new("tight") { Sections = { section } };
+        Tokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4o");
+
+        List<IngestionChunk> chunks = await Tokens(5).ProcessAsync(document).ToListAsync();
+
+        Assert.True(chunks.Count > 1);
+        Assert.Equal(string.Join(Environment.NewLine, "local", "paragraphA", "description", "paragraphB") + "\tneighbor",
+            string.Concat(chunks.Select(Text)));
+        Assert.Equal(5, chunks[0].TokenCount);
+        Assert.All(chunks, chunk =>
+        {
+            Assert.InRange(chunk.TokenCount, 1, 5);
+            Assert.Equal(tokenizer.CountTokens(Text(chunk), considerNormalization: false), chunk.TokenCount);
+            Assert.Same(document, chunk.Document);
+            Assert.Contains(table, chunk.SourceElements);
+        });
+        Assert.Equal(new ExtractionDocumentElement[] { section, table, cell, paragraphA, image, paragraphB, neighbor },
+            chunks.SelectMany(chunk => chunk.SourceElements).Distinct());
+    }
+
+    [Theory]
+    [InlineData("DocumentToken")]
+    [InlineData("Section")]
+    [InlineData("Header")]
+    [InlineData("SemanticSimilarity")]
+    public async Task MixedCells_AllChunkers_DescendNestedCellSectionsWithoutEmptySeparators(string kind)
+    {
+        ExtractionDocumentTextElement paragraph = new(new TextContent("paragraph"));
+        ExtractionDocumentSection nested = new(new TextContent("inner")) { Elements = { paragraph } };
+        ExtractionDocumentSection empty = new(new TextContent(string.Empty));
+        ExtractionDocumentSection cell = new(new TextContent("outer")) { Elements = { empty, nested, empty } };
+        ExtractionDocumentTableElement table = new(null, 1, 1);
+        table.Cells[0, 0] = new(cell);
+        ExtractionDocumentSection section = new() { Elements = { table } };
+        IngestionDocument document = new("nested-cell") { Sections = { section } };
+        List<string> embedded = [];
+        using TestEmbeddingGenerator<TextContent, Embedding<float>> generator = MixedCellsEmbeddings(embedded);
+
+        IngestionChunk chunk = Assert.Single(await MixedCellsChunker(kind, TiktokenTokenizer.CreateForModel("gpt-4o"), 100, generator)
+            .ProcessAsync(document).ToListAsync());
+
+        string expected = string.Join(Environment.NewLine, "outer", "inner", "paragraph");
+        Assert.Equal(expected, Text(chunk));
+        Assert.Equal(new ExtractionDocumentElement[] { section, table, cell, empty, nested, paragraph }, chunk.SourceElements);
+        Assert.Equal("outer", Assert.IsType<TextContent>(cell.Content).Text);
+        Assert.Equal("inner", Assert.IsType<TextContent>(nested.Content).Text);
+        Assert.Equal(kind == "SemanticSimilarity" ? new[] { expected } : Array.Empty<string>(), embedded);
+    }
+
+    private static IngestionDocument MixedCellsMalformedGraph(string mutation)
+    {
+        ExtractionDocumentSection cell = new();
+        ExtractionDocumentTableElement table = new(null, 1, 1);
+        table.Cells[0, 0] = new(cell);
+        switch (mutation)
+        {
+            case "Section":
+                cell.Elements.Add(cell);
+                break;
+            case "Table":
+                ExtractionDocumentTableElement nestedTable = new(null, 1, 1);
+                nestedTable.Cells[0, 0] = new(cell);
+                table.Cells[0, 0] = new(nestedTable);
+                cell.Elements.Add(nestedTable);
+                break;
+            case "Mixed":
+                cell.Elements.Add(table);
+                break;
+            case "Null":
+                cell.Elements.Add(null!);
+                break;
+            default:
+                throw new InvalidOperationException(mutation);
+        }
+
+        return new("malformed-mixed") { Sections = { new() { Elements = { table } } } };
+    }
+
+    private static TestEmbeddingGenerator<TextContent, Embedding<float>> MixedCellsEmbeddings(List<string> embedded) => new()
+    {
+        GenerateAsyncCallback = (values, _, _) =>
+        {
+            TextContent[] inputs = values.ToArray();
+            embedded.AddRange(inputs.Select(value => value.Text));
+            return Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(
+                inputs.Select(_ => new Embedding<float>(new float[] { 1, 0, 0 }))));
+        }
+    };
+
+    private static IngestionChunker MixedCellsChunker(string kind, Tokenizer tokenizer, int limit,
+        TestEmbeddingGenerator<TextContent, Embedding<float>> generator)
+    {
+        IngestionChunkerOptions options = new(tokenizer) { MaxTokensPerChunk = limit, OverlapTokens = 0 };
+        return kind switch
+        {
+            "DocumentToken" => new DocumentTokenChunker(options),
+            "Section" => new SectionChunker(options),
+            "Header" => new HeaderChunker(options),
+            "SemanticSimilarity" => new SemanticSimilarityChunker(generator, options),
+            _ => throw new InvalidOperationException(kind)
+        };
     }
 
     private static DocumentTokenChunker Tokens(int limit) => new(

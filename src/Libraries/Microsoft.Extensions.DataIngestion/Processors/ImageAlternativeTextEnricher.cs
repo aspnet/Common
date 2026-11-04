@@ -66,8 +66,8 @@ public sealed class ImageAlternativeTextEnricher : IngestionDocumentProcessor
     private static IEnumerable<ExtractionDocumentImageElement> EnumerateImages(IngestionDocument document)
     {
         HashSet<ExtractionDocumentImageElement> images = [];
-        HashSet<ExtractionDocumentTableElement> path = [];
-        foreach (var element in document.EnumerateContent())
+        HashSet<ExtractionDocumentElement> path = [];
+        foreach (var element in document.Sections)
         {
             foreach (var image in EnumerateImages(element, path))
             {
@@ -80,20 +80,32 @@ public sealed class ImageAlternativeTextEnricher : IngestionDocumentProcessor
     }
 
     private static IEnumerable<ExtractionDocumentImageElement> EnumerateImages(
-        ExtractionDocumentElement element, HashSet<ExtractionDocumentTableElement> path)
+        ExtractionDocumentElement element, HashSet<ExtractionDocumentElement> path)
     {
-        if (element is ExtractionDocumentImageElement image)
+        if (element is null || !path.Add(element))
         {
-            yield return image;
+            throw new InvalidOperationException(element is ExtractionDocumentTableElement
+                ? "Cyclic table relationships are not supported."
+                : "Null entries and cyclic relationships are not supported in the hierarchy.");
         }
-        else if (element is ExtractionDocumentTableElement table)
-        {
-            if (!path.Add(table))
-            {
-                throw new InvalidOperationException("Cyclic table relationships are not supported.");
-            }
 
-            try
+        try
+        {
+            if (element is ExtractionDocumentImageElement image)
+            {
+                yield return image;
+            }
+            else if (element is ExtractionDocumentSection section)
+            {
+                foreach (var child in section.Elements)
+                {
+                    foreach (var childImage in EnumerateImages(child, path))
+                    {
+                        yield return childImage;
+                    }
+                }
+            }
+            else if (element is ExtractionDocumentTableElement table)
             {
                 foreach (var cell in table.Cells)
                 {
@@ -106,10 +118,10 @@ public sealed class ImageAlternativeTextEnricher : IngestionDocumentProcessor
                     }
                 }
             }
-            finally
-            {
-                _ = path.Remove(table);
-            }
+        }
+        finally
+        {
+            _ = path.Remove(element);
         }
     }
 

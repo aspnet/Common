@@ -16,13 +16,13 @@ namespace Microsoft.Extensions.DataIngestion;
 /// </remarks>
 public sealed class DocumentExtractionReader : IngestionDocumentReader
 {
-    private readonly IDocumentExtractionClient _client;
+    private readonly DocumentExtractionClient _client;
     private readonly DocumentExtractionOptions? _options;
 
     /// <summary>Initializes a new instance of the <see cref="DocumentExtractionReader"/> class.</summary>
     /// <param name="client">The extraction client, which remains owned by the caller.</param>
     /// <param name="options">The per-operation options, copied at construction.</param>
-    public DocumentExtractionReader(IDocumentExtractionClient client, DocumentExtractionOptions? options = null)
+    public DocumentExtractionReader(DocumentExtractionClient client, DocumentExtractionOptions? options = null)
     {
         _client = Throw.IfNull(client);
         _options = options?.Clone();

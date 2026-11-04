@@ -61,6 +61,10 @@ Chunkers consume each document, section, and element's local text payload once. 
 
 `DocumentTokenChunker`, `SectionChunker`, `HeaderChunker`, and `SemanticSimilarityChunker` consume the shared graph, including root-local and section-local text, without aggregating that text into the envelope. Image enrichment updates shared image nodes, including nested table-cell images.
 
+A cell can contain a section with local text and ordered mixed descendants, such as paragraph, image, and paragraph. Chunkers derive cell text from that order without changing `Section.Content` or the public structural traversal, which treats tables as atomic. Cell headings stay within the table instead of changing document heading context. A table's local text remains authoritative over its cell text. Whole-table and split-row chunks retain the contributing descendant element identities; repeated explicit headers retain their own descendants. Image enrichment visits cell sections and processes each shared image instance once. Active-path cycle checks reject malformed section/table graphs without rejecting shared acyclic nodes.
+
+Cell-only `Sources` remain on the original cells. `SourceElements` cannot identify contributing cells independently of their elements, so it is not an exact cell-only provenance carrier for split-row chunks. Applications needing that distinction require an explicit cell-source contract; chunkers do not fabricate elements or copy cell sources onto other nodes.
+
 `IngestionChunk.Document` retains the envelope. Its read-only `SourceElements` snapshot retains contributing shared elements and their source graph, including heading context and nested sections. Source frame identifiers and physical page numbers are not assembly positions or durable citations. `ExtractedDocument.SourcePages` retains blank/unnumbered frames; page dimensions, coordinate units/origin and source polygons remain available for region interpretation. Borrowed native objects in `ExtractedDocument.RawRepresentation` or source-reference `GetRawRepresentation()` are excluded from semantic chunk text and default storage.
 
 ### Configuring the vector store
