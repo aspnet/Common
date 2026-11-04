@@ -122,15 +122,177 @@ public class DocumentTableCellCollectionTests
         Assert.Equal(0, cell.ColumnIndex);
     }
 
-    [Fact]
-    public void RejectsSectionContent()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MixedSectionCell_PreservesOrderedLocalPayloadsSourcesAndSpans(bool useUriContent)
     {
-        ExtractionDocumentTableElement table = new(null, 1, 1);
-        ExtractionDocumentSection section = new(null);
+        ExtractionDocument document = new("mixed-cell");
+        ExtractionDocumentSection root = new();
+        ExtractionDocumentTableElement table = new(null, 2, 3);
+        root.Elements.Add(table);
+        document.Sections.Add(root);
+        ExtractionDocumentSourcePage page = DocumentAnnotationTestData.PdfPage();
+        document.SourcePages.Add(page);
+        ExtractionDocumentSourceReference cellSource = new(page, DocumentAnnotationTestData.Polygon());
+        ExtractionDocumentSourceReference firstSource = new(page, [new(1.25, 2.5), new(3.75, 2.5), new(1.25, 4.5)]);
+        ExtractionDocumentSourceReference imageSource = new(page, [new(5.25, 6.5), new(7.75, 6.5), new(5.25, 8.5)]);
+        ExtractionDocumentSourceReference lastSource = new(page, [new(9.25, 10.5), new(11.75, 10.5), new(9.25, 12.5)]);
+        TextContent paragraphA = new("Paragraph A **before** the image.");
+        TextContent paragraphB = new("Paragraph B *after* the image.");
+        ExtractionDocumentTextElement first = new(paragraphA, "paragraph");
+        ExtractionDocumentTextElement last = new(paragraphB, "paragraph");
+        byte[] bytes = [11, 22, 33, 44];
+        Uri payloadUri = new("urn:mixed-cell:payload");
+        Uri originalAsset = new("urn:mixed-cell:original");
+        AIContent imagePayload = useUriContent
+            ? new UriContent(payloadUri, "image/png")
+            : new DataContent(bytes, "image/png");
+        ExtractionDocumentImageElement image = new(imagePayload, "OCR 17 & 23")
+        {
+            Source = originalAsset,
+            AlternativeText = "A diagram, not its transcription."
+        };
+        first.Sources.Add(firstSource);
+        image.Sources.Add(imageSource);
+        last.Sources.Add(lastSource);
+        ExtractionDocumentSection mixed = new();
+        mixed.Elements.Add(first);
+        mixed.Elements.Add(image);
+        mixed.Elements.Add(last);
+        ExtractionDocumentTableCell cell = new(mixed, 2, 2, "rowHeader");
+        cell.Sources.Add(cellSource);
 
-        Assert.Throws<InvalidOperationException>(() => table.Cells[0, 0] = new ExtractionDocumentTableCell(section));
+        table.Cells[0, 1] = cell;
 
+        Assert.Same(cell, table.Cells[0, 1]);
+        Assert.Same(table, cell.Table);
+        Assert.Equal(0, cell.RowIndex);
+        Assert.Equal(1, cell.ColumnIndex);
+        Assert.Equal(2, cell.RowSpan);
+        Assert.Equal(2, cell.ColumnSpan);
+        Assert.Equal("rowHeader", cell.Role);
         Assert.Null(table.Cells[0, 0]);
+        foreach ((int row, int column) in new[] { (0, 2), (1, 1), (1, 2) })
+        {
+            Assert.Null(table.Cells[row, column]);
+            Assert.True(table.Cells.IsCovered(row, column));
+            Assert.Same(cell, table.Cells.GetCoveringCell(row, column));
+        }
+
+        Assert.Same(mixed, cell.Content);
+        Assert.Equal(3, mixed.Elements.Count);
+        Assert.Same(first, mixed.Elements[0]);
+        Assert.Same(image, mixed.Elements[1]);
+        Assert.Same(last, mixed.Elements[2]);
+        Assert.Same(paragraphA, first.Content);
+        Assert.Same(paragraphB, last.Content);
+        Assert.NotSame(first, last);
+        Assert.NotSame(paragraphA, paragraphB);
+        Assert.Equal("Paragraph A **before** the image.", Assert.IsType<TextContent>(first.Content).Text);
+        Assert.Equal("Paragraph B *after* the image.", Assert.IsType<TextContent>(last.Content).Text);
+        Assert.Equal("paragraph", first.Role);
+        Assert.Equal("paragraph", last.Role);
+        Assert.Same(imagePayload, image.Content);
+        if (useUriContent)
+        {
+            UriContent payload = Assert.IsType<UriContent>(image.Content);
+            Assert.Same(payloadUri, payload.Uri);
+            Assert.Equal("image/png", payload.MediaType);
+        }
+        else
+        {
+            DataContent payload = Assert.IsType<DataContent>(image.Content);
+            Assert.Equal(new byte[] { 11, 22, 33, 44 }, payload.Data.ToArray());
+            Assert.Equal("image/png", payload.MediaType);
+        }
+
+        Assert.Same(originalAsset, image.Source);
+        Assert.Equal("OCR 17 & 23", image.Text);
+        Assert.Equal("A diagram, not its transcription.", image.AlternativeText);
+        Assert.Same(cellSource, Assert.Single(cell.Sources));
+        Assert.Same(firstSource, Assert.Single(first.Sources));
+        Assert.Same(imageSource, Assert.Single(image.Sources));
+        Assert.Same(lastSource, Assert.Single(last.Sources));
+        Assert.Equal(DocumentAnnotationTestData.Polygon(), cellSource.Polygon);
+        Assert.Equal(new ExtractionDocumentPoint[] { new(1.25, 2.5), new(3.75, 2.5), new(1.25, 4.5) }, firstSource.Polygon);
+        Assert.Equal(new ExtractionDocumentPoint[] { new(5.25, 6.5), new(7.75, 6.5), new(5.25, 8.5) }, imageSource.Polygon);
+        Assert.Equal(new ExtractionDocumentPoint[] { new(9.25, 10.5), new(11.75, 10.5), new(9.25, 12.5) }, lastSource.Polygon);
+        Assert.All(new[] { cellSource, firstSource, imageSource, lastSource }, source => Assert.Same(page, source.Page));
+        Assert.Same(page, Assert.Single(document.SourcePages));
+        Assert.Equal(new ExtractionDocumentPageDimensions(200, 100), page.Dimensions);
+        Assert.Equal(ExtractionDocumentCoordinateUnit.Point, page.CoordinateUnit);
+        Assert.Equal(ExtractionDocumentCoordinateOrigin.BottomLeft, page.CoordinateOrigin);
+        Assert.Null(document.Content);
+        Assert.Null(root.Content);
+        Assert.Null(table.Content);
+        Assert.Null(mixed.Content);
+        Assert.Empty(root.Sources);
+        Assert.Empty(table.Sources);
+        Assert.Empty(mixed.Sources);
+        Assert.Same(table, Assert.Single(document.EnumerateContent()));
+
+        image.Text = "Corrected OCR 17 & 28";
+        Assert.Equal("Corrected OCR 17 & 28", image.Text);
+        Assert.Equal("A diagram, not its transcription.", image.AlternativeText);
+        image.AlternativeText = "Revised caption.";
+        Assert.Equal("Revised caption.", image.AlternativeText);
+        Assert.Equal("Corrected OCR 17 & 28", image.Text);
+        Assert.Same(imagePayload, image.Content);
+        Assert.Same(originalAsset, image.Source);
+        Assert.Same(paragraphA, first.Content);
+        Assert.Same(paragraphB, last.Content);
+        Assert.Null(mixed.Content);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MixedSectionCell_PostAttachmentCyclesDoNotExpandPublicTraversal(bool includeInnerTable)
+    {
+        ExtractionDocument document = new("mixed-cycle");
+        ExtractionDocumentSection root = new();
+        ExtractionDocumentTableElement table = new(null, 1, 1);
+        ExtractionDocumentSection mixed = new();
+        ExtractionDocumentTextElement paragraph = new(new TextContent("cell-only paragraph"));
+        mixed.Elements.Add(paragraph);
+        ExtractionDocumentTableCell cell = new(mixed);
+        table.Cells[0, 0] = cell;
+        root.Elements.Add(table);
+        document.Sections.Add(root);
+        Assert.Same(table, Assert.Single(document.EnumerateContent()));
+
+        ExtractionDocumentTableElement? innerTable = null;
+        if (includeInnerTable)
+        {
+            innerTable = new(null, 1, 1);
+            mixed.Elements.Add(innerTable);
+            innerTable.Cells[0, 0] = new ExtractionDocumentTableCell(root);
+        }
+        else
+        {
+            mixed.Elements.Add(root);
+        }
+
+        // A cycle behind a cell boundary is outside structural traversal.
+        Assert.Same(table, Assert.Single(document.EnumerateContent()));
+        Assert.Same(cell, table.Cells[0, 0]);
+        Assert.Same(mixed, cell.Content);
+        Assert.Same(paragraph, mixed.Elements[0]);
+        Assert.Equal("cell-only paragraph", Assert.IsType<TextContent>(paragraph.Content).Text);
+        if (includeInnerTable)
+        {
+            Assert.Same(innerTable, mixed.Elements[1]);
+            Assert.Same(root, innerTable!.Cells[0, 0]!.Content);
+        }
+        else
+        {
+            Assert.Same(root, mixed.Elements[1]);
+        }
+
+        Assert.Null(document.Content);
+        Assert.Null(table.Content);
+        Assert.Null(mixed.Content);
     }
 
     [Fact]

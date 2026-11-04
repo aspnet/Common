@@ -280,7 +280,7 @@
       "Stage": "Experimental",
       "Methods": [
         {
-          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentSourceReference.ExtractionDocumentSourceReference(Microsoft.Extensions.Documents.ExtractionDocumentSourcePage page, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Documents.ExtractionDocumentPoint>? polygon = null, object? rawRepresentation = null);",
+          "Member": "Microsoft.Extensions.Documents.ExtractionDocumentSourceReference.ExtractionDocumentSourceReference(Microsoft.Extensions.Documents.ExtractionDocumentSourcePage page, System.Collections.Generic.IEnumerable<Microsoft.Extensions.Documents.ExtractionDocumentPoint>? polygon = null, object? rawRepresentation = null);",
           "Stage": "Experimental"
         },
         {
