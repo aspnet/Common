@@ -76,7 +76,8 @@ public readonly struct ExtractionDocumentPoint : IEquatable<ExtractionDocumentPo
     }
 }
 
-/// <summary>Represents positive source page dimensions in the page's coordinate unit.</summary>
+/// <summary>Represents source page dimensions in the page's coordinate unit, or an empty (0, 0) value.</summary>
+/// <remarks>Empty dimensions cannot be assigned to a source page. Use <see langword="null"/> for unknown page dimensions.</remarks>
 public readonly struct ExtractionDocumentPageDimensions : IEquatable<ExtractionDocumentPageDimensions>
 {
     /// <summary>Initializes a new instance of the <see cref="ExtractionDocumentPageDimensions"/> struct.</summary>
@@ -84,8 +85,14 @@ public readonly struct ExtractionDocumentPageDimensions : IEquatable<ExtractionD
     {
         DocumentSourceValidation.Finite(width, nameof(width));
         DocumentSourceValidation.Finite(height, nameof(height));
-        Width = Throw.IfLessThanOrEqual(width, 0);
-        Height = Throw.IfLessThanOrEqual(height, 0);
+        if (!width.Equals(0.0) || !height.Equals(0.0))
+        {
+            _ = Throw.IfLessThanOrEqual(width, 0);
+            _ = Throw.IfLessThanOrEqual(height, 0);
+        }
+
+        Width = width;
+        Height = height;
     }
 
     /// <summary>Gets the width.</summary>
@@ -181,7 +188,7 @@ public sealed class ExtractionDocumentSourceReference
     /// <param name="rawRepresentation">An optional borrowed native observation.</param>
     public ExtractionDocumentSourceReference(
         ExtractionDocumentSourcePage page,
-        IReadOnlyList<ExtractionDocumentPoint>? polygon = null,
+        IEnumerable<ExtractionDocumentPoint>? polygon = null,
         object? rawRepresentation = null)
     {
         Page = Throw.IfNull(page);

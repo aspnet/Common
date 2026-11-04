@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Documents;
 using Xunit;
@@ -112,6 +114,85 @@ public class DocumentReferencesTests
         Assert.Equal(0, native.DisposeCount);
     }
 
+    [Fact]
+    public void SourceReference_IteratorPolygonIsEnumeratedOnceAndSnapshotsMutableList()
+    {
+        List<ExtractionDocumentPoint> points = [new(1.25, 2.5), new(3.75, 4.5), new(5.25, 6.5)];
+        ExtractionDocumentPoint[] expected = points.ToArray();
+        int enumerations = 0;
+        ExtractionDocumentSourcePage page = DocumentAnnotationTestData.PdfPage();
+        using DocumentAnnotationTestData.BorrowedNative native = new();
+
+        IEnumerable<ExtractionDocumentPoint> EnumerateOnce()
+        {
+            if (++enumerations != 1)
+            {
+                throw new InvalidOperationException("The polygon must only be enumerated once.");
+            }
+
+            foreach (ExtractionDocumentPoint point in points)
+            {
+                yield return point;
+            }
+        }
+
+        ExtractionDocumentSourceReference reference = new(page, EnumerateOnce(), native);
+        Assert.Equal(1, enumerations);
+        points[0] = new(99, 100);
+        points.RemoveAt(2);
+        points.Add(new(101, 102));
+        points.Add(new(103, 104));
+
+        Assert.Equal(expected, reference.Polygon);
+        Assert.Equal(expected, reference.Polygon.ToArray());
+        Assert.Equal(1, enumerations);
+        Assert.Same(page, reference.Page);
+        Assert.Same(native, reference.GetRawRepresentation());
+        Assert.Equal(0, native.DisposeCount);
+        IList<ExtractionDocumentPoint> polygon = Assert.IsAssignableFrom<IList<ExtractionDocumentPoint>>(reference.Polygon);
+        Assert.True(polygon.IsReadOnly);
+        Assert.Throws<NotSupportedException>(() => polygon[0] = default);
+        Assert.Throws<NotSupportedException>(() => polygon.Add(new(7, 8)));
+        Assert.Throws<NotSupportedException>(() => polygon.Clear());
+        Assert.Equal(expected, reference.Polygon);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void SourceReference_IteratorPolygonPreservesEmptyAndShortValidation(int count)
+    {
+        int enumerations = 0;
+        IEnumerable<ExtractionDocumentPoint> EnumerateOnce()
+        {
+            if (++enumerations != 1)
+            {
+                throw new InvalidOperationException("The polygon must only be enumerated once.");
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                yield return new(i, i + 1);
+            }
+        }
+
+        ExtractionDocumentSourcePage page = new("iterator", 1);
+        if (count == 0)
+        {
+            ExtractionDocumentSourceReference reference = new(page, EnumerateOnce());
+            Assert.Empty(reference.Polygon);
+            Assert.Same(page, reference.Page);
+            Assert.Null(reference.GetRawRepresentation());
+        }
+        else
+        {
+            Assert.Throws<ArgumentException>("polygon", () => new ExtractionDocumentSourceReference(page, EnumerateOnce()));
+        }
+
+        Assert.Equal(1, enumerations);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -206,9 +287,67 @@ public class DocumentReferencesTests
         Assert.Throws<ArgumentOutOfRangeException>("y", () => new ExtractionDocumentPoint(2, value));
         Assert.Throws<ArgumentOutOfRangeException>("width", () => new ExtractionDocumentPageDimensions(value, 100));
         Assert.Throws<ArgumentOutOfRangeException>("height", () => new ExtractionDocumentPageDimensions(200, value));
+        Assert.Throws<ArgumentOutOfRangeException>("width", () => new ExtractionDocumentPageDimensions(value, 0));
+        Assert.Throws<ArgumentOutOfRangeException>("height", () => new ExtractionDocumentPageDimensions(0, value));
         ExtractionDocumentSourceReference valid = new(DocumentAnnotationTestData.PdfPage(), DocumentAnnotationTestData.Polygon());
         Assert.Equal(5, valid.Polygon.Count);
         Assert.Equal(60.125, valid.Polygon[2].Y);
+    }
+
+    [Fact]
+    public void Dimensions_ExplicitEmptyEqualsDefaultWithoutTreatingPositiveDimensionsAsEmpty()
+    {
+        ExtractionDocumentPageDimensions empty = new(0, 0);
+        ExtractionDocumentPageDimensions defaultDimensions = default;
+        Assert.Equal(0, empty.Width);
+        Assert.Equal(0, empty.Height);
+        Assert.Equal(defaultDimensions, empty);
+        Assert.True(empty.Equals(defaultDimensions));
+        Assert.True(empty.Equals((object)defaultDimensions));
+        Assert.True(empty == defaultDimensions);
+        Assert.False(empty != defaultDimensions);
+        Assert.Equal(defaultDimensions.GetHashCode(), empty.GetHashCode());
+
+        ExtractionDocumentPageDimensions positive = new(double.Epsilon, double.Epsilon);
+        Assert.Equal(double.Epsilon, positive.Width);
+        Assert.Equal(double.Epsilon, positive.Height);
+        Assert.NotEqual(empty, positive);
+        Assert.False(empty == positive);
+        Assert.True(empty != positive);
+        ExtractionDocumentSourcePage page = new("tiny", 1, positive);
+        Assert.Equal(positive, page.Dimensions);
+    }
+
+    [Theory]
+    [InlineData(-1, 100, "width")]
+    [InlineData(200, -1, "height")]
+    [InlineData(-double.Epsilon, 100, "width")]
+    [InlineData(200, -double.Epsilon, "height")]
+    [InlineData(0, 100, "width")]
+    [InlineData(200, 0, "height")]
+    [InlineData(0, double.Epsilon, "width")]
+    [InlineData(double.Epsilon, 0, "height")]
+    [InlineData(-1, 0, "width")]
+    [InlineData(0, -1, "width")]
+    public void Dimensions_RejectsNegativeAndOneSidedZero(double width, double height, string parameter)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(parameter, () => new ExtractionDocumentPageDimensions(width, height));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SourcePage_RejectsExplicitAndDefaultEmptyDimensionsButAllowsUnknown(bool explicitEmpty)
+    {
+        ExtractionDocumentPageDimensions dimensions = explicitEmpty ? new(0, 0) : default;
+        Assert.Throws<ArgumentOutOfRangeException>("dimensions", () => new ExtractionDocumentSourcePage("empty", 1, dimensions));
+
+        ExtractionDocumentSourcePage unknown = new("unknown", 1, dimensions: null);
+        Assert.Null(unknown.Dimensions);
+        Assert.Equal("unknown", unknown.Identifier);
+        Assert.Equal(1, unknown.PageNumber);
+        Assert.Null(unknown.CoordinateUnit);
+        Assert.Null(unknown.CoordinateOrigin);
     }
 
     [Fact]

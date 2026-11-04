@@ -46,7 +46,7 @@ public sealed class ExtractionDocumentTableCell
     /// <summary>
     /// Initializes a new instance of the <see cref="ExtractionDocumentTableCell"/> class.
     /// </summary>
-    /// <param name="content">The element in the cell.</param>
+    /// <param name="content">The element in the cell. Use a section for ordered mixed content.</param>
     /// <param name="rowSpan">The positive number of rows covered by the cell.</param>
     /// <param name="columnSpan">The positive number of columns covered by the cell.</param>
     /// <param name="role">The optional producer-supplied cell role.</param>
@@ -69,6 +69,7 @@ public sealed class ExtractionDocumentTableCell
     /// <summary>
     /// Gets the element in the cell.
     /// </summary>
+    /// <remarks>A section can contain multiple paragraphs, images and other elements in order. Its payload remains local, not an aggregate of its children.</remarks>
     public ExtractionDocumentElement? Content { get; }
 
     /// <summary>Gets the number of rows occupied by this anchor cell.</summary>
@@ -145,8 +146,12 @@ public sealed class ExtractionDocumentTableCellCollection : IEnumerable<Extracti
     public int ColumnCount => _cells.GetLength(1);
 
     /// <summary>
-    /// Gets or sets a cell by row and column address. <see langword="null"/> represents an empty cell.
+    /// Gets or sets the anchor cell at a row and column address.
     /// </summary>
+    /// <remarks>
+    /// The getter returns <see langword="null"/> for an empty position or a position covered by another anchor's span.
+    /// A covered position must be edited through its anchor cell.
+    /// </remarks>
     /// <param name="row">The zero-based row index.</param>
     /// <param name="column">The zero-based column index.</param>
     public ExtractionDocumentTableCell? this[int row, int column]
@@ -226,7 +231,7 @@ public sealed class ExtractionDocumentTableCellCollection : IEnumerable<Extracti
             throw new InvalidOperationException("The table cell is already owned by a table.");
         }
 
-        if (cell.Content is ExtractionDocumentSection || ReferenceEquals(cell.Content, _owner))
+        if (ReferenceEquals(cell.Content, _owner))
         {
             throw new InvalidOperationException("Adding the cell content would create an invalid table relationship.");
         }
