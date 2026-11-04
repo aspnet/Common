@@ -8,5 +8,6 @@ internal enum StrongTypeMetricObjectType
     String = 0,
     Enum = 1,
     Class = 2,
-    Struct = 3
+    Struct = 3,
+    Primitive = 4
 }

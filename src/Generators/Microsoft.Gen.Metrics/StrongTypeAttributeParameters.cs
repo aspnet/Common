@@ -10,6 +10,7 @@ internal sealed class StrongTypeAttributeParameters
 {
     public string MetricNameFromAttribute = string.Empty;
     public string MetricUnitFromAttribute = string.Empty;
+    public string MetricDescriptionFromAttribute = string.Empty;
     public HashSet<string> TagHashSet = [];
     public Dictionary<string, string> TagDescriptionDictionary = [];
     public List<StrongTypeConfig> StrongTypeConfigs = [];

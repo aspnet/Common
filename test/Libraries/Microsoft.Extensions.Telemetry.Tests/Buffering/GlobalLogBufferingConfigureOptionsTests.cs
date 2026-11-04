@@ -71,6 +71,7 @@ public class GlobalLogBufferingConfigureOptionsTests
         {
             ["GlobalLogBuffering:MaxLogRecordSizeInBytes"] = "1024",
             ["GlobalLogBuffering:MaxBufferSizeInBytes"] = "4096",
+            ["GlobalLogBuffering:IncludeScopes"] = "true",
             ["GlobalLogBuffering:Rules:0:CategoryName"] = "TestCategory",
             ["GlobalLogBuffering:Rules:0:LogLevel"] = "Information"
         };
@@ -88,6 +89,7 @@ public class GlobalLogBufferingConfigureOptionsTests
         // Assert
         Assert.Equal(1024, options.MaxLogRecordSizeInBytes);
         Assert.Equal(4096, options.MaxBufferSizeInBytes);
+        Assert.True(options.IncludeScopes);
         Assert.Single(options.Rules);
         Assert.Equal("TestCategory", options.Rules[0].CategoryName);
         Assert.Equal(LogLevel.Information, options.Rules[0].LogLevel);

@@ -222,7 +222,7 @@ namespace Microsoft.Gen.Metrics {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Invalid tag name type. Valid types are string and enum.
+        ///   Looks up a localized string similar to Invalid tag name type. Valid types are string, enum, bool, sbyte, byte, short, ushort, int, uint, long, float, and double.
         /// </summary>
         internal static string ErrorInvalidTagTypeMessage {
             get {

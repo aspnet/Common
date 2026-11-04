@@ -159,10 +159,13 @@ internal static class DiagnosticIds
     {
         internal const string NonObservableResourceMonitoringApiDiagId = "EXTOBS0001";
         internal const string ObsoleteTelemetryApiDiagId = "EXTOBS0002";
+        internal const string HybridCacheDisableCompressionDiagId = "EXTOBS0003";
         internal const string NonObservableResourceMonitoringApiMessage =
             "This API is obsolete and will be removed in a future version. Consider using Resource Monitoring observable instruments.";
         internal const string ObsoleteTelemetryApiMessage =
             "This API is obsolete and will be removed in a future version. Instead of the AddServiceLogEnricher() methods, consider using the respective AddApplicationLogEnricher() methods.";
+        internal const string HybridCacheDisableCompressionMessage =
+            "HybridCache does not provide built-in compression, so this option doesn't do anything.";
     }
 }
 

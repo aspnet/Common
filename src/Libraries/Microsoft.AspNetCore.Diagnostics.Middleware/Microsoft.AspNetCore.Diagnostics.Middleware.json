@@ -19,7 +19,7 @@
         },
         {
           "Member": "static Microsoft.Extensions.DependencyInjection.IServiceCollection Microsoft.Extensions.DependencyInjection.HttpLoggingServiceCollectionExtensions.AddHttpServerLatencyTelemetry(this Microsoft.Extensions.DependencyInjection.IServiceCollection services);",
-          "Stage": "Experimental"
+          "Stage": "Stable"
         }
       ]
     },
@@ -183,6 +183,10 @@
         {
           "Member": "System.TimeSpan Microsoft.AspNetCore.Diagnostics.Buffering.PerRequestLogBufferingOptions.AutoFlushDuration { get; set; }",
           "Stage": "Stable"
+        },
+        {
+          "Member": "bool Microsoft.AspNetCore.Diagnostics.Buffering.PerRequestLogBufferingOptions.IncludeScopes { get; set; }",
+          "Stage": "Experimental"
         },
         {
           "Member": "int Microsoft.AspNetCore.Diagnostics.Buffering.PerRequestLogBufferingOptions.MaxLogRecordSizeInBytes { get; set; }",

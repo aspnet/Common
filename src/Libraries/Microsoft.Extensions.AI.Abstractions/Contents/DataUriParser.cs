@@ -52,7 +52,7 @@ internal static class DataUriParser
 
         // Determine whether the data is Base64-encoded or percent-encoded (Uri-encoded).
         // If it's base64-encoded, validate it. If it's Uri-encoded, there's nothing to validate,
-        // as WebUtility.UrlDecode will successfully decode any input with no sequence considered invalid.
+        // as WebUtility.UrlDecodeToBytes will successfully decode any input with no sequence considered invalid.
         if (metadata.Span.EndsWith(";base64".AsSpan(), StringComparison.OrdinalIgnoreCase))
         {
             metadata = metadata.Slice(0, metadata.Length - ";base64".Length);
@@ -200,8 +200,16 @@ internal static class DataUriParser
 
         public bool IsBase64 { get; } = isBase64;
 
-        public byte[] ToByteArray() => IsBase64 ?
-            Convert.FromBase64String(Data.ToString()) :
-            Encoding.UTF8.GetBytes(WebUtility.UrlDecode(Data.ToString()));
+        public byte[] ToByteArray()
+        {
+            if (IsBase64)
+            {
+                return Convert.FromBase64String(Data.ToString());
+            }
+
+            // Each %xx escape is the octet it names, and '+' is a literal plus, not a space as in form encoding.
+            byte[] bytes = Encoding.UTF8.GetBytes(Data.ToString().Replace("+", "%2B"));
+            return WebUtility.UrlDecodeToBytes(bytes, 0, bytes.Length)!;
+        }
     }
 }

@@ -28,8 +28,13 @@
       Include="$(SrcLibrariesDir)\*\*.*proj"
       Exclude="$(MSBuildProjectFullPath)" />
 
-    <!-- This is needed in order to avoid a version conflict between some dependencies bringing in the 6.0 version of the assembly
-    and some others depending on the 9.0 version. -->
+    <!-- Align transitive dependencies with the latest TFM's reference assemblies. -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Primitives" />
     <PackageReference Include="System.Text.Encodings.Web" />
     <PackageReference Include="System.Diagnostics.DiagnosticSource" />
     <PackageReference Include="System.Text.Json" />

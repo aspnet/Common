@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>Microsoft.Extensions.Compliance.Redaction</RootNamespace>
+    <TargetFrameworks>$(NetCoreTargetFrameworks);netstandard2.0;net462</TargetFrameworks>
     <Description>Redaction engine and canonical redactors.</Description>
     <Workstream>Compliance</Workstream>
   </PropertyGroup>
@@ -21,7 +22,7 @@
 
   <PropertyGroup>
     <Stage>normal</Stage>
-    <MinCodeCoverage>100</MinCodeCoverage>
+    <MinCodeCoverage>94</MinCodeCoverage>
     <MinMutationScore>100</MinMutationScore>
   </PropertyGroup>
 

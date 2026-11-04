@@ -136,7 +136,7 @@
     <value>Tag names should only contain alphanumeric characters and allowed symbols</value>
   </data>
   <data name="ErrorInvalidTagTypeMessage" xml:space="preserve">
-    <value>Invalid tag name type. Valid types are string and enum</value>
+    <value>Invalid tag name type. Valid types are string, enum, bool, sbyte, byte, short, ushort, int, uint, long, float, and double</value>
   </data>
   <data name="ErrorInvalidTagTypeTitle" xml:space="preserve">
     <value>A metric class contains an invalid tag name type</value>

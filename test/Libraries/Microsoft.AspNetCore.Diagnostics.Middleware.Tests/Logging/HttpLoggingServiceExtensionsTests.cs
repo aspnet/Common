@@ -7,6 +7,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Compliance.Classification;
+using Microsoft.Extensions.Compliance.Redaction;
+using Microsoft.Extensions.Compliance.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Diagnostics;
@@ -190,6 +192,52 @@ public class HttpLoggingServiceExtensionsTests
         Assert.Single(options.ResponseHeadersDataClasses);
         Assert.Equal("Taxonomy3", options.ResponseHeadersDataClasses["three"].TaxonomyName);
         Assert.Equal("Value3", options.ResponseHeadersDataClasses["three"].Value);
+    }
+
+    [Fact]
+    public void AddHttpLoggingRedaction_RedactionNotRegistered_RegistersErasingRedactor()
+    {
+        using var provider = new ServiceCollection()
+            .AddLogging()
+            .AddHttpLoggingRedaction()
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        Assert.IsType<ErasingRedactor>(provider.GetRequiredService<IRedactorProvider>().GetRedactor(FakeTaxonomy.PrivateData));
+    }
+
+    [Fact]
+    public void AddHttpLoggingRedaction_WithConfigurationSection_RedactionNotRegistered_RegistersErasingRedactor()
+    {
+        var section = new ConfigurationBuilder().Build().GetSection("HttpLogging");
+        using var provider = new ServiceCollection()
+            .AddLogging()
+            .AddHttpLoggingRedaction(section)
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        Assert.IsType<ErasingRedactor>(provider.GetRequiredService<IRedactorProvider>().GetRedactor(FakeTaxonomy.PrivateData));
+    }
+
+    [Fact]
+    public void AddHttpLogEnricher_RedactionNotRegistered_RegistersErasingRedactor()
+    {
+        using var provider = new ServiceCollection()
+            .AddLogging()
+            .AddHttpLogEnricher<TestHttpLogEnricher>()
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        Assert.IsType<ErasingRedactor>(provider.GetRequiredService<IRedactorProvider>().GetRedactor(FakeTaxonomy.PrivateData));
+    }
+
+    [Fact]
+    public void AddHttpLoggingRedaction_RedactionRegisteredAfter_UsesRegisteredRedactor()
+    {
+        using var provider = new ServiceCollection()
+            .AddLogging()
+            .AddHttpLoggingRedaction()
+            .AddRedaction(redaction => redaction.SetFakeRedactor(FakeTaxonomy.PrivateData))
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        Assert.IsType<FakeRedactor>(provider.GetRequiredService<IRedactorProvider>().GetRedactor(FakeTaxonomy.PrivateData));
     }
 }
 #endif

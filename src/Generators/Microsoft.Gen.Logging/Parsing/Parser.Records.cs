@@ -129,29 +129,35 @@ namespace Microsoft.Gen.Logging.Parsing
                         extractedType = ((INamedTypeSymbol)memberType).TypeArguments[0];
                     }
 
-                    // Checking "extractedType" here:
-                    if (typesChain.Contains(extractedType))
-                    {
-                        continue; // Move to the next member
-                    }
-
                     var propertyDataClassAttributes = GetDataClassificationAttributes(m, symbols);
                     if (propertyDataClassAttributes.Count > 0)
                     {
                         return true;
                     }
 
+                    // Checking "extractedType" here:
+                    if (typesChain.Contains(extractedType))
+                    {
+                        continue; // Move to the next member
+                    }
+
                     if (extractedType.IsRecord && // Going inside record types only
                         extractedType.Kind == SymbolKind.NamedType &&
                         !extractedType.IsSpecialType(symbols))
                     {
-                        _ = typesChain.Add(namedType);
+                        // Too deep to finish inspecting: assume the record is sensitive rather than let unchecked data be logged.
+                        if (typesChain.Count >= MaxTypeTraversalDepth)
+                        {
+                            return true;
+                        }
+
+                        _ = typesChain.Add(extractedType);
                         if (RecordHasSensitivePublicMembers(extractedType, typesChain, symbols, token))
                         {
                             return true;
                         }
 
-                        _ = typesChain.Remove(namedType);
+                        _ = typesChain.Remove(extractedType);
                     }
                 }
 

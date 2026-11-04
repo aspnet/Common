@@ -92,6 +92,16 @@ public class PerIncomingRequestLoggingBuilderExtensionsTests
     }
 
     [Fact]
+    public void WhenConfigurationActionProvided_AppliesIncludeScopesToGlobalBuffer()
+    {
+        var serviceCollection = new ServiceCollection();
+        serviceCollection.AddLogging(b => b.AddPerIncomingRequestBuffer(options => options.IncludeScopes = true));
+        using ServiceProvider serviceProvider = serviceCollection.BuildServiceProvider();
+
+        Assert.True(serviceProvider.GetRequiredService<IOptionsMonitor<GlobalLogBufferingOptions>>().CurrentValue.IncludeScopes);
+    }
+
+    [Fact]
     public async Task WhenConfigUpdated_PicksUpConfigChanges()
     {
         List<LogBufferingFilterRule> initialData =

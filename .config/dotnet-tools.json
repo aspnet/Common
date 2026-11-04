@@ -3,7 +3,7 @@
   "isRoot": true,
   "tools": {
     "dotnet-coverage": {
-      "version": "18.11.2",
+      "version": "18.12.0",
       "commands": [
         "dotnet-coverage"
       ]
@@ -15,13 +15,13 @@
       ]
     },
     "microsoft.visualstudio.slngen.tool": {
-      "version": "12.0.53",
+      "version": "12.0.58",
       "commands": [
         "slngen"
       ]
     },
     "PowerShell": {
-      "version": "7.6.6",
+      "version": "7.6.9",
       "commands": [
         "pwsh"
       ]

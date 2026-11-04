@@ -52,5 +52,6 @@
   <Import Project="General-LTS.props" />
   <Import Project="General-net9.props" />
   <Import Project="General-net10.props" />
+  <Import Project="General-net11.props" />
 
 </Project>

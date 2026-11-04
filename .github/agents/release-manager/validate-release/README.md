@@ -7,6 +7,8 @@ branches.
 
 Run this playbook after **publish-release**.
 
+Load/present [the canonical workflow and checkpoint](../references/workflow.md). Prepublication original PDB metadata is Stage 4a; public URL validation must wait for source reachability, so Stage 6a can precede Stage 5b without pretending Stage 5 passed.
+
 - Stage 5 verifies package dependency resolution and symbols.
 - Stage 6 stages reconciliation merges when needed (pushing and PR completion are left to the user).
 - Stage 7 handles support-page follow-up based on release type and package novelty.
@@ -15,11 +17,7 @@ For servicing releases prepared directly on public `release/<major>.<minor>`, St
 
 ## Stage 5 - Verify Package Dependencies, Source Link, and Symbols
 
-First verify every published package's exact-version dependencies resolve from clean,
-consumer-visible sources. Then run the Source Link sweep until every library package reports `valid`
-on msdl. Both checks are **release sign-off gates**: unresolved dependencies block completion, and a
-persistent `symbols-not-indexed` result means the official release build never reached the public
-`.NET <major>` channel (see publish-release, Stage 4).
+Verify clean consumer dependency resolution and every library TFM's matching msdl PDB. Then validate full Source Link source URLs/checksums after source publication. These are sign-off gates, with explicit exceptions recorded as exceptions, not passes. Missing symbols may reflect transport, identity, indexing or channel issues; they do not prove a promotion failed. Bound retries and diagnose the evidence.
 
 Read and follow [references/stage-5-verify-source-link.md](references/stage-5-verify-source-link.md).
 
@@ -41,4 +39,4 @@ Read and follow [references/stage-7-support-page.md](references/stage-7-support-
 
 ## Done
 
-These three final stages complete the branch-level release and its verification. Tagging and publishing the GitHub release notes are the **write-release-notes** playbook.
+Close out only after required work is completed or has explicit recorded exceptions; list those exceptions instead of claiming full validation. Tagging and publishing GitHub release notes use the **write-release-notes** playbook's build-source/nuspec provenance gate.

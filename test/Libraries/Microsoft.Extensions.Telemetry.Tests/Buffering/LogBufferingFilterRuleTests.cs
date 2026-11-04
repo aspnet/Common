@@ -10,8 +10,6 @@ namespace Microsoft.Extensions.Diagnostics.Buffering.Test;
 
 public class LogBufferingFilterRuleTests
 {
-    private readonly LogBufferingFilterRuleSelector _selector = new();
-
     [Fact]
     public void SelectsRightRule()
     {
@@ -40,7 +38,7 @@ public class LogBufferingFilterRuleTests
 
         // Act
         LogBufferingFilterRule[] categorySpecificRules = LogBufferingFilterRuleSelector.SelectByCategory(rules, "Program.MyLogger");
-        LogBufferingFilterRule? result = _selector.Select(
+        LogBufferingFilterRule? result = LogBufferingFilterRuleSelector.Select(
             categorySpecificRules,
             LogLevel.Warning,
             1,
@@ -71,7 +69,7 @@ public class LogBufferingFilterRuleTests
 
         // Act
         LogBufferingFilterRule[] categorySpecificRules = LogBufferingFilterRuleSelector.SelectByCategory(rules, "Program.MyLogger");
-        LogBufferingFilterRule? result = _selector.Select(categorySpecificRules, LogLevel.Warning, 1, [new("region", "westus2")]);
+        LogBufferingFilterRule? result = LogBufferingFilterRuleSelector.Select(categorySpecificRules, LogLevel.Warning, 1, [new("region", "westus2")]);
 
         // Assert
         Assert.Same(rules.Last(), result);
@@ -91,10 +89,30 @@ public class LogBufferingFilterRuleTests
 
         // Act
         LogBufferingFilterRule[] categorySpecificRules = LogBufferingFilterRuleSelector.SelectByCategory(rules, "Program.MyLogger");
-        LogBufferingFilterRule? result = _selector.Select(categorySpecificRules, LogLevel.Warning, 1, [new("priority", "2")]);
+        LogBufferingFilterRule? result = LogBufferingFilterRuleSelector.Select(categorySpecificRules, LogLevel.Warning, 1, [new("priority", "2")]);
 
         // Assert
         Assert.Same(rules[1], result);
+    }
+
+    [Fact]
+    public void SelectsRightRule_WhenCategoriesHaveDifferentRules()
+    {
+        // Arrange
+        var rules = new List<LogBufferingFilterRule>
+        {
+            new LogBufferingFilterRule("Program.MyLogger", LogLevel.Warning),
+        };
+        LogBufferingFilterRule[] myLoggerRules = LogBufferingFilterRuleSelector.SelectByCategory(rules, "Program.MyLogger");
+        LogBufferingFilterRule[] otherLoggerRules = LogBufferingFilterRuleSelector.SelectByCategory(rules, "Program.OtherLogger");
+
+        // Act
+        LogBufferingFilterRule? myLoggerResult = LogBufferingFilterRuleSelector.Select(myLoggerRules, LogLevel.Warning, 1, attributes: null);
+        LogBufferingFilterRule? otherLoggerResult = LogBufferingFilterRuleSelector.Select(otherLoggerRules, LogLevel.Warning, 1, attributes: null);
+
+        // Assert
+        Assert.Same(rules[0], myLoggerResult);
+        Assert.Null(otherLoggerResult);
     }
 }
 #endif

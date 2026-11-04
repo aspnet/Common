@@ -33,6 +33,7 @@ public static class HttpClientLoggingServiceCollectionExtensions
         _ = Throw.IfNull(services);
 
         _ = services
+            .AddRedaction()
             .AddHttpRouteProcessor()
             .AddHttpHeadersRedactor()
             .AddOutgoingRequestContext();

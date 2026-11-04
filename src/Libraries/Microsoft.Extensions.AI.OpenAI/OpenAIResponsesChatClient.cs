@@ -605,6 +605,15 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                             yield return CreateUpdate(CreateReasoningContent(text: null, protectedData: encryptedContent, itemId: rri.Id));
                             break;
 
+                        // The ImageGenerationToolCallContent has already been yielded as part of in-progress updates,
+                        // but any partial images yielded along the way are lower-quality intermediate renders rather than
+                        // deltas of the final image. Yield the final image here; coalescing will replace the partial
+                        // results with this one, since they share the same CallId. This mirrors the non-streaming path,
+                        // which produces a result for every ImageGenerationCallResponseItem.
+                        case ImageGenerationCallResponseItem imageGenItem:
+                            yield return CreateUpdate(CreateImageGenerationResultContent(imageGenItem, options));
+                            break;
+
                         // For ResponseItems where we've already yielded partial deltas for the whole content,
                         // we still want to yield an update, but we don't want it to include the ResponseItem
                         // as the RawRepresentation, since if it did, when roundtripping we'd end up sending
@@ -1967,16 +1976,20 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
 
     private static void AddImageGenerationContents(ImageGenerationCallResponseItem outputItem, CreateResponseOptions? options, IList<AIContent> contents)
     {
+        contents.Add(new ImageGenerationToolCallContent(outputItem.Id));
+        contents.Add(CreateImageGenerationResultContent(outputItem, options));
+    }
+
+    private static ImageGenerationToolResultContent CreateImageGenerationResultContent(ImageGenerationCallResponseItem outputItem, CreateResponseOptions? options)
+    {
         var imageGenTool = options?.Tools.OfType<ImageGenerationTool>().FirstOrDefault();
         string outputFormat = imageGenTool?.OutputFileFormat?.ToString() ?? "png";
 
-        contents.Add(new ImageGenerationToolCallContent(outputItem.Id));
-
-        contents.Add(new ImageGenerationToolResultContent(outputItem.Id)
+        return new ImageGenerationToolResultContent(outputItem.Id)
         {
             RawRepresentation = outputItem,
             Outputs = [new DataContent(outputItem.ImageResultBytes, $"image/{outputFormat}")]
-        });
+        };
     }
 
     private static ImageGenerationToolResultContent GetImageGenerationResult(StreamingResponseImageGenerationCallPartialImageUpdate update, CreateResponseOptions? options)

@@ -80,7 +80,12 @@ internal sealed class HttpRouteFormatter : IHttpRouteFormatter
 
                     if (i < routeSegments.Segments.Length - 1)
                     {
-                        length = httpPathAsSpan.Slice(startIndex).IndexOf(routeSegments.Segments[i + 1].Content[0]);
+                        length = HttpRouteParser.GetParameterLength(httpPathAsSpan.Slice(startIndex), routeSegments.Segments, i);
+
+                        if (length == -1)
+                        {
+                            length = httpPathAsSpan.Slice(startIndex).IndexOf(routeSegments.Segments[i + 1].Content[0]);
+                        }
                     }
                     else
                     {

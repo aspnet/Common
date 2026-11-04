@@ -126,6 +126,22 @@ public class TelemetryHealthChecksPublisherTests
     }
 
     [Fact]
+    public void Metrics_HaveDescriptions()
+    {
+        using var meter = new Meter(nameof(Metrics_HaveDescriptions));
+        _ = GetMockedMetrics(meter);
+        using var healthReportMetricCollector = new MetricCollector<long>(meter, HealthReportMetricName);
+        using var unhealthyHealthCheckMetricCollector = new MetricCollector<long>(meter, UnhealthyHealthCheckMetricName);
+
+        Assert.Equal(
+            "Number of times a health report reported the health status of an application.",
+            healthReportMetricCollector.Instrument?.Description);
+        Assert.Equal(
+            "Number of times a health check reported the health status of an application as Degraded or Unhealthy.",
+            unhealthyHealthCheckMetricCollector.Instrument?.Description);
+    }
+
+    [Fact]
     public void Ctor_ThrowsWhenOptionsValueNull()
     {
         using var meter = new Meter(nameof(Ctor_ThrowsWhenOptionsValueNull));
@@ -133,6 +149,18 @@ public class TelemetryHealthChecksPublisherTests
         var logger = new FakeLogger<TelemetryHealthCheckPublisher>();
 
         Assert.Throws<ArgumentException>(() => new TelemetryHealthCheckPublisher(metrics, logger, Options.Options.Create<TelemetryHealthCheckPublisherOptions>(null!)));
+    }
+
+    [Fact]
+    public void Counters_HaveUnits()
+    {
+        using var meter = new Meter(nameof(Counters_HaveUnits));
+        _ = GetMockedMetrics(meter);
+        using var healthReportCollector = new MetricCollector<long>(meter, HealthReportMetricName);
+        using var unhealthyHealthCheckCollector = new MetricCollector<long>(meter, UnhealthyHealthCheckMetricName);
+
+        Assert.Equal("{report}", healthReportCollector.Instrument?.Unit);
+        Assert.Equal("{unhealthy_check}", unhealthyHealthCheckCollector.Instrument?.Unit);
     }
 
     private static long GetValue(IReadOnlyCollection<CollectedMeasurement<long>> counters, string healthy, string status)

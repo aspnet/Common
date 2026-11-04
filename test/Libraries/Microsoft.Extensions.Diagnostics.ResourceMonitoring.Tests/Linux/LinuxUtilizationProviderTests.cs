@@ -109,6 +109,8 @@ public sealed class LinuxUtilizationProviderTests
 
         Assert.Contains(samples, x => x.instrument.Name == ResourceUtilizationInstruments.ProcessMemoryUtilization);
         Assert.Equal(0.5, samples.Single(i => i.instrument.Name == ResourceUtilizationInstruments.ProcessMemoryUtilization).value);
+
+        Assert.All(samples, x => Assert.False(string.IsNullOrWhiteSpace(x.instrument.Description), $"Instrument '{x.instrument.Name}' has no description."));
     }
 
     [Fact]
@@ -302,6 +304,8 @@ public sealed class LinuxUtilizationProviderTests
 
         Assert.Contains(samples, x => x.instrument.Name == ResourceUtilizationInstruments.ProcessMemoryUtilization);
         Assert.Equal(1, samples.Single(i => i.instrument.Name == ResourceUtilizationInstruments.ProcessMemoryUtilization).value);
+
+        Assert.All(samples, x => Assert.False(string.IsNullOrWhiteSpace(x.instrument.Description), $"Instrument '{x.instrument.Name}' has no description."));
     }
 
     [Fact]

@@ -112,10 +112,10 @@ The package generates the following metrics:
 
 | Metric name | Metric value | Dimension | Dimension value |
 |-|-|-|-|
-| `HeaderParsing.ParsingErrors` | Increased by **1** with every parsing error     | `HeaderName` | Header name                                       |
-|                               |                                                 | `Kind`       | Error message returned by the `TryParse()` method |
-| `HeaderParsing.CacheAccess`   | Increased by **1** with every cache hit or miss | `HeaderName` | Header name                                       |
-|                               |                                                 | `Type`       | Either `Hit` or `Miss` for the internal header cache hits and misses respectively |
+| `aspnetcore.header_parsing.parse_errors`   | Increased by **1** with every parsing error     | `aspnetcore.header_parsing.header.name`       | Header name                                       |
+|                                            |                                                 | `error.type`                                  | Error message returned by the `TryParse()` method |
+| `aspnetcore.header_parsing.cache_accesses` | Increased by **1** with every cache hit or miss | `aspnetcore.header_parsing.header.name`       | Header name                                       |
+|                                            |                                                 | `aspnetcore.header_parsing.cache_access.type` | Either `Hit` or `Miss` for the internal header cache hits and misses respectively |
 
 ## Custom headers parsing
 

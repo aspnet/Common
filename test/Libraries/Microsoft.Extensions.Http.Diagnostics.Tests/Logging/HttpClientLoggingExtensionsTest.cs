@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using AutoFixture;
 using FluentAssertions;
 using Microsoft.Extensions.Compliance.Classification;
+using Microsoft.Extensions.Compliance.Redaction;
 using Microsoft.Extensions.Compliance.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ using Microsoft.Extensions.Hosting.Testing;
 using Microsoft.Extensions.Http.Diagnostics;
 using Microsoft.Extensions.Http.Logging.Internal;
 using Microsoft.Extensions.Http.Logging.Test.Internal;
+using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
@@ -734,6 +736,112 @@ public class HttpClientLoggingExtensionsTest
         var innerLogs = collector.GetSnapshot();
         Assert.Equal(6, innerLogs.Count); // 3 attempts × (1 start + 1 stop/failed)
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AddExtendedHttpClientLogging_WithoutRedactionRegistration_LogsRequest(bool useHttpClientBuilder)
+    {
+        await using var sp = BuildServiceProviderWithoutRedactionRegistration(useHttpClientBuilder);
+
+        using var client = sp.GetRequiredService<IHttpClientFactory>().CreateClient("test");
+        using var response = await client.GetAsync("http://localhost/api");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("200", GetHttpClientLoggerRecord(sp).GetStructuredStateValue(HttpClientLoggingTagNames.StatusCode));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AddExtendedHttpClientLogging_WithoutRedactionRegistration_ErasesClassifiedData(bool useHttpClientBuilder)
+    {
+        await using var sp = BuildServiceProviderWithoutRedactionRegistration(useHttpClientBuilder, options =>
+        {
+            options.RequestHeadersDataClasses.Add("X-Private", FakeTaxonomy.PrivateData);
+            options.RequestHeadersDataClasses.Add("X-Public", DataClassification.None);
+        });
+
+        using var client = sp.GetRequiredService<IHttpClientFactory>().CreateClient("test");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/api");
+        request.Headers.Add("X-Private", "private-value");
+        request.Headers.Add("X-Public", "public-value");
+        using var response = await client.SendAsync(request);
+
+        var record = GetHttpClientLoggerRecord(sp);
+        Assert.Equal(string.Empty, record.GetStructuredStateValue($"{HttpClientLoggingTagNames.RequestHeaderPrefix}x-private"));
+        Assert.Equal("public-value", record.GetStructuredStateValue($"{HttpClientLoggingTagNames.RequestHeaderPrefix}x-public"));
+    }
+
+    [Fact]
+    public async Task AddExtendedHttpClientLogging_RedactionConfiguredAfterLogging_UsesConfiguredRedactor()
+    {
+        await using var sp = new ServiceCollection()
+            .AddFakeLogging()
+            .AddHttpClient("test")
+            .ConfigurePrimaryHttpMessageHandler(() => new TestMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)))
+            .AddExtendedHttpClientLogging(options => options.RequestHeadersDataClasses.Add("X-Test", FakeTaxonomy.PrivateData))
+            .Services
+            .AddRedaction(redaction => redaction.SetFakeRedactor(options => options.RedactionFormat = "REDACTED:{0}", FakeTaxonomy.PrivateData))
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        using var client = sp.GetRequiredService<IHttpClientFactory>().CreateClient("test");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/api");
+        request.Headers.Add("X-Test", "header-value");
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal("REDACTED:header-value", GetHttpClientLoggerRecord(sp).GetStructuredStateValue($"{HttpClientLoggingTagNames.RequestHeaderPrefix}x-test"));
+    }
+
+    [Fact]
+    public async Task LatencyInfo_IsPopulated_WithoutLatencyContextAndRedactionRegistration()
+    {
+        await using var sp = new ServiceCollection()
+            .AddHttpClientLatencyTelemetry()
+            .AddHttpClient("test")
+            .ConfigurePrimaryHttpMessageHandler(() => new TestMessageHandler(_ =>
+            {
+                var response = new HttpResponseMessage(HttpStatusCode.OK);
+                response.Headers.TryAddWithoutValidation(TelemetryConstants.ServerApplicationNameHeader, "TestServer");
+                return response;
+            }))
+            .AddExtendedHttpClientLogging(wrapHandlersPipeline: true)
+            .Services
+            .AddFakeLogging()
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        var client = sp.GetRequiredService<IHttpClientFactory>().CreateClient("test");
+
+        using var response = await client.GetAsync("http://localhost/api");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var latencyInfo = GetHttpClientLoggerRecord(sp).GetStructuredStateValue("LatencyInfo");
+        Assert.False(string.IsNullOrEmpty(latencyInfo));
+        Assert.StartsWith("v1.0,", latencyInfo);
+        Assert.Contains("TestServer", latencyInfo);
+    }
+
+    private static ServiceProvider BuildServiceProviderWithoutRedactionRegistration(bool useHttpClientBuilder, Action<LoggingOptions>? configure = null)
+    {
+        var services = new ServiceCollection().AddFakeLogging();
+        var builder = services
+            .AddHttpClient("test")
+            .ConfigurePrimaryHttpMessageHandler(() => new TestMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        if (useHttpClientBuilder)
+        {
+            _ = configure is null ? builder.AddExtendedHttpClientLogging() : builder.AddExtendedHttpClientLogging(configure);
+        }
+        else
+        {
+            _ = configure is null ? services.AddExtendedHttpClientLogging() : services.AddExtendedHttpClientLogging(configure);
+        }
+
+        return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+    }
+
+    private static FakeLogRecord GetHttpClientLoggerRecord(IServiceProvider serviceProvider)
+        => serviceProvider.GetFakeLogCollector().GetSnapshot().Single(r => r.Category == typeof(HttpClientLogger).FullName);
 
     private sealed class TestMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
         : HttpMessageHandler

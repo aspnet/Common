@@ -1392,6 +1392,159 @@ public class FunctionInvokingChatClientTests
     }
 
     [Fact]
+    public async Task TerminationIsHonoredWhenFunctionThrows()
+    {
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                AIFunctionFactory.Create(string () =>
+                {
+                    FunctionInvokingChatClient.CurrentContext!.Terminate = true;
+                    throw new InvalidOperationException("Oh no!");
+                }, "Func1"),
+            ]
+        };
+
+        List<ChatMessage> planBeforeTermination =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Error: Function failed.")]),
+        ];
+
+        // The inner client must not be asked for a final answer after the function requested termination
+        List<ChatMessage> plan =
+        [
+            .. planBeforeTermination,
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        await InvokeAndAssertAsync(options, plan, planBeforeTermination);
+
+        await InvokeAndAssertStreamingAsync(options, plan, planBeforeTermination);
+    }
+
+    [Fact]
+    public async Task TerminationIsHonoredWhenFunctionThrows_SerialStopsRemainingCalls()
+    {
+        int func2Invocations = 0;
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                AIFunctionFactory.Create(string () =>
+                {
+                    FunctionInvokingChatClient.CurrentContext!.Terminate = true;
+                    throw new InvalidOperationException("Oh no!");
+                }, "Func1"),
+                AIFunctionFactory.Create(() =>
+                {
+                    Interlocked.Increment(ref func2Invocations);
+                    return "Result 2";
+                }, "Func2"),
+            ]
+        };
+
+        // Termination in serial mode stops processing of subsequent calls in the same iteration,
+        // matching the behavior when a function requests termination without throwing.
+        List<ChatMessage> planBeforeTermination =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1"), new FunctionCallContent("callId2", "Func2")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Error: Function failed.")]),
+        ];
+
+        List<ChatMessage> plan =
+        [
+            .. planBeforeTermination,
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        await InvokeAndAssertAsync(options, plan, planBeforeTermination);
+
+        await InvokeAndAssertStreamingAsync(options, plan, planBeforeTermination);
+
+        Assert.Equal(0, func2Invocations);
+    }
+
+    [Fact]
+    public async Task TerminationIsHonoredWhenFunctionThrows_Concurrent()
+    {
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                AIFunctionFactory.Create(string () =>
+                {
+                    FunctionInvokingChatClient.CurrentContext!.Terminate = true;
+                    throw new InvalidOperationException("Oh no!");
+                }, "Func1"),
+                AIFunctionFactory.Create(() => "Result 2", "Func2"),
+            ]
+        };
+
+        // With concurrent invocation, all calls in the iteration run, and then the loop terminates.
+        List<ChatMessage> planBeforeTermination =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1"), new FunctionCallContent("callId2", "Func2")]),
+            new ChatMessage(ChatRole.Tool,
+            [
+                new FunctionResultContent("callId1", result: "Error: Function failed."),
+                new FunctionResultContent("callId2", result: "Result 2"),
+            ]),
+        ];
+
+        List<ChatMessage> plan =
+        [
+            .. planBeforeTermination,
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        Func<ChatClientBuilder, ChatClientBuilder> configure = b => b.Use(
+            s => new FunctionInvokingChatClient(s) { AllowConcurrentInvocation = true });
+
+        await InvokeAndAssertAsync(options, plan, planBeforeTermination, configure);
+
+        await InvokeAndAssertStreamingAsync(options, plan, planBeforeTermination, configure);
+    }
+
+    [Fact]
+    public async Task TerminationWhenFunctionThrows_PreservesExceptionOnResult()
+    {
+        var exception = new InvalidOperationException("Oh no!");
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                AIFunctionFactory.Create(string () =>
+                {
+                    FunctionInvokingChatClient.CurrentContext!.Terminate = true;
+                    throw exception;
+                }, "Func1"),
+            ]
+        };
+
+        using var innerClient = new TestChatClient
+        {
+            GetResponseAsyncCallback = (contents, _, _) =>
+            {
+                Assert.DoesNotContain(contents, m => m.Role == ChatRole.Tool);
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")])));
+            }
+        };
+
+        using var client = new FunctionInvokingChatClient(innerClient);
+        var response = await client.GetResponseAsync("hello", options);
+
+        Assert.Equal(ChatRole.Tool, response.Messages.Last().Role);
+        var frc = Assert.IsType<FunctionResultContent>(Assert.Single(response.Messages.Last().Contents));
+        Assert.Same(exception, frc.Exception);
+        Assert.Null(FunctionInvokingChatClient.CurrentContext);
+    }
+
+    [Fact]
     public async Task PropagatesResponseConversationIdToOptions()
     {
         var options = new ChatOptions
@@ -3323,6 +3476,38 @@ public class FunctionInvokingChatClientTests
             new ChatMessage(ChatRole.User, "hello"),
             new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "TerminatingFunc")]),
             new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Terminated")]),
+        ];
+
+        Func<ChatClientBuilder, ChatClientBuilder> configure = b =>
+            b.Use((c, services) => new FunctionInvokingChatClient(c, services.GetRequiredService<ILoggerFactory>()));
+
+        await InvokeAndAssertAsync(options, plan, null, configure, c.BuildServiceProvider());
+
+        var logs = collector.GetSnapshot();
+        Assert.Contains(logs, e => e.Message.Contains("Function 'TerminatingFunc' requested termination of the processing loop") && e.Level == LogLevel.Debug);
+    }
+
+    [Fact]
+    public async Task LogsFunctionRequestedTerminationWhenFunctionThrows()
+    {
+        var collector = new FakeLogCollector();
+        ServiceCollection c = new();
+        c.AddLogging(b => b.AddProvider(new FakeLoggerProvider(collector)).SetMinimumLevel(LogLevel.Debug));
+
+        var options = new ChatOptions
+        {
+            Tools = [AIFunctionFactory.Create(string () =>
+            {
+                FunctionInvokingChatClient.CurrentContext!.Terminate = true;
+                throw new InvalidOperationException("Oh no!");
+            }, "TerminatingFunc")]
+        };
+
+        List<ChatMessage> plan =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "TerminatingFunc")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Error: Function failed.")]),
         ];
 
         Func<ChatClientBuilder, ChatClientBuilder> configure = b =>

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Microsoft.Extensions.VectorData.ConformanceTests</RootNamespace>
     <Description>Conformance tests for Microsoft.Extensions.VectorData providers.</Description>
-    <TargetFrameworks>net10.0;net472</TargetFrameworks>
+    <TargetFrameworks>net11.0;net10.0;net472</TargetFrameworks>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InjectSharedThrow>false</InjectSharedThrow>
     <Stage>normal</Stage>

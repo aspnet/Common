@@ -368,7 +368,7 @@ internal sealed partial class OpenAIChatClient : IChatClient
             finishReason ??= update.FinishReason is OpenAI.Chat.ChatFinishReason reason ? FromOpenAIFinishReason(reason) : null;
             responseId ??= update.CompletionId;
             createdAt ??= update.CreatedAt;
-            modelId ??= update.Model;
+            modelId ??= string.IsNullOrEmpty(update.Model) ? null : update.Model;
 
             // Record the service tier and system fingerprint each once if not yet recorded.
             OpenAIClientExtensions.AddOpenAIResponseAttributes(
@@ -872,34 +872,11 @@ internal sealed partial class OpenAIChatClient : IChatClient
 #pragma warning disable SCME0001 // JsonPatch is experimental
     /// <summary>Tries to extract reasoning text from a streaming chat completion update's Patch.</summary>
     private static bool TryGetReasoningDelta(StreamingChatCompletionUpdate update, [NotNullWhen(true)] out string? reasoningText)
-        => TryGetReasoningContent(update.Patch, "delta"u8, out reasoningText);
+        => update.Patch.TryGetValue("$.choices[0].delta.reasoning_content"u8, out reasoningText) && reasoningText is not null;
 
     /// <summary>Tries to extract reasoning text from a non-streaming chat completion's Patch.</summary>
     private static bool TryGetReasoningMessage(ChatCompletion completion, [NotNullWhen(true)] out string? reasoningText)
-        => TryGetReasoningContent(completion.Patch, "message"u8, out reasoningText);
-
-    /// <summary>
-    /// Workaround for <see href="https://github.com/openai/openai-dotnet/issues/1281"/> that safely reads reasoning content when "choices" is empty.
-    /// </summary>
-    private static bool TryGetReasoningContent(in JsonPatch patch, ReadOnlySpan<byte> container, [NotNullWhen(true)] out string? reasoningText)
-    {
-        reasoningText = null;
-
-        if (patch.TryGetJson("$.choices"u8, out ReadOnlyMemory<byte> choicesJson))
-        {
-            using JsonDocument doc = JsonDocument.Parse(choicesJson);
-            if (doc.RootElement.ValueKind == JsonValueKind.Array &&
-                doc.RootElement.GetArrayLength() > 0 &&
-                doc.RootElement[0].TryGetProperty(container, out JsonElement containerElement) &&
-                containerElement.TryGetProperty("reasoning_content"u8, out JsonElement reasoningElement) &&
-                reasoningElement.ValueKind == JsonValueKind.String)
-            {
-                reasoningText = reasoningElement.GetString();
-            }
-        }
-
-        return reasoningText is not null;
-    }
+        => completion.Patch.TryGetValue("$.choices[0].message.reasoning_content"u8, out reasoningText) && reasoningText is not null;
 #pragma warning restore SCME0001
 
     private const string InvalidAuthorNamePattern = @"[^a-zA-Z0-9_]+";

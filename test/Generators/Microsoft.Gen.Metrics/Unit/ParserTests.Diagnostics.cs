@@ -304,17 +304,19 @@ public partial class ParserTests
     }
 
     [Theory]
-    [InlineData("int")]
     [InlineData("int?")]
-    [InlineData("System.Int32")]
     [InlineData("System.Int32?")]
-    [InlineData("bool")]
     [InlineData("bool?")]
-    [InlineData("System.Boolean")]
     [InlineData("System.Boolean?")]
-    [InlineData("byte")]
     [InlineData("byte?")]
+    [InlineData("char")]
     [InlineData("char?")]
+    [InlineData("ulong")]
+    [InlineData("System.UInt64")]
+    [InlineData("decimal")]
+    [InlineData("System.Decimal")]
+    [InlineData("System.IntPtr")]
+    [InlineData("System.UIntPtr")]
     [InlineData("double?")]
     [InlineData("decimal?")]
     [InlineData("object")]
@@ -591,8 +593,8 @@ public partial class ParserTests
     }
 
     [Theory]
-    [InlineData("int")]
-    [InlineData("bool")]
+    [InlineData("ulong")]
+    [InlineData("decimal")]
     [InlineData("System.DateTime")]
     [InlineData("object")]
     public async Task Gauge_StrongType_InvalidPropertyType(string type)

@@ -74,7 +74,11 @@ public static class PerIncomingRequestLoggingBuilderExtensions
 
         return builder
             .AddPerRequestBufferManager()
-            .AddGlobalBuffer(opts => opts.Rules = options.Rules);
+            .AddGlobalBuffer(opts =>
+            {
+                opts.Rules = options.Rules;
+                opts.IncludeScopes = options.IncludeScopes;
+            });
     }
 
     /// <summary>

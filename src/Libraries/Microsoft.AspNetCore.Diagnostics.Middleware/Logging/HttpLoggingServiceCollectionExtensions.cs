@@ -37,6 +37,7 @@ public static partial class HttpLoggingServiceCollectionExtensions
     {
         _ = Throw.IfNull(services);
 
+        _ = services.AddRedaction();
         _ = services.AddOptionsWithValidateOnStart<LoggingRedactionOptions, LoggingRedactionOptionsValidator>()
             .Configure(configure ?? (static _ => { }));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHttpLoggingInterceptor, HttpLoggingRedactionInterceptor>());

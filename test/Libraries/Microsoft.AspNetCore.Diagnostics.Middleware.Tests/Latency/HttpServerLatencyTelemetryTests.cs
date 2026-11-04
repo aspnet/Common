@@ -3,6 +3,8 @@
 
 using System;
 using Microsoft.AspNetCore.Diagnostics.Logging;
+using Microsoft.Extensions.Compliance.Redaction;
+using Microsoft.Extensions.Compliance.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -28,5 +30,16 @@ public class HttpServerLatencyTelemetryTests
 
         Assert.NotNull(enricher);
         Assert.IsType<HttpLatencyLogEnricher>(enricher);
+    }
+
+    [Fact]
+    public void AddHttpServerLatencyTelemetry_RedactionNotRegistered_RegistersErasingRedactor()
+    {
+        using var serviceProvider = new ServiceCollection()
+            .AddLogging()
+            .AddHttpServerLatencyTelemetry()
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        Assert.IsType<ErasingRedactor>(serviceProvider.GetRequiredService<IRedactorProvider>().GetRedactor(FakeTaxonomy.PrivateData));
     }
 }

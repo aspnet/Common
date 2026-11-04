@@ -39,6 +39,7 @@ internal sealed class GlobalLogBufferingConfigureOptions : IConfigureOptions<Glo
         options.MaxLogRecordSizeInBytes = parsedOptions.MaxLogRecordSizeInBytes;
         options.MaxBufferSizeInBytes = parsedOptions.MaxBufferSizeInBytes;
         options.AutoFlushDuration = parsedOptions.AutoFlushDuration;
+        options.IncludeScopes = parsedOptions.IncludeScopes;
 
         foreach (LogBufferingFilterRule rule in parsedOptions.Rules)
         {

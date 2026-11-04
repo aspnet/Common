@@ -809,6 +809,25 @@ public partial class ParserTests
     }
 
     [Fact]
+    public async Task DescriptionParameterTest()
+    {
+        var d = await RunGenerator(@"
+            partial class C
+            {
+                [Counter(Description = ""Counter description."", Name = ""myCounterName"")]
+                static partial MyCounter CreateCounter(Meter meter);
+
+                [Histogram(""d1"", Unit = ""s"", Description = ""Histogram description."")]
+                static partial MyHistogram CreateHistogram(Meter meter);
+
+                [Gauge(Description = ""Gauge description."")]
+                static partial MyGauge CreateGauge(Meter meter);
+            }");
+
+        Assert.Empty(d);
+    }
+
+    [Fact]
     public async Task StrongTypeGauge_CyclicReference()
     {
         var d = await RunGenerator(@"

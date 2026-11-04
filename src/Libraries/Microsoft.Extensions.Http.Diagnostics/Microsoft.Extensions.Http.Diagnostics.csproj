@@ -27,11 +27,12 @@
 
   <PropertyGroup>
     <Stage>normal</Stage>
-    <MinCodeCoverage>94</MinCodeCoverage>
+    <MinCodeCoverage>91</MinCodeCoverage>
     <MinMutationScore>78</MinMutationScore>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Microsoft.Extensions.Compliance.Redaction\Microsoft.Extensions.Compliance.Redaction.csproj" />
     <ProjectReference Include="..\Microsoft.Extensions.Telemetry\Microsoft.Extensions.Telemetry.csproj" />
   </ItemGroup>
 

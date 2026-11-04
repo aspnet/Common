@@ -492,10 +492,28 @@ public class HttpRouteFormatterTests
         Assert.Equal("", formattedPath);
     }
 
-    private static HttpRouteFormatter CreateHttpRouteFormatter()
+    [Theory]
+    [InlineData("/a/{token}.{format}", "/a/part1.part2.part3.json", "a/[REDACTED].json")]
+    [InlineData("/a/{token}.{format}.zip", "/a/part1.part2.json.zip", "a/[REDACTED].json.zip")]
+    [InlineData("/a/{token}.json/{format}", "/a/part1.part2.json/xml", "a/[REDACTED].json/xml")]
+    [InlineData("/a/{token}.{format}.zip", "/a/part1.part2.json.ZIP", "a/[REDACTED].json.zip")]
+    public void Format_ParameterValueContainsFollowingLiteral_RedactsWholeValue(string httpRoute, string httpPath, string expectedPath)
+    {
+        HttpRouteFormatter httpFormatter = CreateHttpRouteFormatter("[REDACTED]");
+        Dictionary<string, DataClassification> parametersToRedact = new()
+        {
+            { "token", FakeTaxonomy.PrivateData },
+            { "format", DataClassification.None },
+        };
+
+        Assert.Equal(expectedPath, httpFormatter.Format(httpRoute, httpPath, HttpRouteParameterRedactionMode.Strict, parametersToRedact));
+        Assert.Equal(expectedPath, httpFormatter.Format(httpRoute, httpPath, HttpRouteParameterRedactionMode.Loose, parametersToRedact));
+    }
+
+    private static HttpRouteFormatter CreateHttpRouteFormatter(string redactionFormat = "Redacted:{0}")
     {
         var redactorProvider = new FakeRedactorProvider(
-            new FakeRedactorOptions { RedactionFormat = "Redacted:{0}" });
+            new FakeRedactorOptions { RedactionFormat = redactionFormat });
         var httpParser = new HttpRouteParser(redactorProvider);
         return new HttpRouteFormatter(httpParser, redactorProvider);
     }
