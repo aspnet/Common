@@ -41,6 +41,7 @@ if desired.
 | `EXTEXP0016`      | Hosting integration testing experiments |
 | `EXTEXP0017`      | Contextual options experiments |
 | `EXTEXP0018`      | HybridCache experiments |
+| `EXTEXP0019`      | Documents experiments |
 | `MEAI001`         | AI experiments |
 | `MEVD9001`        | Vector Data experiments |
 
