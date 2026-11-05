@@ -983,7 +983,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
             string? functionNamespace = namespaceValue as string ??
                 (namespaceValue is JsonElement { ValueKind: JsonValueKind.String } jsonElement ? jsonElement.GetString() : null);
 
-            if (!string.IsNullOrEmpty(functionNamespace))
+            if (functionNamespace is { Length: > 0 })
             {
                 item.Patch.Set("$.namespace"u8, functionNamespace);
             }
