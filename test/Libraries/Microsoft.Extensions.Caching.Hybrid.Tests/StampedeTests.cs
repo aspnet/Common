@@ -78,6 +78,40 @@ public class StampedeTests : IClassFixture<TestEventListener>
         Assert.Equal(Expected, state.ToString());
     }
 
+    [Fact]
+    public async Task CompletedOldOperationDoesNotRemoveReplacement()
+    {
+        using var scope = GetDefaultCache(out var cache);
+        const string Key = "test_key";
+        const HybridCacheEntryFlags Flags = HybridCacheEntryFlags.DisableDistributedCache | HybridCacheEntryFlags.DisableLocalCache;
+        var oldStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseOld = new SemaphoreSlim(0);
+
+        Assert.True(cache.GetOrCreateStampedeState<int, int>(Key, Flags, out var old, true, null));
+
+        int state = 0;
+        Task oldExecution = old.ExecuteDirectAsync(in state, async (_, cancellationToken) =>
+        {
+            oldStarted.SetResult(true);
+            await releaseOld.WaitAsync(CancellationToken.None);
+            cancellationToken.ThrowIfCancellationRequested();
+            return 1;
+        }, null);
+
+        await oldStarted.Task;
+        old.CancelCaller();
+
+        Assert.True(cache.GetOrCreateStampedeState<int, int>(Key, Flags, out var replacement, false, null));
+        Assert.Equal(1, cache.DebugGetCallerCount(Key, Flags));
+
+        releaseOld.Release();
+        await oldExecution;
+
+        Assert.Equal(1, cache.DebugGetCallerCount(Key, Flags));
+        Assert.False(cache.GetOrCreateStampedeState<int, int>(Key, Flags, out var joined, false, null));
+        Assert.Same(replacement, joined);
+    }
+
     [Theory]
     [InlineData(1, false)]
     [InlineData(1, true)]
