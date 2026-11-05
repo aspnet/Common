@@ -44,6 +44,7 @@ if desired.
 | `EXTEXP0019`      | Documents experiments |
 | `MEAI001`         | AI experiments |
 | `MEVD9001`        | Vector Data experiments |
+| `MEDE0001`        | Document Extraction experiments |
 
 # Obsoletions
 

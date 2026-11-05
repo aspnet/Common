@@ -1,0 +1,83 @@
+{
+  "Name": "Microsoft.Extensions.DocumentExtraction.Abstractions, Version=10.10.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+  "Types": [
+    {
+      "Type": "class Microsoft.Extensions.DocumentExtraction.DelegatingDocumentExtractionClient : Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DocumentExtraction.DelegatingDocumentExtractionClient.DelegatingDocumentExtractionClient(Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient innerClient);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "override void Microsoft.Extensions.DocumentExtraction.DelegatingDocumentExtractionClient.Dispose(bool disposing);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "override System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DocumentExtraction.DelegatingDocumentExtractionClient.ExtractAsync(System.IO.Stream document, string identifier, string mediaType, Microsoft.Extensions.DocumentExtraction.DocumentExtractionOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "override object? Microsoft.Extensions.DocumentExtraction.DelegatingDocumentExtractionClient.GetService(System.Type serviceType, object? serviceKey = null);",
+          "Stage": "Experimental"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient Microsoft.Extensions.DocumentExtraction.DelegatingDocumentExtractionClient.InnerClient { get; }",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
+      "Type": "abstract class Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient : System.IDisposable",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient.DocumentExtractionClient();",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "void Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient.Dispose();",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "virtual void Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient.Dispose(bool disposing);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "abstract System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient.ExtractAsync(System.IO.Stream document, string identifier, string mediaType, Microsoft.Extensions.DocumentExtraction.DocumentExtractionOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "virtual object? Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient.GetService(System.Type serviceType, object? serviceKey = null);",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.DocumentExtraction.DocumentExtractionOptions",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionOptions.DocumentExtractionOptions();",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionOptions Microsoft.Extensions.DocumentExtraction.DocumentExtractionOptions.Clone();",
+          "Stage": "Experimental"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "System.Collections.Generic.Dictionary<string, object?> Microsoft.Extensions.DocumentExtraction.DocumentExtractionOptions.AdditionalProperties { get; }",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "string? Microsoft.Extensions.DocumentExtraction.DocumentExtractionOptions.ExtractorName { get; set; }",
+          "Stage": "Experimental"
+        }
+      ]
+    }
+  ]
+}
