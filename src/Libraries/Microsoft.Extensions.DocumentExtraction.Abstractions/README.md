@@ -1,117 +1,187 @@
 # Microsoft.Extensions.DocumentExtraction.Abstractions
 
-This experimental package defines a small extraction capability over the standalone
-`Microsoft.Extensions.Documents.Abstractions` exchange model. It does not define a
-second document tree or require an authoring, page-streaming or observation protocol.
+Extract structured content through a common .NET client contract, without tying
+your application to a particular provider SDK. `DocumentExtractionClient` accepts
+a document `Stream` and returns a completed `ExtractionDocument` containing text,
+images, tables and sections.
 
-The single client contract is the abstract `DocumentExtractionClient` class.
-Its primary operation is:
+This package defines the client, per-call options and a base for delegating
+middleware. **It does not include an OCR engine or a provider implementation.**
+Choose a provider that supports your document formats and environment.
 
-```csharp
-public abstract Task<ExtractionDocument> ExtractAsync(
-    Stream document,
-    string identifier,
-    string mediaType,
-    DocumentExtractionOptions? options = null,
-    CancellationToken cancellationToken = default);
+Use the companion `Microsoft.Extensions.DocumentExtraction` package if you also
+want pipeline builders, logging and dependency-injection registration. If you only
+need to construct or consume the document graph, use
+[Microsoft.Extensions.Documents.Abstractions](https://github.com/dotnet/extensions/blob/main/src/Libraries/Microsoft.Extensions.Documents.Abstractions/README.md).
+
+## Install
+
+```shell
+dotnet add package Microsoft.Extensions.DocumentExtraction.Abstractions --prerelease
 ```
 
-For example, a provider that needs no special service lookup or cleanup can
-implement only the operation:
+Install your chosen provider separately and follow its configuration requirements.
+
+The direct dependency is `Microsoft.Extensions.Documents.Abstractions`, which
+uses `Microsoft.Extensions.AI.Abstractions` for content payloads. Prefer .NET 8 or
+later. Compatibility assets for .NET Framework and .NET Standard do not guarantee
+support for every older runtime; check package compatibility and your provider's
+requirements.
+
+## Extract a document
+
+This application helper takes an already configured provider client. It opens
+and disposes the input file; the caller retains responsibility for the client's
+lifetime. The media type must be supported by that provider.
 
 ```csharp
-sealed class MyClient : DocumentExtractionClient
+using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DocumentExtraction;
+using Microsoft.Extensions.Documents;
+
+public static class ExtractDocument
 {
-    public override Task<ExtractionDocument> ExtractAsync(
-        Stream document, string identifier, string mediaType,
-        DocumentExtractionOptions? options = null,
+    public static async Task<ExtractionDocument> RunAsync(
+        DocumentExtractionClient client, string path, string mediaType,
         CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(new ExtractionDocument(identifier));
+        using FileStream input = File.OpenRead(path);
+        ExtractionDocument result = await client.ExtractAsync(
+            input, Path.GetFileName(path), mediaType,
+            cancellationToken: cancellationToken);
+
+        foreach (ExtractionDocumentElement element in result.EnumerateContent())
+        {
+            if (element is ExtractionDocumentTextElement text &&
+                text.Content is TextContent content)
+            {
+                Console.WriteLine(content.Text);
+            }
+        }
+
+        return result;
     }
 }
 ```
 
-This replaces the previous `IDocumentExtractionClient` interface, not an
-additional compatibility layer. Existing providers must derive from the class
-and override `ExtractAsync`; callers, factory signatures and keyed/unkeyed DI
-lookups must use `DocumentExtractionClient`. Previously compiled interface-based
-consumers must be rebuilt. The root has a protected parameterless constructor,
-virtual `GetService` that returns itself for assignable unkeyed requests, and
-public `Dispose` that invokes the optional protected virtual `Dispose(bool)`
-hook. It neither owns the input nor adds automatic validation, option cloning,
-a finalizer or a global disposed flag. Providers retain those responsibilities.
+The identifier names the input; it does not fetch a file or URI. The task returns
+one completed document, not a stream of partial results. `EnumerateContent()`
+walks non-section elements in document order. Inspect the hierarchy directly for
+table cells and document/section-local payloads.
 
-The class is an evolution seam for future operations with useful virtual defaults,
-not a claim that every future member is semantically compatible. Such operations
-must define ownership, failure and interception by configured middleware before
-being added. This migration adds no pipe, streaming, batching or other operation.
+## Select an extractor
 
-An adapter returns the canonical `Microsoft.Extensions.Documents.ExtractionDocument` directly.
-The caller owns the input stream. The returned document is non-disposable data.
-Adapters clean up
-their parser, response, stream and temporary resources on success, failure and
-cancellation, must attempt every acquired resource, and must preserve the primary
-error if cleanup also fails. They must not dispose caller streams or borrowed native
-SDK objects.
+`ExtractorName` selects an extractor or analyzer within the configured provider;
+null uses its default. Use a selector that your provider documents as supported.
+`AdditionalProperties` accepts provider-specific settings whose names and types
+are defined by that provider, not by this package.
 
-Documents can be constructed or consumed without Extraction. Extraction depends on
-Documents, not MEDI or provider SDK packages. Documents uses standard AIContent
-payloads from MEAI. MEDI or another consumer can accept
-the same shared document from any producer without requiring Extraction. The
-packages compose through the exchanged document rather than a mandatory pipeline.
+This alternative helper accepts an existing stream and leaves it open:
 
-## Mapping and source fidelity
+```csharp
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DocumentExtraction;
+using Microsoft.Extensions.Documents;
 
-Adapters map provider output to shared text, image, table and section elements.
-Text roles such as `heading`, `pageHeader`, `pageFooter`, custom roles and optional
-heading levels are preserved without inventing unspecified information.
-Local standard `AIContent` payloads are inspected directly through the hierarchy.
-The shared model has no structural renderer or required Markdown convention.
-Text elements retain exactly the supplied `TextContent.Text` as their authoritative
-text, with no duplicate plain-text view. Image OCR/transcription `Text` is independent
-of image content and `AlternativeText`; captions and descriptions belong in
-`AlternativeText`. Heading levels are nullable or positive, without an arbitrary cap.
+public static class SelectExtractor
+{
+    public static Task<ExtractionDocument> RunAsync(
+        DocumentExtractionClient client, Stream input, string mediaType,
+        string supportedSelector, CancellationToken cancellationToken = default)
+    {
+        var options = new DocumentExtractionOptions
+        {
+            ExtractorName = supportedSelector
+        };
+        return client.ExtractAsync(
+            input, "document", mediaType, options, cancellationToken);
+    }
+}
+```
 
-Typed `Sources` retain source pages, coordinate frames and ordered polygons, with
-explicit native-object access. A source without a polygon identifies a page, not a
-precise location. Adapters add real blank-page frames even when no element refers to
-them. Adding references does not populate the ordinary page list;
-call `document.SourcePages.Add(frame)` explicitly. Page numbers are nullable and positive when present;
-named frames do not acquire a number from assembly position. Table spans, roles and sources are independent
-of whether a cell has content.
+Unsupported explicit settings should be rejected rather than silently ignored.
+Do not mutate options or their referenced values while a call is in progress.
+`Clone()` creates a separate options container, but does not deep-clone values in
+`AdditionalProperties`.
 
-The Extraction contract has no staged element metadata, arbitrary semantic-artifact
-bags, generalized detections or extension-element schema. Specialized SDK data is
-available through borrowed native source objects; document-level metadata remains
-available for consumers to populate explicitly. No source association establishes
-verified grounding or calibrated confidence.
+## Implement a local client
 
-## Per-call options and break-glass output
+Implement `DocumentExtractionClient` when adapting another extraction library.
+This optional, self-contained example only decodes plain text into one section:
+it does not perform OCR or parse PDFs. It preserves the input stream and rejects
+settings it does not support.
 
-`DocumentExtractionOptions.ExtractorName` selects an extractor/analyzer within an
-already configured provider; it does not select the DI provider. Null uses that
-provider's default, and nonblank opaque selectors are preserved verbatim. Genuine
-reported provider model identity remains independent and can be inspected on the
-native output when available. Options also provide an
-adapter-specific `AdditionalProperties` dictionary. Providers must reject unsupported
-explicit settings, create fresh requests per operation, and avoid mutating caller
-arguments or shared defaults. Implementations must snapshot options before
-asynchronous work. `DelegatingDocumentExtractionClient` copies scalar values and
-dictionary entries before forwarding; opaque values remain borrowed and callers
-must not mutate them while an operation is in flight.
+```csharp
+using System;
+using System.IO;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DocumentExtraction;
+using Microsoft.Extensions.Documents;
 
-`ExtractionDocument.RawRepresentation` optionally exposes the borrowed native
-result, even for zero sections and no payload, and is ignored by default
-System.Text.Json serialization. Standard `AIContent.RawRepresentation` and
-source-reference `GetRawRepresentation()` retain local native inspection. None is
-implicitly disposed or deep-cloned. Native objects may contain sensitive response
-data: access is not redaction and must not automatically enter logs, embeddings or
-ingestion records. Providers must not capture credentials or authorization headers.
-The shared contract defines no raw-capture option, artifact/status graph, operation
-registration, original-wire-byte guarantee or durable serialization guarantee.
+public sealed class PlainTextExtractionClient : DocumentExtractionClient
+{
+    public override async Task<ExtractionDocument> ExtractAsync(
+        Stream document, string identifier, string mediaType,
+        DocumentExtractionOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentException.ThrowIfNullOrEmpty(identifier);
+        ArgumentException.ThrowIfNullOrEmpty(mediaType);
+        if (!string.Equals(mediaType, "text/plain", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException("This example accepts only text/plain.");
+        }
 
-All public Extraction APIs are experimental under `MEDE0001`; shared Documents uses
-`EXTEXP0019`. The package does not include provider implementations, MEDI adapters,
-URI fetching, progress/usage APIs, configuration middleware or OpenTelemetry.
+        DocumentExtractionOptions? settings = options?.Clone();
+        if (settings?.ExtractorName is not null ||
+            settings?.AdditionalProperties.Count > 0)
+        {
+            throw new NotSupportedException("This example has no configurable extractor settings.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        using var reader = new StreamReader(
+            document, Encoding.UTF8, detectEncodingFromByteOrderMarks: true,
+            bufferSize: 1024, leaveOpen: true);
+        string text = await reader.ReadToEndAsync(cancellationToken);
+
+        var result = new ExtractionDocument(identifier);
+        var section = new ExtractionDocumentSection();
+        section.Elements.Add(new ExtractionDocumentTextElement(new TextContent(text)));
+        result.Sections.Add(section);
+        return result;
+    }
+}
+```
+
+## Ownership, cancellation and errors
+
+Callers own input streams. Returned documents are non-disposable data. Optional
+native objects exposed through `RawRepresentation` or source references are
+borrowed, may be unavailable, and are not automatically disposed or safe to log.
+Native access does not guarantee original response bytes.
+
+Pass a cancellation token to the operation; cancellation support and format errors
+depend on the selected provider. Providers are responsible for releasing their own
+resources on success, failure and cancellation without disposing caller-owned
+streams or borrowed native objects.
+
+Extraction APIs are experimental under `MEDE0001`; the Documents model uses
+`EXTEXP0019`. Acknowledge these diagnostics only if you accept experimental APIs.
+
+## Feedback
+
+Report contract issues through
+[dotnet/extensions issues](https://github.com/dotnet/extensions/issues).
+For supported formats, credentials and provider-specific errors, consult the
+provider's documentation and issue tracker.

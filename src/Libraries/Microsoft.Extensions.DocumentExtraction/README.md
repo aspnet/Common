@@ -1,100 +1,185 @@
 # Microsoft.Extensions.DocumentExtraction
 
-These experimental packages provide a small extraction capability and optional
-composition middleware over the standalone shared Documents exchange model.
+Add middleware, lifecycle logging and dependency-injection registration around a
+configured `DocumentExtractionClient`. Your provider still performs extraction;
+**this package is not an OCR engine or a provider SDK**.
 
-`Microsoft.Extensions.DocumentExtraction.Abstractions` defines
-`DocumentExtractionClient.ExtractAsync(Stream, identifier, mediaType, options,
-cancellationToken)`, returning `Task<Microsoft.Extensions.Documents.ExtractionDocument>`
-directly. There is no required public page/observation staging model, finalization
-builder or result wrapper. Adapters build the canonical document and clean up their
-provider resources on success, failure and cancellation. The returned document is
-non-disposable data. Caller streams and native document, payload and source objects
-remain borrowed; the result does not take implicit ownership.
+Use `Microsoft.Extensions.DocumentExtraction.Abstractions` alone if you only need
+to call or implement the client. The returned document uses the shared
+[Microsoft.Extensions.Documents.Abstractions](https://github.com/dotnet/extensions/blob/main/src/Libraries/Microsoft.Extensions.Documents.Abstractions/README.md)
+model, which can also be used independently of extraction.
 
-`Microsoft.Extensions.DocumentExtraction` supplies the optional
-`DocumentExtractionClientBuilder`, dependency-injection registration and lifecycle
-logging. Delegation snapshots per-call options without mutating arguments or
-shared defaults. Logging records only invocation, completion, cancellation and
-failure; it does not serialize documents, source references, roles, options,
-exceptions, credentials or provider payloads. When lifecycle logging succeeds,
-the returned document and original failure/cancellation are forwarded unchanged.
-Invocation logging precedes the provider call; if it throws, the provider is not
-called. A completion logging failure prevents delivery of the returned document.
-If failure or cancellation logging also throws, the resulting `AggregateException`
-contains the original provider exception first and the logging exception second.
-`DocumentExtractionOptions.ExtractorName`
-selects within the configured provider, not the DI provider; null/default and opaque
-selector semantics are preserved. Reported provider model identity remains
-independently inspectable on native results when supplied.
+## Install
 
-## Migrating the preview client contract
+```shell
+dotnet add package Microsoft.Extensions.DocumentExtraction --prerelease
+```
 
-The former `IDocumentExtractionClient` interface is replaced entirely by the
-abstract `DocumentExtractionClient` class. This is a source- and binary-breaking
-preview change: rebuild implementers and consumers together. There is no
-compatibility interface or adapter. Change implementations from
-`class MyClient : IDocumentExtractionClient` to
-`class MyClient : DocumentExtractionClient` and make `ExtractAsync` an override.
-The Stream input and `Task<ExtractionDocument>` result are unchanged.
+Install and configure a provider separately.
 
-Change caller declarations and factory return types to `DocumentExtractionClient`.
-Resolve unkeyed registrations with
-`GetRequiredService<DocumentExtractionClient>()` and keyed registrations with
-`GetRequiredKeyedService<DocumentExtractionClient>(key)`. The builder and both
-DI registration paths now use that same class; lifetime and pipeline ownership
-rules are unchanged.
+Direct dependencies are `Microsoft.Extensions.DocumentExtraction.Abstractions`,
+`Microsoft.Extensions.DependencyInjection.Abstractions` and
+`Microsoft.Extensions.Logging.Abstractions`. The shared Documents and AI content
+types are transitive dependencies. Prefer .NET 8 or later; compatibility assets
+for .NET Framework and .NET Standard do not guarantee support for every older
+runtime. Check package compatibility and the provider's runtime requirements.
 
-The abstract root provides virtual unkeyed self-service lookup and optional
-protected `Dispose(bool)` cleanup. Move implementation cleanup into that override,
-not a hidden public `Dispose` method. It adds no global disposed-state policy.
-The class allows future operations to have useful virtual defaults without
-requiring every provider to implement them immediately, at the cost of using
-the provider's base-class slot. This change adds no operations, streaming,
-PipeReader overloads or async disposal. Future operations still need defined
-ownership, failure and middleware-interception semantics; discovering an inner
-provider is not permission to bypass the configured pipeline.
+## Build a logging pipeline
 
-Registering an existing client instance requires `ServiceLifetime.Singleton`;
-unsupported lifetimes are rejected before changing the service collection.
-The container disposes the composed singleton pipeline and inner client.
-Factory and keyed-factory registrations support singleton, scoped and transient
-lifetimes; factories must supply independent clients for independent pipelines.
-If pipeline construction and cleanup both fail, the aggregate preserves the
-construction error first and the cleanup error second.
+This helper accepts a factory that creates a configured provider client and an
+application-owned logger factory. The returned document is ready to consume when
+the task completes. The helper owns and disposes its pipeline, but leaves the
+supplied stream and logger factory open.
 
-Documents works without Extraction. Extraction depends on Documents, not MEDI.
-MEDI and other consumers can accept the same shared document from any producer
-without requiring an Extraction client. Composition is optional: these libraries
-can be used independently and work together through the exchanged document.
+```csharp
+using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DocumentExtraction;
+using Microsoft.Extensions.Documents;
+using Microsoft.Extensions.Logging;
 
-Provider mappings preserve nullable/custom text roles and heading levels, images,
-table spans and cell roles, typed source geometry and blank-page registration.
-Local standard `AIContent` payloads are inspected directly through the hierarchy,
-without a structural renderer or a required Markdown convention.
-Text elements use `TextContent.Text` as their sole authoritative text, with no
-format normalization. Image OCR/transcription `Text` and `AlternativeText` remain
-separate; captions belong in `AlternativeText`. Source asset references are
-independent of payload URIs. Frames are added explicitly to the ordinary
-`SourcePages` list;
-page numbers are nullable and positive when supplied, never inferred from assembly
-order. Native source objects preserve specialized SDK information
-without adding generic element metadata, arbitrary artifact bags or normalized
-provider-specific schemas.
+public static class LoggingPipeline
+{
+    public static async Task<ExtractionDocument> RunAsync(
+        Func<DocumentExtractionClient> createClient, ILoggerFactory loggerFactory,
+        Stream input, string identifier, string mediaType,
+        CancellationToken cancellationToken = default)
+    {
+        using DocumentExtractionClient client =
+            new DocumentExtractionClientBuilder(_ => createClient())
+                .UseLogging(loggerFactory)
+                .Build();
 
-Optional `ExtractionDocument.RawRepresentation` supports native inspection even
-with zero sections or no payload and is ignored by default System.Text.Json
-serialization. Existing payload and source-reference native access remains.
-Borrowed native objects are not implicitly disposed or deep-cloned and may contain
-sensitive data. There is no shared capture option, artifact/status graph, operation
-registration, original HTTP-byte guarantee or durable serialization guarantee.
-Adapters still clean up all owned provider/parser/response/temp resources and
-preserve primary errors if cleanup also fails.
+        return await client.ExtractAsync(
+            input, identifier, mediaType, cancellationToken: cancellationToken);
+    }
+}
+```
 
-The packages do not include provider clients, provider SDK dependencies,
-MEDI integration, source fetching or package publication.
-Production targets are net11.0, net10.0, net9.0, net8.0, net462 and netstandard2.0.
-Public APIs use experimental diagnostic `MEDE0001`; Documents uses `EXTEXP0019`.
+Use a factory that creates a new client for each independently owned pipeline;
+do not share an inner client across pipelines that will dispose it.
+Add custom middleware with `Use(inner => new YourMiddleware(inner))`, where
+`YourMiddleware` derives from `DelegatingDocumentExtractionClient`. The first
+middleware registered is outermost.
 
-Local candidates are provisional, not API-approved or published packages. In-memory validation is not
-live-provider, full-application or MEDI end-to-end acceptance.
+## Register with dependency injection
+
+This independent example additionally uses `Microsoft.Extensions.DependencyInjection`
+and `Microsoft.Extensions.Logging`. Pass your provider factory and the
+application's logging configuration; a console logging configuration would also
+require `Microsoft.Extensions.Logging.Console`.
+
+```csharp
+using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DocumentExtraction;
+using Microsoft.Extensions.Documents;
+using Microsoft.Extensions.Logging;
+
+public static class ScopedExtraction
+{
+    public static async Task<ExtractionDocument> RunAsync(
+        Func<IServiceProvider, DocumentExtractionClient> createClient,
+        Action<ILoggingBuilder> configureLogging,
+        Stream input, string identifier, string mediaType,
+        CancellationToken cancellationToken = default)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging(configureLogging);
+        services.AddDocumentExtractionClient(createClient, ServiceLifetime.Scoped)
+            .UseLogging();
+
+        using ServiceProvider provider = services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true });
+        using IServiceScope scope = provider.CreateScope();
+        DocumentExtractionClient client =
+            scope.ServiceProvider.GetRequiredService<DocumentExtractionClient>();
+
+        return await client.ExtractAsync(
+            input, identifier, mediaType, cancellationToken: cancellationToken);
+    }
+}
+```
+
+`UseLogging()` without an explicit factory resolves `ILoggerFactory` from the
+services used to build the pipeline. Without a factory, it adds no logging wrapper.
+Invocation, completion and cancellation events use Debug; failure events use Error.
+
+Factory registrations support singleton, scoped and transient lifetimes. An
+existing-client registration supports only singleton. The container owns and
+disposes registered pipelines and their inner clients; do not separately dispose
+a resolved client. In an existing host, register with the host's service
+collection rather than building another container as this standalone helper does.
+
+## Select a keyed client
+
+Use keyed registration when an application needs separately configured clients.
+This independent helper needs `Microsoft.Extensions.DependencyInjection`.
+The key selects the DI registration; it is not the per-call
+`DocumentExtractionOptions.ExtractorName`, which selects within a provider.
+
+```csharp
+using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DocumentExtraction;
+using Microsoft.Extensions.Documents;
+
+public static class KeyedExtraction
+{
+    public static async Task<ExtractionDocument> RunAsync(
+        Func<IServiceProvider, DocumentExtractionClient> createClient,
+        Stream input, string identifier, string mediaType,
+        CancellationToken cancellationToken = default)
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedDocumentExtractionClient(
+            "documents", createClient, ServiceLifetime.Scoped);
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        using IServiceScope scope = provider.CreateScope();
+        DocumentExtractionClient client =
+            scope.ServiceProvider.GetRequiredKeyedService<DocumentExtractionClient>("documents");
+
+        return await client.ExtractAsync(
+            input, identifier, mediaType, cancellationToken: cancellationToken);
+    }
+}
+```
+
+## Ownership and errors
+
+Callers own input streams. Results are completed, non-disposable document data,
+not page streams. Borrowed native objects are not implicitly disposed and may
+contain sensitive data. Do not mutate options or their referenced values while a
+call is in progress. Pass cancellation tokens through to your provider.
+
+Lifecycle logging does not log document content, options, exception details or
+provider payloads. When logging succeeds, results and provider failures are
+forwarded unchanged. Logger failures are observable: invocation logging can
+prevent the provider call, and completion logging can prevent result delivery.
+If both a provider failure/cancellation and terminal logging fail,
+`AggregateException` contains the original provider exception first and the logger
+exception second; the operation faults rather than completing as canceled.
+If pipeline construction and cleanup both fail, the construction exception is
+likewise first in the aggregate.
+
+## Troubleshooting and feedback
+
+If logging is silent, supply a real logger factory or configure logging in DI,
+and enable Debug for lifecycle events. Match keyed/unkeyed registration with the
+corresponding resolution method, and resolve scoped clients inside a scope.
+For unsupported formats or settings, consult the selected provider.
+
+Extraction APIs are experimental under `MEDE0001`; Documents uses `EXTEXP0019`.
+Acknowledge these diagnostics only if you accept experimental APIs.
+Report composition issues through
+[dotnet/extensions issues](https://github.com/dotnet/extensions/issues);
+report provider-specific behavior to the provider's issue tracker.
