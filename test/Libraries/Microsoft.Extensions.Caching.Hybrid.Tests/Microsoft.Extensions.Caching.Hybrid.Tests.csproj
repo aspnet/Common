@@ -4,7 +4,6 @@
     <TargetFrameworks>$(NetCoreTargetFrameworks)$(ConditionalNet472)</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
   </PropertyGroup>
 
   <ItemGroup>

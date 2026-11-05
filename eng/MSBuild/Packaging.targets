@@ -10,19 +10,12 @@
   <!-- packaging control -->
   <PropertyGroup>
     <IsPackable Condition="'$(Stage)' == ''">false</IsPackable>
-    <BeforePack>$(BeforePack);_VerifyMinimumSupportedTfmForPackagingIsUsed;_AddNETStandardCompatErrorFileForPackaging</BeforePack>
+    <BeforePack>$(BeforePack);_VerifyMinimumSupportedTfmForPackagingIsUsed</BeforePack>
     <IsPackNet462 Condition="'$(MinimumSupportedTfmForPackaging)' != '' and
                              '$(ConditionalNet462)' != '' and
                              ($(TargetFrameworks.Contains('$(MinimumSupportedTfmForPackaging)')) and $(TargetFrameworks.Contains('$(ConditionalNet462)')))"
                   >true</IsPackNet462>
   </PropertyGroup>
-
-  <!-- Include a compat warning for users trying to use our packages on unsupported TFMs -->
-  <ItemGroup>
-    <NETStandardCompatError Include="$(ConditionalNet462)"
-                            Supported="$(MinimumSupportedTfmForPackaging)"
-                            Condition="'$(IsPackNet462)' == 'true'" />
-  </ItemGroup>
 
   <PropertyGroup Condition=" '$(IsPackable)' == 'true' and '$(IsShipping)' == 'true' ">
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -47,61 +40,6 @@
           Condition="'$(IsPackable)' == 'true' and '$(PackageType)' != 'Template' and '$(DisableMinimumSupportedTfmCompatErrors)' != 'true'">
     <Error Text="$TargetFrameworks ('$(TargetFrameworks)') does not contain $MinimumSupportedTfmForPackaging ('$(MinimumSupportedTfmForPackaging)'). This is ignored for PackageType=Template or if DisableMinimumSupportedTfmCompatErrors=true."
            Condition="!$(TargetFrameworks.Contains('$(MinimumSupportedTfmForPackaging)'))" />
-  </Target>
-
-  <!-- Add targets file that marks selected TFMs as unsupported. -->
-  <Target Name="_AddNETStandardCompatErrorFileForPackaging"
-          Condition="'@(NETStandardCompatError)' != '' and '$(DisableMinimumSupportedTfmCompatErrors)' != 'true'"
-          Inputs="%(NETStandardCompatError.Identity)"
-          Outputs="unused">
-    <PropertyGroup>
-      <_NETStandardCompatErrorFilePath>$(BaseIntermediateOutputPath)netstandardcompaterror_%(NETStandardCompatError.Identity).targets</_NETStandardCompatErrorFilePath>
-      <_NETStandardCompatErrorFileTarget>NETStandardCompatError_$(PackageId.Replace('.', '_'))_$([System.String]::new('%(NETStandardCompatError.Supported)').Replace('.', '_'))</_NETStandardCompatErrorFileTarget>
-      <_NETStandardCompatErrorFileContent>
-<![CDATA[<Project InitialTargets="$(_NETStandardCompatErrorFileTarget)">
-  $(_AdditionalNETStandardCompatErrorFileContents)
-  <Target Name="$(_NETStandardCompatErrorFileTarget)"
-          Condition="'%24(SuppressTfmSupportBuildWarnings)' == ''">
-    <Warning Text="$(PackageId) $(PackageVersion) doesn't support %24(TargetFramework) and has not been tested with it. Consider upgrading your TargetFramework to %(NETStandardCompatError.Supported) or later. You may also set &lt%3BSuppressTfmSupportBuildWarnings&gt%3Btrue&lt%3B/SuppressTfmSupportBuildWarnings&gt%3B in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk." />
-  </Target>
-</Project>]]>
-      </_NETStandardCompatErrorFileContent>
-      <_NETStandardCompatErrorPlaceholderFilePackagePath>buildTransitive$([System.IO.Path]::DirectorySeparatorChar)%(NETStandardCompatError.Supported)</_NETStandardCompatErrorPlaceholderFilePackagePath>
-      <PlaceholderFile>$(RepositoryEngineeringDir)_._</PlaceholderFile>
-    </PropertyGroup>
-
-    <WriteLinesToFile File="$(_NETStandardCompatErrorFilePath)"
-                      Lines="$(_NETStandardCompatErrorFileContent)"
-                      Overwrite="true"
-                      WriteOnlyWhenDifferent="true" />
-
-    <ItemGroup>
-      <_PackageBuildFile Include="@(None->Metadata('PackagePath'));
-                                  @(Content->Metadata('PackagePath'))" />
-      <_PackageBuildFile PackagePathWithoutFilename="$([System.IO.Path]::GetDirectoryName('%(Identity)'))" />
-
-      <None Include="$(_NETStandardCompatErrorFilePath)"
-            PackagePath="buildTransitive\%(NETStandardCompatError.Identity)\$(PackageId).targets"
-            Pack="true" />
-
-      <!-- Add the placeholder file to the supported target framework buildTransitive folder, if it's empty.
-           Because this target uses Item batching, it will run more than once so adding the placeholder to None which would cause a warning.
-           In order to workaround it, we know this item will contain duplicates, so we will use Distinct() and add it in a target that runs
-           right after this. -->
-      <NoneWithDuplicates Include="$(PlaceholderFile)"
-            PackagePath="$(_NETStandardCompatErrorPlaceholderFilePackagePath)\"
-            Pack="true"
-            Condition="'@(_PackageBuildFile)' == '' or
-                       !@(_PackageBuildFile->AnyHaveMetadataValue('PackagePathWithoutFilename', '$(_NETStandardCompatErrorPlaceholderFilePackagePath)'))" />
-    </ItemGroup>
-  </Target>
-
-  <!-- Add the de-duped placeholder file to the package. -->
-  <Target Name="_AddPlaceholderFileToNone"
-          AfterTargets="_AddNETStandardCompatErrorFileForPackaging">
-    <ItemGroup>
-      <None Include="@(NoneWithDuplicates->Distinct())" />
-    </ItemGroup>
   </Target>
 
   <!-- Extract the PackageId and PackageVersion. Used to resolve the version in project templates builds. -->

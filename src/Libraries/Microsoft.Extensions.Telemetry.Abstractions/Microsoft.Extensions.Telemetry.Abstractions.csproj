@@ -30,19 +30,6 @@
     <None Include="buildTransitive\**\*" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="buildTransitive\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
-  <!-- For net462 we automatically add package buildtransitive target files, so we need to Include
-  the code that will disable the Microsoft.Extensions.Logging.Abstractions source generator. -->
-  <PropertyGroup>
-    <_AdditionalNETStandardCompatErrorFileContents>
-<![CDATA[
-  <!-- This package should replace the Microsoft.Extensions.Logging.Abstractions source generator, so we set the property to remove the source generator from the project. -->
-  <PropertyGroup>
-    <DisableMicrosoftExtensionsLoggingSourceGenerator>true</DisableMicrosoftExtensionsLoggingSourceGenerator>
-  </PropertyGroup>
-]]>
-    </_AdditionalNETStandardCompatErrorFileContents>
-  </PropertyGroup>
-
   <ItemGroup>
     <AnalyzerReference Include="..\..\Generators\Microsoft.Gen.Logging\Microsoft.Gen.Logging.csproj" />
     <AnalyzerReference Include="..\..\Generators\Microsoft.Gen.Metrics\Microsoft.Gen.Metrics.csproj" />
