@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.AI.Evaluation.Reporting.Tests;
@@ -59,13 +58,10 @@ public abstract class ResultStoreTester
 
     private void SkipIfNotConfigured()
     {
-        if (!IsConfigured)
-        {
-            throw new SkipTestException("Test not configured");
-        }
+        Assert.SkipUnless(IsConfigured, "Test not configured");
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task WriteAndReadResults()
     {
         SkipIfNotConfigured();
@@ -104,7 +100,27 @@ public abstract class ResultStoreTester
         Assert.Equal(IterationName(5), results[5].iterationName);
     }
 
-    [ConditionalFact]
+    [Fact]
+    public async Task IterationNamesAreOrderedNumerically()
+    {
+        SkipIfNotConfigured();
+
+        IEvaluationResultStore resultStore = CreateResultStore();
+        Assert.NotNull(resultStore);
+
+        string newExecutionName = $"Test Execution {Path.GetRandomFileName()}";
+        string[] iterationNames = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"];
+
+        await resultStore.WriteResultsAsync(
+            iterationNames.Select(iterationName => CreateTestResult(ScenarioName(0), iterationName, newExecutionName)));
+
+        string[] readIterationNames =
+            [.. (await LoadResultsAsync(1, resultStore)).Select(r => r.iterationName)];
+
+        Assert.Equal(iterationNames, readIterationNames);
+    }
+
+    [Fact]
     public async Task WriteAndReadHistoricalResults()
     {
         SkipIfNotConfigured();
@@ -148,7 +164,7 @@ public abstract class ResultStoreTester
         Assert.True(results.Skip(6).Take(3).All(r => r.executionName == firstExecutionName));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task DeleteExecutions()
     {
         SkipIfNotConfigured();
@@ -172,7 +188,7 @@ public abstract class ResultStoreTester
         Assert.Empty(results);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task DeleteSomeExecutions()
     {
         SkipIfNotConfigured();
@@ -207,7 +223,7 @@ public abstract class ResultStoreTester
         Assert.Equal(IterationName(5), results[2].iterationName);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task DeleteScenarios()
     {
         SkipIfNotConfigured();
@@ -242,7 +258,7 @@ public abstract class ResultStoreTester
         Assert.Equal(IterationName(5), results[2].iterationName);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task DeleteIterations()
     {
         SkipIfNotConfigured();

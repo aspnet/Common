@@ -48,8 +48,10 @@ public readonly struct ResourceUtilization
     /// <summary>
     /// Gets the latest snapshot of the resource utilization of the system.
     /// </summary>
+#pragma warning disable LA0004 // Experimental member on an already-obsolete containing type is intentional
     [Experimental(diagnosticId: DiagnosticIds.Experiments.ResourceMonitoring, UrlFormat = DiagnosticIds.UrlFormat)]
     public Snapshot Snapshot { get; } = default;
+#pragma warning restore LA0004
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ResourceUtilization"/> struct.

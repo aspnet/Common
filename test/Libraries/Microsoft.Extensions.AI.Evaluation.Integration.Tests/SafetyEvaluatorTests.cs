@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -13,7 +13,6 @@ using Microsoft.Extensions.AI.Evaluation.Reporting.Storage;
 using Microsoft.Extensions.AI.Evaluation.Safety;
 using Microsoft.Extensions.AI.Evaluation.Tests;
 using Microsoft.Extensions.AI.Evaluation.Utilities;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.AI.Evaluation.Integration.Tests;
@@ -154,7 +153,7 @@ public class SafetyEvaluatorTests
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task EvaluateConversationWithSingleTurn_HubBasedProject()
     {
         SkipIfNotConfigured();
@@ -166,7 +165,7 @@ public class SafetyEvaluatorTests
         await EvaluateConversationWithSingleTurn(scenarioRun);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task EvaluateConversationWithSingleTurn_NonHubBasedProject()
     {
         SkipIfNotConfigured();
@@ -232,7 +231,7 @@ public class SafetyEvaluatorTests
             ReferenceEquals(context2, ungroundedAttributesContext));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task EvaluateConversationWithMultipleTurns_HubBasedProject()
     {
         SkipIfNotConfigured();
@@ -244,7 +243,7 @@ public class SafetyEvaluatorTests
         await EvaluateConversationWithMultipleTurns(scenarioRun);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task EvaluateConversationWithMultipleTurns_NonHubBasedProject()
     {
         SkipIfNotConfigured();
@@ -323,7 +322,7 @@ public class SafetyEvaluatorTests
             ReferenceEquals(context2, ungroundedAttributesContext));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task EvaluateConversationWithImageInQuestion()
     {
         SkipIfNotConfigured();
@@ -359,7 +358,7 @@ public class SafetyEvaluatorTests
         Assert.True(result.TryGet(IndirectAttackEvaluator.IndirectAttackMetricName, out BooleanMetric? _));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task EvaluateConversationWithImageInAnswer()
     {
         SkipIfNotConfigured();
@@ -395,7 +394,7 @@ public class SafetyEvaluatorTests
         Assert.True(result.TryGet(IndirectAttackEvaluator.IndirectAttackMetricName, out BooleanMetric? _));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task EvaluateConversationWithImagesInMultipleTurns()
     {
         SkipIfNotConfigured();
@@ -444,7 +443,7 @@ public class SafetyEvaluatorTests
         Assert.True(result.TryGet(IndirectAttackEvaluator.IndirectAttackMetricName, out BooleanMetric? _));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task EvaluateConversationWithImagesAndTextInMultipleTurns()
     {
         SkipIfNotConfigured();
@@ -506,7 +505,7 @@ public class SafetyEvaluatorTests
         Assert.True(result.TryGet(IndirectAttackEvaluator.IndirectAttackMetricName, out BooleanMetric? _));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task EvaluateCodeCompletionWithSingleTurn()
     {
         SkipIfNotConfigured();
@@ -535,7 +534,7 @@ public class SafetyEvaluatorTests
         Assert.True(result.TryGet(CodeVulnerabilityEvaluator.CodeVulnerabilityMetricName, out BooleanMetric? _));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task EvaluateCodeCompletionWithMultipleTurns()
     {
         SkipIfNotConfigured();
@@ -576,7 +575,7 @@ public class SafetyEvaluatorTests
         Assert.True(result.TryGet(CodeVulnerabilityEvaluator.CodeVulnerabilityMetricName, out BooleanMetric? _));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task EvaluateSafetyAndQualityMetricsForSameConversation()
     {
         SkipIfNotConfigured();
@@ -622,10 +621,7 @@ public class SafetyEvaluatorTests
     [MemberNotNull(nameof(_hubBasedContentSafetyReportingConfiguration))]
     private static void SkipIfNotConfigured()
     {
-        if (!Settings.Current.Configured)
-        {
-            throw new SkipTestException("Test is not configured");
-        }
+        Assert.SkipUnless(Settings.Current.Configured, "Test is not configured");
 
         Assert.NotNull(_chatOptions);
         Assert.NotNull(_contentSafetyReportingConfiguration);

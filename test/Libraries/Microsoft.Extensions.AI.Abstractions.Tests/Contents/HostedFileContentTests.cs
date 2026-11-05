@@ -1,8 +1,6 @@
 ﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-#pragma warning disable MEAI001
-
 using System;
 using System.Text.Json;
 using Xunit;
@@ -28,8 +26,10 @@ public class HostedFileContentTests
         Assert.Null(c.AdditionalProperties);
         Assert.Null(c.SizeInBytes);
         Assert.Null(c.CreatedAt);
+#pragma warning disable MEAI001
         Assert.Null(c.Purpose);
         Assert.Null(c.Scope);
+#pragma warning restore MEAI001
         Assert.Equal(fileId, c.FileId);
     }
 
@@ -153,6 +153,7 @@ public class HostedFileContentTests
         Assert.Null(c.CreatedAt);
     }
 
+#pragma warning disable MEAI001
     [Fact]
     public void Purpose_Roundtrips()
     {
@@ -178,6 +179,7 @@ public class HostedFileContentTests
         c.Scope = null;
         Assert.Null(c.Scope);
     }
+#pragma warning restore MEAI001
 
     [Fact]
     public void Serialization_IncludesExperimentalProperties()
@@ -189,8 +191,10 @@ public class HostedFileContentTests
             MediaType = "text/plain",
             SizeInBytes = 1024,
             CreatedAt = now,
+#pragma warning disable MEAI001
             Purpose = "fine-tune",
             Scope = "container-1",
+#pragma warning restore MEAI001
         };
 
         var json = JsonSerializer.Serialize(content, AIJsonUtilities.DefaultOptions);
@@ -204,8 +208,10 @@ public class HostedFileContentTests
         Assert.NotNull(deserialized);
         Assert.Equal(1024, deserialized.SizeInBytes);
         Assert.Equal(now, deserialized.CreatedAt);
+#pragma warning disable MEAI001
         Assert.Equal("fine-tune", deserialized.Purpose);
         Assert.Equal("container-1", deserialized.Scope);
+#pragma warning restore MEAI001
     }
 
     [Theory]
@@ -257,8 +263,10 @@ public class HostedFileContentTests
         Assert.Equal("document.pdf", hostedFile.Name);
         Assert.Equal(1024, hostedFile.SizeInBytes);
         Assert.Equal(new DateTimeOffset(2024, 1, 15, 10, 30, 0, TimeSpan.Zero), hostedFile.CreatedAt);
+#pragma warning disable MEAI001
         Assert.Equal("assistants", hostedFile.Purpose);
         Assert.Equal("user", hostedFile.Scope);
+#pragma warning restore MEAI001
         Assert.NotNull(hostedFile.AdditionalProperties);
         Assert.Equal("val", hostedFile.AdditionalProperties["key"]?.ToString());
     }

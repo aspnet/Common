@@ -47,9 +47,11 @@ internal static class OpenTelemetryConsts
 
         /// <summary>
         /// Operation name for realtime sessions.
-        /// This is a custom extension not part of the OpenTelemetry GenAI semantic conventions.
-        /// The spec allows using custom values for <c>gen_ai.operation.name</c> when standard values don't apply.
         /// </summary>
+        /// <remarks>
+        /// This is a custom extension that is not part of the OpenTelemetry GenAI semantic conventions.
+        /// The spec allows using custom values for <c>gen_ai.operation.name</c> when standard values do not apply.
+        /// </remarks>
         public const string RealtimeName = "realtime";
 
         public const string SystemInstructions = "gen_ai.system_instructions";
@@ -128,6 +130,7 @@ internal static class OpenTelemetryConsts
             public const string PresencePenalty = "gen_ai.request.presence_penalty";
             public const string Seed = "gen_ai.request.seed";
             public const string StopSequences = "gen_ai.request.stop_sequences";
+            public const string Stream = "gen_ai.request.stream";
             public const string Temperature = "gen_ai.request.temperature";
             public const string TopK = "gen_ai.request.top_k";
             public const string TopP = "gen_ai.request.top_p";
@@ -138,6 +141,7 @@ internal static class OpenTelemetryConsts
             public const string FinishReasons = "gen_ai.response.finish_reasons";
             public const string Id = "gen_ai.response.id";
             public const string Model = "gen_ai.response.model";
+            public const string TimeToFirstChunk = "gen_ai.response.time_to_first_chunk";
         }
 
         public static class Token
@@ -170,37 +174,46 @@ internal static class OpenTelemetryConsts
             public const string InputTextTokens = "gen_ai.usage.input_text_tokens";
             public const string OutputAudioTokens = "gen_ai.usage.output_audio_tokens";
             public const string OutputTextTokens = "gen_ai.usage.output_text_tokens";
+            public const string ReasoningOutputTokens = "gen_ai.usage.reasoning.output_tokens";
         }
 
         /// <summary>
         /// Custom attributes for realtime sessions.
-        /// These attributes are NOT part of the OpenTelemetry GenAI semantic conventions (as of v1.40).
+        /// These attributes are NOT part of the OpenTelemetry GenAI semantic conventions (as of v1.41).
         /// They are custom extensions to capture realtime session-specific configuration.
         /// </summary>
         public static class Realtime
         {
             /// <summary>
             /// The voice used for audio output in a realtime session.
-            /// Custom attribute: "gen_ai.realtime.voice".
             /// </summary>
+            /// <remarks>
+            /// Custom attribute: <c>gen_ai.realtime.voice</c>.
+            /// </remarks>
             public const string Voice = "gen_ai.realtime.voice";
 
             /// <summary>
-            /// The output modalities configured for a realtime session (e.g., "Text", "Audio").
-            /// Custom attribute: "gen_ai.realtime.output_modalities".
+            /// The output modalities configured for a realtime session (for example, <c>"Text"</c> and <c>"Audio"</c>).
             /// </summary>
+            /// <remarks>
+            /// Custom attribute: <c>gen_ai.realtime.output_modalities</c>.
+            /// </remarks>
             public const string OutputModalities = "gen_ai.realtime.output_modalities";
 
             /// <summary>
-            /// The kind/type of realtime session (e.g., "TextInTextOut", "AudioInAudioOut").
-            /// Custom attribute: "gen_ai.realtime.session_kind".
+            /// The kind or type of realtime session (for example, <c>"TextInTextOut"</c> and <c>"AudioInAudioOut"</c>).
             /// </summary>
+            /// <remarks>
+            /// Custom attribute: <c>gen_ai.realtime.session_kind</c>.
+            /// </remarks>
             public const string SessionKind = "gen_ai.realtime.session_kind";
 
             /// <summary>
-            /// The modalities actually received in a realtime response (e.g., "text", "audio", "transcription").
-            /// Custom attribute: "gen_ai.realtime.received_modalities".
+            /// The modalities actually received in a realtime response (for example, <c>"text"</c>, <c>"audio"</c>, and <c>"transcription"</c>).
             /// </summary>
+            /// <remarks>
+            /// Custom attribute: <c>gen_ai.realtime.received_modalities</c>.
+            /// </remarks>
             public const string ReceivedModalities = "gen_ai.realtime.received_modalities";
         }
     }

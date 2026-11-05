@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>d5681fae-b21b-4114-b781-48180f08c0c4</UserSecretsId>
@@ -13,13 +13,13 @@
 #endif -->
 <!--#if (IsOllama)
     <PackageReference Include="OllamaSharp" Version="${PackageVersion:OllamaSharp}" />
-#elif ((IsGHModels || IsOpenAI) && !IsAspire)
+#elif (IsOpenAI && !IsAspire)
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="${PackageVersion:Microsoft.Extensions.AI.OpenAI}" />
 #elif (IsAzureAIFoundry)
     <PackageReference Include="Azure.AI.Projects" Version="${PackageVersion:Azure.AI.Projects}" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="${PackageVersion:Microsoft.Extensions.AI.OpenAI}" />
 #endif -->
-<!--#if ((IsAzureOpenAI || IsOpenAI || IsGHModels) && IsAspire) -->
+<!--#if ((IsAzureOpenAI || IsOpenAI) && IsAspire) -->
     <PackageReference Include="Aspire.Azure.AI.OpenAI" Version="${PackageVersion:Aspire.Azure.AI.OpenAI}" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="${PackageVersion:Microsoft.Extensions.AI.OpenAI}" />
 <!--#endif -->
@@ -48,12 +48,12 @@
     <PackageReference Include="Azure.Search.Documents" Version="${PackageVersion:Azure.Search.Documents}" />
 #endif -->
 <!--#if (IsAzureAISearch)
-    <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureAISearch" Version="${PackageVersion:Microsoft.SemanticKernel.Connectors.AzureAISearch}" />
+    <PackageReference Include="CommunityToolkit.VectorData.AzureAISearch" Version="${PackageVersion:CommunityToolkit.VectorData.AzureAISearch}" />
 #elif (IsQdrant)-->
     <PackageReference Include="Aspire.Qdrant.Client" Version="${PackageVersion:Aspire.Qdrant.Client}" />
-    <PackageReference Include="Microsoft.SemanticKernel.Connectors.Qdrant" Version="${PackageVersion:Microsoft.SemanticKernel.Connectors.Qdrant}" />
+    <PackageReference Include="CommunityToolkit.VectorData.Qdrant" Version="${PackageVersion:CommunityToolkit.VectorData.Qdrant}" />
 <!--#elif (IsLocalVectorStore)-->
-    <PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="${PackageVersion:Microsoft.SemanticKernel.Connectors.SqliteVec}" />
+    <PackageReference Include="CommunityToolkit.VectorData.SqliteVec" Version="${PackageVersion:CommunityToolkit.VectorData.SqliteVec}" />
 <!--#endif -->
   </ItemGroup>
 <!--#if (IsAspire) -->

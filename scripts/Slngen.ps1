@@ -169,10 +169,6 @@ Push-Location $RepositoryPath
 try {
     [System.Collections.ArrayList]$Globs = @()
 
-    if (!$OnlySources) {
-        $Globs += "test/TestUtilities/TestUtilities.csproj"
-    }
-
     if (!$All) {
         foreach ($Keyword in $Keywords) {
             $Globs += "src/**/*$($Keyword)*/**/*.*sproj"

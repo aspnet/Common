@@ -1,6 +1,11 @@
 <Project>
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.targets', '$(MSBuildThisFileDirectory)../'))" />
 
+  <PropertyGroup>
+    <XUnitCoreSettingsFile>$(MSBuildThisFileDirectory)\..\eng\xunit.runner.json</XUnitCoreSettingsFile>
+    <XUnitDesktopSettingsFile>$(MSBuildThisFileDirectory)\..\eng\xunit.runner.json</XUnitDesktopSettingsFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="AutoFixture.AutoMoq" />
     <PackageReference Include="autofixture" />
@@ -8,10 +13,20 @@
     <PackageReference Include="Moq.AutoMock" />
     <PackageReference Include="Moq" />
     <PackageReference Include="StrongNamer" Condition="'$(SignArtifacts)' == 'true' " />
-    <PackageReference Include="Verify.Xunit" />
+    <PackageReference Include="Verify.XunitV3" />
     <PackageReference Include="Xunit.Combinatorial" />
-
-    <Content Include="$(MSBuildThisFileDirectory)\..\eng\xunit.runner.json" CopyToOutputDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
+
+  <!--
+    Override $(TargetFrameworks) to contain only the current TFM before Verify's WriteVerifyAttributes
+    target runs. When Verify sees multiple TFMs in the Verify.TargetFrameworks assembly metadata, it
+    auto-adds a TFM discriminator (e.g. DotNet10_0) to verified file names, but the existing
+    .verified.txt files don't have one. Setting a single TFM prevents the discriminator.
+  -->
+  <Target Name="_OverrideVerifyTargetFrameworks" BeforeTargets="WriteVerifyAttributes">
+    <PropertyGroup>
+      <TargetFrameworks>$(TargetFramework)</TargetFrameworks>
+    </PropertyGroup>
+  </Target>
 
 </Project>

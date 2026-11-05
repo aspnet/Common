@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Schema;
@@ -128,14 +129,20 @@ public static partial class AIJsonUtilities
                 serializerOptions,
                 inferenceOptions);
 
-            parameterSchemas.Add(parameter.Name, parameterSchema);
+            string parameterSchemaName = GetParameterSchemaName(parameter);
+            if (parameterSchemas.ContainsKey(parameterSchemaName))
+            {
+                Throw.ArgumentException(nameof(method), $"Multiple parameters are mapped to the same name '{parameterSchemaName}'. Ensure that any {nameof(AIParameterNameAttribute)} values do not collide with each other or with other parameter names.");
+            }
+
+            parameterSchemas.Add(parameterSchemaName, parameterSchema);
             bool isRequired = !parameter.IsOptional && !hasDefaultValue;
 #if NET || NETFRAMEWORK
             isRequired = isRequired || parameter.GetCustomAttribute<RequiredAttribute>(inherit: true) is not null;
 #endif
             if (isRequired)
             {
-                (requiredProperties ??= []).Add((JsonNode)parameter.Name);
+                (requiredProperties ??= []).Add((JsonNode)parameterSchemaName);
             }
         }
 
@@ -282,12 +289,14 @@ public static partial class AIJsonUtilities
                 // to accommodate the fact that they're being nested inside of a higher-level schema.
                 if (parameter?.Name is not null && objSchema.TryGetPropertyValue(RefPropertyName, out JsonNode? paramName))
                 {
-                    // Fix up any $ref URIs to match the path from the root document.
+                    // Fix up any $ref URIs to match the path from the root document. The schema name becomes a
+                    // JSON Pointer segment, so escape it per RFC 6901 ('~' => "~0", '/' => "~1").
+                    string parameterSchemaName = EscapeJsonPointerSegment(GetParameterSchemaName(parameter));
                     string refUri = paramName!.GetValue<string>();
                     Debug.Assert(refUri is "#" || refUri.StartsWith("#/", StringComparison.Ordinal), $"Expected {nameof(refUri)} to be either # or start with #/, got {refUri}");
                     refUri = refUri == "#"
-                        ? $"#/{PropertiesPropertyName}/{parameter.Name}"
-                        : $"#/{PropertiesPropertyName}/{parameter.Name}/{refUri.AsMemory("#/".Length)}";
+                        ? $"#/{PropertiesPropertyName}/{parameterSchemaName}"
+                        : $"#/{PropertiesPropertyName}/{parameterSchemaName}/{refUri.AsMemory("#/".Length)}";
 
                     objSchema[RefPropertyName] = (JsonNode)refUri;
                 }
@@ -859,6 +868,30 @@ public static partial class AIJsonUtilities
 
         defaultValue = null;
         return false;
+    }
+
+    internal static string GetParameterSchemaName(ParameterInfo parameter) =>
+        parameter.GetCustomAttribute<AIParameterNameAttribute>(inherit: true)?.Name ?? parameter.Name!;
+
+    private static string EscapeJsonPointerSegment(string segment)
+    {
+        if (segment.IndexOfAny(['~', '/']) < 0)
+        {
+            return segment;
+        }
+
+        StringBuilder sb = new(segment.Length + 2);
+        foreach (char c in segment)
+        {
+            _ = c switch
+            {
+                '~' => sb.Append("~0"),
+                '/' => sb.Append("~1"),
+                _ => sb.Append(c),
+            };
+        }
+
+        return sb.ToString();
     }
 
     /// <summary>

@@ -267,17 +267,17 @@ internal partial class DefaultHybridCache
                     {
                         // result is the wider payload including HC headers; unwrap it:
                         HybridCachePayload.HybridCachePayloadParseResult parseResult = HybridCachePayload.TryParse(
-                            result.AsArraySegment(), Key.Key, CacheItem.Tags, Cache, out ArraySegment<byte> payload, out TimeSpan remainingTime,
-                            out HybridCachePayload.PayloadFlags flags, out ushort entropy, out TagSet pendingTags, out long? payloadLocalSize, out Exception? fault);
+                            result.AsArraySegment(), Key.Key, CacheItem.Tags, Cache, out HybridCachePayload.ParsedPayload parsed, out Exception? fault);
                         switch (parseResult)
                         {
                             case HybridCachePayload.HybridCachePayloadParseResult.Success:
                                 // check any pending expirations, if necessary
-                                if (pendingTags.IsEmpty || !await Cache.IsAnyTagExpiredAsync(pendingTags, CacheItem.CreationTimestamp).ConfigureAwait(false))
+                                if (parsed.PendingTags.IsEmpty
+                                    || !await Cache.IsAnyTagExpiredAsync(parsed.PendingTags, parsed.CreationTime).ConfigureAwait(false))
                                 {
                                     // move into the payload segment (minus any framing/header/etc data)
-                                    result = new(payload.Array!, payload.Offset, payload.Count, result.ReturnToPool);
-                                    SetResultAndRecycleIfAppropriate(ref result, remainingTime, payloadLocalSize);
+                                    result = new(parsed.Payload.Array!, parsed.Payload.Offset, parsed.Payload.Count, result.ReturnToPool);
+                                    SetResultAndRecycleIfAppropriate(ref result, parsed.RemainingTime, parsed.LocalCacheSize);
                                     return;
                                 }
 
@@ -490,11 +490,28 @@ internal partial class DefaultHybridCache
 
         private void SetDefaultResult()
         {
-            // note we don't store this dummy result in L1 or L2
+            // note we don't store this dummy result in L1 or L2; we complete with our own cache item, because
+            // it already holds one reservation per joined caller, and each caller releases one when unwrapping
             if (_result is not null)
             {
+                CacheItem<T> cacheItem;
+                switch (CacheItem)
+                {
+                    case ImmutableCacheItem<T> immutable:
+                        immutable.SetValue(default!, size: -1);
+                        cacheItem = immutable;
+                        break;
+                    case MutableCacheItem<T> mutable:
+                        mutable.SetFallbackValue(default!);
+                        cacheItem = mutable;
+                        break;
+                    default:
+                        cacheItem = ThrowUnexpectedCacheItem();
+                        break;
+                }
+
                 Cache.RemoveStampedeState(in Key);
-                _ = _result.TrySetResult(ImmutableCacheItem<T>.GetReservedShared());
+                _ = _result.TrySetResult(cacheItem);
             }
         }
 

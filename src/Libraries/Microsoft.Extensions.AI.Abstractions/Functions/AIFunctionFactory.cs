@@ -15,6 +15,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -134,7 +135,8 @@ public static partial class AIFunctionFactory
     /// <param name="method">The method to be represented via the created <see cref="AIFunction"/>.</param>
     /// <param name="name">
     /// The name to use for the <see cref="AIFunction"/>. If <see langword="null"/>, the name will be derived from
-    /// any <see cref="DisplayNameAttribute"/> on <paramref name="method"/>, if available, or else from the name of <paramref name="method"/>.
+    /// any <see cref="AIFunctionNameAttribute"/> on <paramref name="method"/>, then from any <see cref="DisplayNameAttribute"/>
+    /// on <paramref name="method"/>, if available, or else from the name of <paramref name="method"/>.
     /// </param>
     /// <param name="description">
     /// The description to use for the <see cref="AIFunction"/>. If <see langword="null"/>, a description will be derived from
@@ -312,7 +314,8 @@ public static partial class AIFunctionFactory
     /// </param>
     /// <param name="name">
     /// The name to use for the <see cref="AIFunction"/>. If <see langword="null"/>, the name will be derived from
-    /// any <see cref="DisplayNameAttribute"/> on <paramref name="method"/>, if available, or else from the name of <paramref name="method"/>.
+    /// any <see cref="AIFunctionNameAttribute"/> on <paramref name="method"/>, then from any <see cref="DisplayNameAttribute"/>
+    /// on <paramref name="method"/>, if available, or else from the name of <paramref name="method"/>.
     /// </param>
     /// <param name="description">
     /// The description to use for the <see cref="AIFunction"/>. If <see langword="null"/>, a description will be derived from
@@ -627,6 +630,49 @@ public static partial class AIFunctionFactory
                 var paramMarshallers = FunctionDescriptor.ParameterMarshallers;
                 object?[] args = paramMarshallers.Length != 0 ? new object?[paramMarshallers.Length] : [];
 
+                // If the configured serializer options request strict handling of unmapped members,
+                // verify that every argument key corresponds to a declared parameter name. This mirrors
+                // JsonSerializerOptions.UnmappedMemberHandling behavior for object deserialization by
+                // applying the same policy to top-level AIFunction argument binding. Argument name matching
+                // honors the comparer of the supplied AIFunctionArguments dictionary (ordinal by default).
+                //
+                // Validation is skipped when custom ParameterBindingOptions.BindParameter callbacks are in
+                // use, since those may legitimately source values from argument keys that do not correspond
+                // to the .NET parameter names.
+                if (FunctionDescriptor.JsonSerializerOptions.UnmappedMemberHandling is JsonUnmappedMemberHandling.Disallow &&
+                    arguments.Count > 0 &&
+                    !FunctionDescriptor.HasCustomParameterBinding)
+                {
+                    HashSet<string> expectedNames = FunctionDescriptor.ExpectedArgumentNames;
+                    int matched = 0;
+                    foreach (string name in expectedNames)
+                    {
+                        if (arguments.ContainsKey(name))
+                        {
+                            matched++;
+                        }
+                    }
+
+                    if (matched != arguments.Count)
+                    {
+                        foreach (KeyValuePair<string, object?> kvp in arguments)
+                        {
+                            if (!expectedNames.Contains(kvp.Key))
+                            {
+                                Throw.ArgumentException(
+                                    nameof(arguments),
+                                    $"The arguments dictionary contains an unexpected key '{kvp.Key}' that does not correspond to any parameter of '{Name}'.");
+                            }
+                        }
+
+                        // Fallback for comparer mismatches (e.g. case-insensitive arguments dictionary
+                        // with duplicate-casing keys aliasing to the same parameter).
+                        Throw.ArgumentException(
+                            nameof(arguments),
+                            $"The arguments dictionary contains keys that do not correspond to any parameter of '{Name}'.");
+                    }
+                }
+
                 for (int i = 0; i < args.Length; i++)
                 {
                     args[i] = paramMarshallers[i](arguments, cancellationToken);
@@ -664,7 +710,7 @@ public static partial class AIFunctionFactory
         private static readonly object? _boxedDefaultCancellationToken = default(CancellationToken);
 
         /// <summary>
-        /// Gets or creates a descriptors using the specified method and options.
+        /// Gets or creates a descriptor using the specified method and options.
         /// </summary>
         public static ReflectionAIFunctionDescriptor GetOrCreate(MethodInfo method, AIFunctionFactoryOptions options)
         {
@@ -689,14 +735,18 @@ public static partial class AIFunctionFactory
         {
             ParameterInfo[] parameters = key.Method.GetParameters();
 
-            // Determine how each parameter should be bound.
-            Dictionary<ParameterInfo, AIFunctionFactoryOptions.ParameterBindingOptions>? boundParameters = null;
+            // Determine how each parameter should be bound. This is keyed on the parameter's position
+            // rather than the ParameterInfo instance: MethodInfo.GetParameters() does not guarantee the
+            // same ParameterInfo instances across concurrent first calls on a cold MethodInfo, and the
+            // schema generator invokes IncludeParameter with ParameterInfo instances from its own
+            // GetParameters() call. Keying on identity would race and silently drop ExcludeFromSchema.
+            AIFunctionFactoryOptions.ParameterBindingOptions[]? boundParameters = null;
             if (parameters.Length != 0 && key.GetBindParameterOptions is not null)
             {
-                boundParameters = new(parameters.Length);
+                boundParameters = new AIFunctionFactoryOptions.ParameterBindingOptions[parameters.Length];
                 for (int i = 0; i < parameters.Length; i++)
                 {
-                    boundParameters[parameters[i]] = key.GetBindParameterOptions(parameters[i]);
+                    boundParameters[i] = key.GetBindParameterOptions(parameters[i]);
                 }
             }
 
@@ -713,8 +763,11 @@ public static partial class AIFunctionFactory
                     }
 
                     // If the parameter is marked as excluded by GetBindParameterOptions, exclude it.
-                    if (boundParameters?.TryGetValue(parameterInfo, out var options) is true &&
-                        options.ExcludeFromSchema)
+                    // Look up by position because the ParameterInfo passed here may be a different
+                    // instance than the one boundParameters was built from (see comment above).
+                    if (boundParameters is not null &&
+                        (uint)parameterInfo.Position < (uint)boundParameters.Length &&
+                        boundParameters[parameterInfo.Position].ExcludeFromSchema)
                     {
                         return false;
                     }
@@ -733,19 +786,47 @@ public static partial class AIFunctionFactory
 
             // Get marshaling delegates for parameters.
             ParameterMarshallers = parameters.Length > 0 ? new Func<AIFunctionArguments, CancellationToken, object?>[parameters.Length] : [];
+            HashSet<string> expectedArgumentNames = new(StringComparer.Ordinal);
+            bool hasCustomParameterBinding = false;
             for (int i = 0; i < parameters.Length; i++)
             {
-                if (boundParameters?.TryGetValue(parameters[i], out AIFunctionFactoryOptions.ParameterBindingOptions options) is not true)
-                {
-                    options = default;
-                }
+                AIFunctionFactoryOptions.ParameterBindingOptions options =
+                    boundParameters is not null ? boundParameters[i] : default;
 
                 ParameterMarshallers[i] = GetParameterMarshaller(serializerOptions, options, parameters[i]);
+
+                if (options.BindParameter is not null)
+                {
+                    // Custom BindParameter callbacks can legally source their value from arbitrary keys in the
+                    // AIFunctionArguments dictionary, so we cannot know in advance which keys are "expected".
+                    // Note this down so that strict unmapped-member validation is skipped in InvokeCoreAsync.
+                    hasCustomParameterBinding = true;
+                }
+
+                // Collect the set of parameter names that are potentially sourced from the arguments dictionary.
+                // Infrastructure parameters (CancellationToken, AIFunctionArguments, IServiceProvider) are always
+                // bound from dedicated sources and are never resolved by argument name, so they are excluded from
+                // the permitted set.
+                Type pType = parameters[i].ParameterType;
+                if (pType != typeof(CancellationToken) &&
+                    pType != typeof(AIFunctionArguments) &&
+                    pType != typeof(IServiceProvider) &&
+                    !string.IsNullOrEmpty(parameters[i].Name))
+                {
+                    string effectiveName = AIJsonUtilities.GetParameterSchemaName(parameters[i]);
+                    if (!expectedArgumentNames.Add(effectiveName))
+                    {
+                        Throw.ArgumentException("method", $"Multiple parameters are mapped to the same name '{effectiveName}'. Ensure that any {nameof(AIParameterNameAttribute)} values do not collide with each other or with other parameter names.");
+                    }
+                }
             }
+
+            ExpectedArgumentNames = expectedArgumentNames;
+            HasCustomParameterBinding = hasCustomParameterBinding;
 
             ReturnParameterMarshaller = GetReturnParameterMarshaller(key, serializerOptions, out Type? returnType);
             Method = key.Method;
-            Name = key.Name ?? key.Method.GetCustomAttribute<DisplayNameAttribute>(inherit: true)?.DisplayName ?? GetFunctionName(key.Method);
+            Name = key.Name ?? key.Method.GetCustomAttribute<AIFunctionNameAttribute>(inherit: true)?.Name ?? key.Method.GetCustomAttribute<DisplayNameAttribute>(inherit: true)?.DisplayName ?? GetFunctionName(key.Method);
             Description = key.Description ?? key.Method.GetCustomAttribute<DescriptionAttribute>(inherit: true)?.Description ?? string.Empty;
             JsonSerializerOptions = serializerOptions;
             ReturnJsonSchema = returnType is null || key.ExcludeResultSchema ? null : AIJsonUtilities.CreateJsonSchema(
@@ -770,6 +851,8 @@ public static partial class AIFunctionFactory
         public JsonElement? ReturnJsonSchema { get; }
         public Func<AIFunctionArguments, CancellationToken, object?>[] ParameterMarshallers { get; }
         public Func<object?, CancellationToken, ValueTask<object?>> ReturnParameterMarshaller { get; }
+        public HashSet<string> ExpectedArgumentNames { get; }
+        public bool HasCustomParameterBinding { get; }
         public ReflectionAIFunction? CachedDefaultInstance { get; set; }
 
         private static string GetFunctionName(MethodInfo method)
@@ -877,10 +960,11 @@ public static partial class AIFunctionFactory
             // Resolve the contract used to marshal the value from JSON -- can throw if not supported or not found.
             JsonTypeInfo? typeInfo = serializerOptions.GetTypeInfo(parameterType);
             bool hasDefaultValue = AIJsonUtilities.TryGetEffectiveDefaultValue(parameter, out object? effectiveDefaultValue);
+            string argumentName = AIJsonUtilities.GetParameterSchemaName(parameter);
             return (arguments, _) =>
             {
                 // If the parameter has an argument specified in the dictionary, return that argument.
-                if (arguments.TryGetValue(parameter.Name, out object? value))
+                if (arguments.TryGetValue(argumentName, out object? value))
                 {
                     return value switch
                     {
@@ -927,7 +1011,7 @@ public static partial class AIFunctionFactory
                 // If the parameter is required and there's no argument specified for it, throw.
                 if (!hasDefaultValue)
                 {
-                    Throw.ArgumentException(nameof(arguments), $"The arguments dictionary is missing a value for the required parameter '{parameter.Name}'.");
+                    Throw.ArgumentException(nameof(arguments), $"The arguments dictionary is missing a value for the required parameter '{argumentName}'.");
                 }
 
                 // Otherwise, use the optional parameter's default value.
@@ -1145,9 +1229,11 @@ public static partial class AIFunctionFactory
             {
                 return method.ReturnParameter.GetCustomAttribute<DescriptionAttribute>(inherit: true)?.Description;
             }
-            catch (Exception e) when (e is ArgumentNullException or NullReferenceException)
+            catch (Exception e) when (e is ArgumentNullException or NullReferenceException or IndexOutOfRangeException)
             {
-                // DynamicMethod return parameters don't support GetCustomAttribute.
+                // DynamicMethod return parameters don't support GetCustomAttribute. Additionally, on .NET Framework,
+                // querying inherited attributes on the return parameter of an overriding method can throw
+                // IndexOutOfRangeException. In either case, treat the description as absent.
                 return null;
             }
         }

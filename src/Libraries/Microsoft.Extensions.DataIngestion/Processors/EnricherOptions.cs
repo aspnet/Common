@@ -41,8 +41,11 @@ public class EnricherOptions
     public ILoggerFactory? LoggerFactory { get; set; }
 
     /// <summary>
-    /// Gets or sets the batch size for processing chunks. Default is 20.
+    /// Gets or sets the batch size for processing chunks.
     /// </summary>
+    /// <value>
+    /// The default is 20.
+    /// </value>
     public int BatchSize { get; set => field = Throw.IfLessThanOrEqual(value, 0); } = 20;
 
     internal EnricherOptions Clone() => new(ChatClient)

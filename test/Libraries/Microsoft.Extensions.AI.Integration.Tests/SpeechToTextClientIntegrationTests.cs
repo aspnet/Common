@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -6,7 +6,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.TestUtilities;
 using Xunit;
 
 #pragma warning disable CA2214 // Do not call overridable methods in constructors
@@ -30,7 +29,7 @@ public abstract class SpeechToTextClientIntegrationTests : IDisposable
 
     protected abstract ISpeechToTextClient? CreateClient();
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetTextAsync_SingleAudioRequestMessage()
     {
         SkipIfNotEnabled();
@@ -41,7 +40,7 @@ public abstract class SpeechToTextClientIntegrationTests : IDisposable
         Assert.Contains("gym", response.Text, StringComparison.OrdinalIgnoreCase);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetStreamingTextAsync_SingleStreamingResponseChoice()
     {
         SkipIfNotEnabled();
@@ -57,6 +56,23 @@ public abstract class SpeechToTextClientIntegrationTests : IDisposable
         string responseText = sb.ToString();
         Assert.Contains("finally", responseText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("gym", responseText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("audio001.mp3")]
+    [InlineData("audio001_noid3.mp3")]
+    [InlineData("audio001.wav")]
+    [InlineData("audio001.m4a")]
+    [InlineData("audio001.webm")]
+    public virtual async Task GetTextAsync_AutoDetectsAudioFormat(string fileName)
+    {
+        SkipIfNotEnabled();
+
+        using var audioSpeechStream = GetAudioStream(fileName);
+        var response = await _client.GetTextAsync(audioSpeechStream);
+
+        Assert.NotNull(response);
+        Assert.Contains("gym", response.Text, StringComparison.OrdinalIgnoreCase);
     }
 
     private static Stream GetAudioStream(string fileName)
@@ -75,9 +91,6 @@ public abstract class SpeechToTextClientIntegrationTests : IDisposable
     {
         string? skipIntegration = TestRunnerConfiguration.Instance["SkipIntegrationTests"];
 
-        if (skipIntegration is not null || _client is null)
-        {
-            throw new SkipTestException("Client is not enabled.");
-        }
+        Assert.SkipUnless(skipIntegration is null && _client is not null, "Client is not enabled.");
     }
 }

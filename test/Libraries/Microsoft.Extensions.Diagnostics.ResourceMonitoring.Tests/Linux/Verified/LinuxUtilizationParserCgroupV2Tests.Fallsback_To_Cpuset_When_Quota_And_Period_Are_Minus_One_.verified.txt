@@ -6,6 +6,6 @@ at Microsoft.Shared.Diagnostics.Throw.InvalidOperationException(String message)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.<GetHostCpuCount>g__ThrowException|35_0(ReadOnlySpan`1 content)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetHostCpuCount()
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetCgroupLimitedCpus()
-at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass19_0.<Fallsback_To_Cpuset_When_Quota_And_Period_Are_Minus_One_>b__0()
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass20_0.<Fallsback_To_Cpuset_When_Quota_And_Period_Are_Minus_One_>b__0()
 at Xunit.Record.Exception(Func`1 testCode)
 }

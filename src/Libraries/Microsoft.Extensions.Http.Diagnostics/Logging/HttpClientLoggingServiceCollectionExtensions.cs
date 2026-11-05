@@ -33,6 +33,7 @@ public static class HttpClientLoggingServiceCollectionExtensions
         _ = Throw.IfNull(services);
 
         _ = services
+            .AddRedaction()
             .AddHttpRouteProcessor()
             .AddHttpHeadersRedactor()
             .AddOutgoingRequestContext();
@@ -65,7 +66,7 @@ public static class HttpClientLoggingServiceCollectionExtensions
 
         _ = services
             .AddOptionsWithValidateOnStart<LoggingOptions, LoggingOptionsValidator>()
-            .Bind(section);
+            .BindConfigurationSection(section);
 
         return services.AddExtendedHttpClientLogging();
     }

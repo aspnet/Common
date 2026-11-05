@@ -1,21 +1,21 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.DataIngestion.Readers.Tests;
 
-[MarkItDownCondition]
 public class MarkItDownReaderTests : DocumentReaderConformanceTests
 {
     protected override IngestionDocumentReader CreateDocumentReader(bool extractImages = false)
-        => MarkItDownConditionAttribute.IsInstalled.Value
-        ? new MarkItDownReader(extractImages: extractImages)
-        : throw new SkipTestException("MarkItDown is not installed");
+    {
+        Assert.SkipUnless(MarkItDownConditionHelper.IsInstalled.Value, "MarkItDown is not installed");
+
+        return new MarkItDownReader(extractImages: extractImages);
+    }
 
     protected override void SimpleAsserts(IngestionDocument document, string source, string expectedId)
     {
@@ -40,7 +40,7 @@ public class MarkItDownReaderTests : DocumentReaderConformanceTests
     // The original purpose of the MarkItDown library was to support text-only LLMs.
     // Source: https://github.com/microsoft/markitdown/issues/56#issuecomment-2546357264
     // It can extract images, but the support is limited to some formats like docx.
-    [ConditionalFact]
+    [Fact]
     public override Task SupportsImages() => SupportsImagesCore(
         new("https://winprotocoldocs-bhdugrdyduf5h2e4.b02.azurefd.net/MC-SQLR/%5bMC-SQLR%5d-240423.docx")); // SQL Server Resolution Protocol.
 }

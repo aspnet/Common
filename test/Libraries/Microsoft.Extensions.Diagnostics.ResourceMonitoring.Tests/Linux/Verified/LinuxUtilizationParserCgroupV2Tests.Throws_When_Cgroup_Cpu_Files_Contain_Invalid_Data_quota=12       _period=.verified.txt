@@ -6,6 +6,6 @@ at Microsoft.Shared.Diagnostics.Throw.InvalidOperationException(String message)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.TryParseCpuQuotaAndPeriodFromFile(IFileSystem fileSystem, FileInfo cpuLimitsFile, Single& cpuUnits)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.TryGetCpuUnitsFromCgroups(IFileSystem fileSystem, Single& cpuUnits)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetCgroupLimitedCpus()
-at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass20_0.<Throws_When_Cgroup_Cpu_Files_Contain_Invalid_Data>b__0()
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass21_0.<Throws_When_Cgroup_Cpu_Files_Contain_Invalid_Data>b__0()
 at Xunit.Record.Exception(Func`1 testCode)
 }

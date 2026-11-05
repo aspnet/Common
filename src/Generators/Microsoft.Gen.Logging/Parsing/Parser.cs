@@ -17,6 +17,10 @@ namespace Microsoft.Gen.Logging.Parsing;
 
 internal sealed partial class Parser
 {
+    // Bounds how deep nested property types are walked, so that unbounded type graphs
+    // (e.g. Node<T> with a Node<Node<T>> property) can't overflow the compiler's stack.
+    private const int MaxTypeTraversalDepth = 32;
+
     // ITypeParameterSymbol.AllowsRefLikeType was added in Roslyn 4.9 (C# 13). Access via a compiled
     // delegate so the same source file compiles against all supported Roslyn versions, while
     // avoiding the per-call overhead of PropertyInfo.GetValue boxing.
@@ -634,7 +638,7 @@ internal sealed partial class Parser
         var paramDataClassAttributes = new HashSet<string>(
             GetDataClassificationAttributes(paramSymbol, symbols)
             .Distinct(SymbolEqualityComparer.Default)
-            .Select(x => x!.ToDisplayString()));
+            .Select(x => x!.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
 
         var extractedType = paramTypeSymbol;
         if (paramTypeSymbol.IsNullableOfT())

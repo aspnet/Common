@@ -1,8 +1,7 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Microsoft.Extensions.Diagnostics.ResourceMonitoring.Windows.Interop;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring.Windows.Test;
@@ -14,7 +13,7 @@ namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring.Windows.Test;
 /// the necessary environment predictability to really test it.</remarks>
 public sealed class ProcessInfoTests
 {
-    [ConditionalFact]
+    [Fact]
     public void GetCurrentProcessMemoryUsage()
     {
         var workingSet64 = new ProcessInfo().GetCurrentProcessMemoryUsage();

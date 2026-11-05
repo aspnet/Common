@@ -1,4 +1,4 @@
-#if (IsGHModels || IsOpenAI || (IsAzureOpenAI && !IsManagedIdentity))
+#if (IsOpenAI || (IsAzureOpenAI && !IsManagedIdentity))
 using System.ClientModel;
 #elif (IsAzureOpenAI && IsManagedIdentity)
 using System.ClientModel.Primitives;
@@ -15,26 +15,16 @@ using Microsoft.Extensions.AI;
 #if (IsOllama)
 using OllamaSharp;
 #endif
-#if (IsGHModels || IsAzureOpenAI)
+#if (IsAzureOpenAI)
 using OpenAI;
 #endif
-#if (IsGHModels || IsOpenAI || IsAzureOpenAI)
+#if (IsOpenAI || IsAzureOpenAI)
 using OpenAI.Chat;
 #endif
 
 var builder = WebApplication.CreateBuilder(args);
 
-#if (IsGHModels)
-// You will need to set the token to your own value
-// You can do this using Visual Studio's "Manage User Secrets" UI, or on the command line:
-//   cd this-project-directory
-//   dotnet user-secrets set "GITHUB_TOKEN" "your-github-models-token-here"
-var chatClient = new ChatClient(
-        "gpt-4o-mini",
-        new ApiKeyCredential(builder.Configuration["GITHUB_TOKEN"] ?? throw new InvalidOperationException("Missing configuration: GITHUB_TOKEN")),
-        new OpenAIClientOptions { Endpoint = new Uri("https://models.inference.ai.azure.com") })
-    .AsIChatClient();
-#elif (IsOpenAI)
+#if (IsOpenAI)
 // You will need to set the API key to your own value
 // You can do this using Visual Studio's "Manage User Secrets" UI, or on the command line:
 //   cd this-project-directory

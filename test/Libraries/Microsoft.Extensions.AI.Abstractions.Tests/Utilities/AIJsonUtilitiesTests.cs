@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -15,10 +15,10 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using Microsoft.Extensions.AI.JsonSchemaExporter;
-using Microsoft.TestUtilities;
 using Xunit;
 
 #pragma warning disable SA1114 // parameter list should follow declaration
+#pragma warning disable S1144 // Unused private types or members should be removed (members are used via reflection in schema tests)
 
 namespace Microsoft.Extensions.AI;
 
@@ -564,6 +564,25 @@ public static partial class AIJsonUtilitiesTests
     }
 
     [Fact]
+    public static void CreateFunctionJsonSchema_AIFunctionNameAttribute_NotUsedForTitle()
+    {
+        MethodInfo method = ((Action)MethodWithAIFunctionName).Method;
+        JsonElement schema = AIJsonUtilities.CreateFunctionJsonSchema(method);
+
+        // The schema title is derived from the method name, not from AIFunctionNameAttribute.
+        Assert.True(schema.TryGetProperty("title", out JsonElement titleElement));
+        Assert.Equal(nameof(MethodWithAIFunctionName), titleElement.GetString());
+        Assert.NotEqual("my_tool", titleElement.GetString());
+    }
+
+    // Local functions get unspeakable names; define as a private method instead.
+    [AIFunctionName("my_tool")]
+    private static void MethodWithAIFunctionName()
+    {
+        // Test method for schema generation
+    }
+
+    [Fact]
     public static void CreateFunctionJsonSchema_DisplayNameAttribute_CanBeOverridden()
     {
         [DisplayName("custom_method_name")]
@@ -578,6 +597,63 @@ public static partial class AIJsonUtilitiesTests
         using JsonDocument doc = JsonDocument.Parse(schema.GetRawText());
         Assert.True(doc.RootElement.TryGetProperty("title", out JsonElement titleElement));
         Assert.Equal("override_title", titleElement.GetString());
+    }
+
+    [Fact]
+    public static void CreateFunctionJsonSchema_AIParameterNameAttribute_UsedForPropertyName()
+    {
+        static void TestMethod([AIParameterName("custom_property_name")] string select, int top)
+        {
+            // Test method for schema generation
+        }
+
+        var method = ((Action<string, int>)TestMethod).Method;
+        JsonElement schema = AIJsonUtilities.CreateFunctionJsonSchema(method);
+
+        JsonElement properties = schema.GetProperty("properties");
+        Assert.True(properties.TryGetProperty("custom_property_name", out _));
+        Assert.False(properties.TryGetProperty("select", out _));
+
+        string[] required = schema.GetProperty("required").EnumerateArray().Select(e => e.GetString()!).ToArray();
+        Assert.Contains("custom_property_name", required);
+        Assert.Contains("top", required);
+    }
+
+    [Fact]
+    public static void CreateFunctionJsonSchema_AIParameterNameAttribute_DuplicateNamesThrow()
+    {
+        static void DuplicateByAttribute([AIParameterName("dup")] string first, [AIParameterName("dup")] string second)
+        {
+            // Test method for schema generation
+        }
+
+        ArgumentException ex = Assert.Throws<ArgumentException>(() => AIJsonUtilities.CreateFunctionJsonSchema(((Action<string, string>)DuplicateByAttribute).Method));
+        Assert.Contains("dup", ex.Message);
+        Assert.Equal("method", ex.ParamName);
+
+        static void DuplicateByCollision([AIParameterName("filter")] string select, string filter)
+        {
+            // Test method for schema generation
+        }
+
+        ArgumentException ex2 = Assert.Throws<ArgumentException>(() => AIJsonUtilities.CreateFunctionJsonSchema(((Action<string, string>)DuplicateByCollision).Method));
+        Assert.Contains("filter", ex2.Message);
+        Assert.Equal("method", ex2.ParamName);
+    }
+
+    [Fact]
+    public static void CreateFunctionJsonSchema_AIParameterNameAttribute_EscapesJsonPointerSegment()
+    {
+        JsonSerializerOptions options = new() { TypeInfoResolver = new DefaultJsonTypeInfoResolver() };
+        static void TestMethod([AIParameterName("a/b~c")] RecursiveNode node)
+        {
+            // Test method for schema generation
+        }
+
+        string schema = AIJsonUtilities.CreateFunctionJsonSchema(((Action<RecursiveNode>)TestMethod).Method, serializerOptions: options).ToString();
+
+        Assert.Contains("#/properties/a~1b~0c", schema);
+        Assert.DoesNotContain("#/properties/a/b~c", schema);
     }
 
     [Fact]
@@ -648,13 +724,10 @@ public static partial class AIJsonUtilitiesTests
         AssertDeepEquals(expectedSchema, schema);
     }
 
-    [ConditionalFact]
+    [Fact]
     public static void CreateJsonSchema_IncorporatesTypesAndAnnotations_Net()
     {
-        if (RuntimeInformation.FrameworkDescription.Contains(".NET Framework"))
-        {
-            return;
-        }
+        Assert.SkipUnless(!RuntimeInformation.FrameworkDescription.Contains(".NET Framework"), "Only runs on .NET Core");
 
         AssertDeepEquals(JsonSerializer.Deserialize(
             """
@@ -884,13 +957,10 @@ public static partial class AIJsonUtilitiesTests
 
     // .NET Framework only has a subset of the available data annotation attributes.
     // .NET Standard doesn't have any (the M.E.AI.Abstractions library doesn't reference the additional package).
-    [ConditionalFact]
+    [Fact]
     public static void CreateJsonSchema_IncorporatesTypesAndAnnotations_NetFx()
     {
-        if (!RuntimeInformation.FrameworkDescription.Contains(".NET Framework"))
-        {
-            return;
-        }
+        Assert.SkipUnless(RuntimeInformation.FrameworkDescription.Contains(".NET Framework"), "Only runs on .NET Framework");
 
         AssertDeepEquals(JsonSerializer.Deserialize(
             """
@@ -1860,6 +1930,11 @@ public static partial class AIJsonUtilitiesTests
         }
 
         public int CustomValue { get; set; }
+    }
+
+    private sealed class RecursiveNode
+    {
+        public RecursiveNode? Next { get; set; }
     }
 
     [JsonSerializable(typeof(JsonElement))]

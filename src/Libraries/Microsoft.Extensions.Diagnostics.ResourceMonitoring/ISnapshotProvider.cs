@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Shared.DiagnosticIds;
 
 namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring;
@@ -10,7 +9,6 @@ namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring;
 /// <summary>
 /// An interface to be implemented by a provider that represents an underlying system and gets resources data about it.
 /// </summary>
-[Experimental(diagnosticId: DiagnosticIds.Experiments.ResourceMonitoring, UrlFormat = DiagnosticIds.UrlFormat)]
 [Obsolete(DiagnosticIds.Obsoletions.NonObservableResourceMonitoringApiMessage,
     DiagnosticId = DiagnosticIds.Obsoletions.NonObservableResourceMonitoringApiDiagId,
     UrlFormat = DiagnosticIds.UrlFormat)]

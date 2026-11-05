@@ -168,8 +168,14 @@ public class HostedFileClientExtensionsTests
         }
     }
 
-    [Fact]
-    public async Task DownloadToAsync_DirectoryPath_NoFileName_UsesFileId()
+    [Theory]
+    [InlineData(null, "")]
+    [InlineData("", "")]
+    [InlineData("application/unknown", "")]
+    [InlineData("text/plain", ".txt")]
+    [InlineData("text/plain; charset=utf-8", ".txt")]
+    [InlineData("TEXT/PLAIN", ".txt")]
+    public async Task DownloadToAsync_DirectoryPath_NoFileName_UsesFileId(string? mediaType, string extension)
     {
         var data = new byte[] { 99 };
         var tempDir = Path.Combine(Path.GetTempPath(), $"dldir2-{Guid.NewGuid()}");
@@ -178,13 +184,13 @@ public class HostedFileClientExtensionsTests
         using var client = new TestHostedFileClient
         {
             DownloadAsyncCallback = (fileId, options, ct) =>
-                Task.FromResult<HostedFileDownloadStream>(new TestHostedFileDownloadStream(data))
+                Task.FromResult<HostedFileDownloadStream>(new TestHostedFileDownloadStream(data, mediaType: mediaType))
         };
 
         try
         {
             var savedPath = await client.DownloadToAsync("file-id-fallback", tempDir);
-            Assert.Equal(Path.Combine(tempDir, "file-id-fallback"), savedPath);
+            Assert.Equal(Path.Combine(tempDir, $"file-id-fallback{extension}"), savedPath);
             Assert.Equal(data, await File.ReadAllBytesAsync(savedPath));
         }
         finally
@@ -197,27 +203,32 @@ public class HostedFileClientExtensionsTests
     public async Task DownloadToAsync_EmptyDestinationPath_UsesCurrentDirectory()
     {
         var data = new byte[] { 42, 43 };
-        var originalDir = Directory.GetCurrentDirectory();
-        var tempDir = Path.Combine(Path.GetTempPath(), $"dlcwd-{Guid.NewGuid()}");
-        Directory.CreateDirectory(tempDir);
+        var fileName = $"output_{Guid.NewGuid()}.bin";
 
         using var client = new TestHostedFileClient
         {
             DownloadAsyncCallback = (fileId, options, ct) =>
-                Task.FromResult<HostedFileDownloadStream>(new TestHostedFileDownloadStream(data, fileName: "output.bin"))
+                Task.FromResult<HostedFileDownloadStream>(new TestHostedFileDownloadStream(data, fileName: fileName))
         };
 
+        // Capture cwd at call time so the assertion doesn't depend on cwd at check time.
+        string cwdBefore = Directory.GetCurrentDirectory();
+        string expectedAbsolute = Path.Combine(cwdBefore, fileName);
+        string? savedPath = null;
         try
         {
-            Directory.SetCurrentDirectory(tempDir);
-            var savedPath = await client.DownloadToAsync("file-cwd", string.Empty);
-            Assert.Equal("output.bin", savedPath);
-            Assert.Equal(data, await File.ReadAllBytesAsync(Path.Combine(tempDir, savedPath)));
+            savedPath = await client.DownloadToAsync("file-cwd", string.Empty);
+
+            // Empty destination path => file is written to cwd; returned path is just the filename (relative).
+            Assert.Equal(fileName, savedPath);
+            Assert.False(Path.IsPathRooted(savedPath));
+
+            Assert.True(File.Exists(expectedAbsolute));
+            Assert.Equal(data, await File.ReadAllBytesAsync(expectedAbsolute));
         }
         finally
         {
-            Directory.SetCurrentDirectory(originalDir);
-            Directory.Delete(tempDir, recursive: true);
+            File.Delete(expectedAbsolute);
         }
     }
 

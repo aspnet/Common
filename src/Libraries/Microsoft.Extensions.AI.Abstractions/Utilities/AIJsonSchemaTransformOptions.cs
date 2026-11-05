@@ -12,7 +12,7 @@ namespace Microsoft.Extensions.AI;
 public sealed record class AIJsonSchemaTransformOptions
 {
     /// <summary>
-    /// Gets a callback that is invoked for every schema that is generated within the type graph.
+    /// Gets or initializes a callback that is invoked for every schema that is generated within the type graph.
     /// </summary>
     public Func<AIJsonSchemaTransformContext, JsonNode, JsonNode>? TransformSchemaNode { get; init; }
 

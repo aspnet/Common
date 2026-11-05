@@ -319,6 +319,11 @@ public abstract class CollectionModelBuilder
             throw new UnreachableException();
         }
 
+        if (clrProperty is not null)
+        {
+            property.PropertyInfo = clrProperty;
+        }
+
         // Apply storage name: attribute first, then definition (which takes precedence).
         SetPropertyStorageName(property, attributeStorageName);
         if (definitionProperty is not null)
@@ -329,11 +334,6 @@ public abstract class CollectionModelBuilder
         if (definitionProperty?.ProviderAnnotations is not null)
         {
             property.ProviderAnnotations = new Dictionary<string, object?>(definitionProperty.ProviderAnnotations);
-        }
-
-        if (clrProperty is not null)
-        {
-            property.PropertyInfo = clrProperty;
         }
 
         PropertyMap.Add(propertyName, property);

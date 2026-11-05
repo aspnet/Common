@@ -395,20 +395,8 @@ public sealed class OpenTelemetryHostedFileClient : DelegatingHostedFileClient
         }
     }
 
-    private void SetErrorStatus(Activity? activity, Exception? error)
-    {
-        if (error is not null)
-        {
-            _ = activity?
-                .AddTag(OpenTelemetryConsts.Error.Type, error.GetType().FullName)
-                .SetStatus(ActivityStatusCode.Error, error.Message);
-
-            if (_logger is not null)
-            {
-                OpenTelemetryLog.OperationException(_logger, error);
-            }
-        }
-    }
+    private void SetErrorStatus(Activity? activity, Exception? error) =>
+        OpenTelemetryLog.RecordOperationError(activity, _logger, error);
 
     private void TagAdditionalProperties(Activity activity, HostedFileClientOptions? options)
     {

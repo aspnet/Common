@@ -41,8 +41,10 @@ if desired.
 | `EXTEXP0016`      | Hosting integration testing experiments |
 | `EXTEXP0017`      | Contextual options experiments |
 | `EXTEXP0018`      | HybridCache experiments |
+| `EXTEXP0019`      | Documents experiments |
 | `MEAI001`         | AI experiments |
 | `MEVD9001`        | Vector Data experiments |
+| `MEDE0001`        | Document Extraction experiments |
 
 # Obsoletions
 
@@ -54,6 +56,7 @@ You may continue using obsolete APIs in your application, but we advise explorin
 | :---------------- | :---------- |
 | `EXTOBS0001` | This API is obsolete and will be removed in a future version. Consider using [Resource Monitoring observable instruments](https://learn.microsoft.com/dotnet/core/diagnostics/built-in-metrics-diagnostics#microsoftextensionsdiagnosticsresourcemonitoring). |
 | `EXTOBS0002` | This API is obsolete and will be removed in a future version. Instead of the AddServiceLogEnricher() methods, consider using the respective AddApplicationLogEnricher() methods.                                                                              |
+| `EXTOBS0003` | HybridCache does not provide built-in compression, so this option doesn't do anything. To compress cached data, configure a serializer that performs compression. |
 
 # LoggerMessage
 

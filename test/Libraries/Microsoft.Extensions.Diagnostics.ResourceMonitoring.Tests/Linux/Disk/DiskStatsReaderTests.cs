@@ -1,18 +1,23 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Disk.Test;
 
-[OSSkipCondition(OperatingSystems.Windows | OperatingSystems.MacOSX, SkipReason = "Linux specific tests")]
 public class DiskStatsReaderTests
 {
+    public DiskStatsReaderTests()
+    {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Linux), "Skipped on Windows/macOS");
+    }
+
     private static readonly string[] _skipDevicePrefixes = new[] { "ram", "loop", "dm-" };
 
     [Fact]

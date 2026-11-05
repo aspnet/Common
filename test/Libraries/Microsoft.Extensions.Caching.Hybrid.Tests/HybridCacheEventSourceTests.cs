@@ -1,9 +1,9 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Diagnostics.Tracing;
 using Microsoft.Extensions.Caching.Hybrid.Internal;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Microsoft.Extensions.Caching.Hybrid.Tests;
 
@@ -19,7 +19,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         Assert.Equal(Guid.Parse("b3aca39e-5dc9-5e21-f669-b72225b66cfc"), listener.Source.Guid); // from name
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task LocalCacheHit()
     {
         AssertEnabled();
@@ -32,7 +32,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task LocalCacheMiss()
     {
         AssertEnabled();
@@ -45,7 +45,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DistributedCacheGet()
     {
         AssertEnabled();
@@ -58,7 +58,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DistributedCacheHit()
     {
         AssertEnabled();
@@ -72,7 +72,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DistributedCacheMiss()
     {
         AssertEnabled();
@@ -86,7 +86,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DistributedCacheFailed()
     {
         AssertEnabled();
@@ -99,7 +99,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DistributedCacheCanceled()
     {
         AssertEnabled();
@@ -112,7 +112,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UnderlyingDataQueryStart()
     {
         AssertEnabled();
@@ -126,7 +126,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UnderlyingDataQueryComplete()
     {
         AssertEnabled();
@@ -140,7 +140,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UnderlyingDataQueryFailed()
     {
         AssertEnabled();
@@ -154,7 +154,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task UnderlyingDataQueryCanceled()
     {
         AssertEnabled();
@@ -168,7 +168,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task LocalCacheWrite()
     {
         AssertEnabled();
@@ -181,7 +181,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DistributedCacheWrite()
     {
         AssertEnabled();
@@ -194,7 +194,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task StampedeJoin()
     {
         AssertEnabled();
@@ -207,7 +207,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         listener.AssertRemainingCountersZero();
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task TagInvalidated()
     {
         AssertEnabled();
@@ -225,7 +225,7 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         // including this data for visibility when tests fail - ETW subsystem can be ... weird
         log.WriteLine($".NET {Environment.Version} on {Environment.OSVersion}, {IntPtr.Size * 8}-bit");
 
-        Skip.IfNot(listener.Source.IsEnabled(), "Event source not enabled");
+        Assert.SkipUnless(listener.Source.IsEnabled(), "Event source not enabled");
     }
 
     private async Task AssertCountersAsync()
@@ -240,6 +240,9 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
         // fundamentally working. We're not meant to be testing that
         // the counters system *itself* works!
 
-        Skip.If(count == 0, "No counters received");
+        if (count == 0)
+        {
+            Assert.Skip("No counters received");
+        }
     }
 }

@@ -1,9 +1,8 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.TestUtilities;
 using Xunit;
 
 #pragma warning disable MEAI001
@@ -17,14 +16,11 @@ public class OpenAITextToSpeechClientIntegrationTests : TextToSpeechClientIntegr
             .GetAudioClient(TestRunnerConfiguration.Instance["OpenAI:TextToSpeechModel"] ?? "tts-1")
             .AsITextToSpeechClient();
 
-    [ConditionalFact]
+    [Fact]
     public async Task GetStreamingAudioAsync_StreamingModel_ReturnsMultipleUpdatesWithUsage()
     {
         var openAIClient = IntegrationTestHelpers.GetOpenAIClient();
-        if (openAIClient is null)
-        {
-            throw new SkipTestException("Client is not enabled.");
-        }
+        Assert.SkipUnless(openAIClient is not null, "Client is not enabled.");
 
         using ITextToSpeechClient client = openAIClient
             .GetAudioClient(TestRunnerConfiguration.Instance["OpenAI:TextToSpeechStreamingModel"] ?? "gpt-4o-mini-tts")

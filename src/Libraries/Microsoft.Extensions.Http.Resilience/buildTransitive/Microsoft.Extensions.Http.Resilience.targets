@@ -2,6 +2,8 @@
   <PropertyGroup>
     <_GrpcNetClientFactory>Grpc.Net.ClientFactory</_GrpcNetClientFactory>
     <_CompatibleGrpcNetClientFactoryVersion>2.64.0</_CompatibleGrpcNetClientFactoryVersion>
+    <!-- Extract a System.Version-compatible lower bound. Examples: [2.63.0] -> 2.63.0, [2.64.0,3.0.0) -> 2.64.0, (,2.80.0] and [2.64.0-preview.1] -> empty. -->
+    <_GrpcNetClientFactoryComparableVersionPattern>^\s*[\[\(]?\s*(\d+(?:\.\d+){1,3})(?=\s*(?:[,)\]]|$))</_GrpcNetClientFactoryComparableVersionPattern>
     <_GrpcNetClientFactoryVersionIsIncorrect>Grpc.Net.ClientFactory 2.63.0 or earlier could cause issues when used together with Microsoft.Extensions.Http.Resilience. For more details, see https://learn.microsoft.com/dotnet/core/resilience/http-resilience#known-issues. Consider using Grpc.Net.ClientFactory $(_CompatibleGrpcNetClientFactoryVersion) or later. To suppress the warning set SuppressCheckGrpcNetClientFactoryVersion=true.</_GrpcNetClientFactoryVersionIsIncorrect>
   </PropertyGroup>
 
@@ -15,40 +17,47 @@
           Condition=" '$(SuppressCheckGrpcNetClientFactoryVersion)' != 'true' ">
     <ItemGroup>
       <!-- Find the package in the .csproj file. -->
-      <_GrpcNetClientFactoryPackageReference Include="@(PackageReference)" Condition=" '%(PackageReference.Identity)' == '$(_GrpcNetClientFactory)' " />
+      <_GrpcNetClientFactoryPackageReference Include="@(PackageReference)" Condition=" '%(PackageReference.Identity)' == '$(_GrpcNetClientFactory)' ">
+        <_ComparableVersion>$([System.Text.RegularExpressions.Regex]::Match('%(PackageReference.Version)', '$(_GrpcNetClientFactoryComparableVersionPattern)').Groups[1].Value)</_ComparableVersion>
+        <_ComparableVersionOverride>$([System.Text.RegularExpressions.Regex]::Match('%(PackageReference.VersionOverride)', '$(_GrpcNetClientFactoryComparableVersionPattern)').Groups[1].Value)</_ComparableVersionOverride>
+      </_GrpcNetClientFactoryPackageReference>
 
       <!-- Find the version of the package in the Central Package Source. The solution uses the Central Package Management. -->
-      <_GrpcNetClientFactoryPackageVersion Include="@(PackageVersion)" Condition=" '%(PackageVersion.Identity)' == '$(_GrpcNetClientFactory)' " />
+      <_GrpcNetClientFactoryPackageVersion Include="@(PackageVersion)" Condition=" '%(PackageVersion.Identity)' == '$(_GrpcNetClientFactory)' ">
+        <_ComparableVersion>$([System.Text.RegularExpressions.Regex]::Match('%(PackageVersion.Version)', '$(_GrpcNetClientFactoryComparableVersionPattern)').Groups[1].Value)</_ComparableVersion>
+      </_GrpcNetClientFactoryPackageVersion>
       
       <!-- The package is added to the project as a transitive dependency. -->
-      <_GrpcNetClientFactoryTransitiveDependency Include="@(ReferencePath)" Condition=" '%(ReferencePath.NuGetPackageId)' == '$(_GrpcNetClientFactory)' " />
+      <_GrpcNetClientFactoryTransitiveDependency Include="@(ReferencePath)" Condition=" '%(ReferencePath.NuGetPackageId)' == '$(_GrpcNetClientFactory)' ">
+        <_ComparableVersion>$([System.Text.RegularExpressions.Regex]::Match('%(ReferencePath.NuGetPackageVersion)', '$(_GrpcNetClientFactoryComparableVersionPattern)').Groups[1].Value)</_ComparableVersion>
+      </_GrpcNetClientFactoryTransitiveDependency>
     </ItemGroup>
 
     <!-- The version of the package is included in the .csproj file. -->
     <Warning Condition=" @(_GrpcNetClientFactoryPackageReference->Count()) &gt; 0
-                         AND '%(_GrpcNetClientFactoryPackageReference.Version)' != ''
-                         AND $([MSBuild]::VersionLessThan('%(_GrpcNetClientFactoryPackageReference.Version)', '$(_CompatibleGrpcNetClientFactoryVersion)')) "
+                         AND '%(_GrpcNetClientFactoryPackageReference._ComparableVersion)' != ''
+                         AND $([MSBuild]::VersionLessThan('%(_GrpcNetClientFactoryPackageReference._ComparableVersion)', '$(_CompatibleGrpcNetClientFactoryVersion)')) "
              Text="$(_GrpcNetClientFactoryVersionIsIncorrect)" />
 
     <!-- The solution uses the Central Package Management and the version of the package is overridden in the .csproj file using the VersionOverride property. -->
     <Warning Condition=" '$(ManagePackageVersionsCentrally)' == 'true'
                          AND @(_GrpcNetClientFactoryPackageReference->Count()) &gt; 0
-                         AND '%(_GrpcNetClientFactoryPackageReference.VersionOverride)' != ''
-                         AND $([MSBuild]::VersionLessThan('%(_GrpcNetClientFactoryPackageReference.VersionOverride)', '$(_CompatibleGrpcNetClientFactoryVersion)')) "
+                         AND '%(_GrpcNetClientFactoryPackageReference._ComparableVersionOverride)' != ''
+                         AND $([MSBuild]::VersionLessThan('%(_GrpcNetClientFactoryPackageReference._ComparableVersionOverride)', '$(_CompatibleGrpcNetClientFactoryVersion)')) "
              Text="$(_GrpcNetClientFactoryVersionIsIncorrect)" />
 
     <!-- The solution uses the Central Package Management and the version of the package is included in the Central Package Source. -->
     <Warning Condition=" '$(ManagePackageVersionsCentrally)' == 'true'
                          AND @(_GrpcNetClientFactoryPackageReference->Count()) &gt; 0
-                         AND '%(_GrpcNetClientFactoryPackageVersion.Version)' != ''
-                         AND $([MSBuild]::VersionLessThan('%(_GrpcNetClientFactoryPackageVersion.Version)', '$(_CompatibleGrpcNetClientFactoryVersion)')) "
+                         AND '%(_GrpcNetClientFactoryPackageVersion._ComparableVersion)' != ''
+                         AND $([MSBuild]::VersionLessThan('%(_GrpcNetClientFactoryPackageVersion._ComparableVersion)', '$(_CompatibleGrpcNetClientFactoryVersion)')) "
              Text="$(_GrpcNetClientFactoryVersionIsIncorrect)" />
 
     <!-- This condition handles a case when the package is added to the project as a transitive dependency. -->
     <Warning Condition=" @(_GrpcNetClientFactoryPackageReference->Count()) == 0
                          AND @(_GrpcNetClientFactoryTransitiveDependency->Count()) &gt; 0
-                         AND '%(_GrpcNetClientFactoryTransitiveDependency.NuGetPackageVersion)' != ''
-                         AND $([MSBuild]::VersionLessThan('%(_GrpcNetClientFactoryTransitiveDependency.NuGetPackageVersion)', '$(_CompatibleGrpcNetClientFactoryVersion)')) "
+                         AND '%(_GrpcNetClientFactoryTransitiveDependency._ComparableVersion)' != ''
+                         AND $([MSBuild]::VersionLessThan('%(_GrpcNetClientFactoryTransitiveDependency._ComparableVersion)', '$(_CompatibleGrpcNetClientFactoryVersion)')) "
              Text="$(_GrpcNetClientFactoryVersionIsIncorrect)" />
   </Target>
 </Project>

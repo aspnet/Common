@@ -39,5 +39,11 @@ namespace TestClasses
 
         [LoggerMessage(9, LogLevel.Error, "M10{p1}")]
         public static partial void Method10(ILogger logger, int p1);
+
+        [LoggerMessage(10, LogLevel.Error, "{RequestId} {First} {Second} {Third}")]
+        public static partial void Method11(ILogger logger, string requestId, string first, string second, string third);
+
+        [LoggerMessage(11, LogLevel.Error, "{RequestId}")]
+        public static partial void Method12(ILogger logger, string requestId);
     }
 }

@@ -5,6 +5,6 @@
 at Microsoft.Shared.Diagnostics.Throw.InvalidOperationException(String message)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.ParseCpuUsageFromFile(IFileSystem fileSystem, FileInfo cpuUsageFile)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetCgroupCpuUsageInNanoseconds()
-at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass26_0.<Throws_When_Usage_Usec_Has_Negative_Value>b__0()
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass27_0.<Throws_When_Usage_Usec_Has_Negative_Value>b__0()
 at Xunit.Record.Exception(Func`1 testCode)
 }

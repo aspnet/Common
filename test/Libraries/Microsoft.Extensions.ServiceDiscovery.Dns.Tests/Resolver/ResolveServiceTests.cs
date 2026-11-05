@@ -2,7 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Net;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Microsoft.Extensions.ServiceDiscovery.Dns.Resolver.Tests;
 

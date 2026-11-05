@@ -41,15 +41,15 @@ internal sealed partial class DnsSrvServiceEndpointProviderFactory(
 
         var srvQuery = optionsValue.ServiceDomainNameCallback != null
             ? optionsValue.ServiceDomainNameCallback(query)
-            : DefaultServiceDomainNameCallback(query, optionsValue);
+            : DefaultServiceDomainNameCallback(query, _querySuffix!);
         provider = new DnsSrvServiceEndpointProvider(query, srvQuery, hostName: query.ServiceName, options, logger, resolver, timeProvider);
         return true;
     }
 
-    private static string DefaultServiceDomainNameCallback(ServiceEndpointQuery query, DnsSrvServiceEndpointProviderOptions options)
+    private static string DefaultServiceDomainNameCallback(ServiceEndpointQuery query, string querySuffix)
     {
         var portName = query.EndpointName ?? "default";
-        return $"_{portName}._tcp.{query.ServiceName}.{options.QuerySuffix}";
+        return $"_{portName}._tcp.{query.ServiceName}.{querySuffix}";
     }
 
     private static string? GetKubernetesHostDomain()

@@ -9,7 +9,7 @@
     <PackageVersion Include="Aspire.AppHost.Sdk" Version="13.0.0" />
     <PackageVersion Include="Aspire.Azure.AI.OpenAI" Version="13.0.0-preview.1.25560.3" />
     <PackageVersion Include="Aspire.Azure.Search.Documents" Version="13.0.0" />
-    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.0.0" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Azure.CognitiveServices" Version="13.0.0" />
     <PackageVersion Include="Aspire.Hosting.Azure.Search" Version="13.0.0" />
     <PackageVersion Include="Aspire.Hosting.Qdrant" Version="13.0.0" />
@@ -18,24 +18,25 @@
     <PackageVersion Include="Azure.Search.Documents" Version="11.7.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.0.0-beta.444" />
     <PackageVersion Include="CommunityToolkit.Aspire.OllamaSharp" Version="13.0.0-beta.444" />
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.0.0-rc1" />
-    <PackageVersion Include="Microsoft.Agents.AI.DevUI" Version="1.0.0-preview.260219.1" />
-    <PackageVersion Include="Microsoft.Agents.AI.Hosting" Version="1.0.0-preview.260219.1" />
-    <PackageVersion Include="Microsoft.Agents.AI.Hosting.OpenAI" Version="1.0.0-alpha.260219.1" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-rc1" />
+    <PackageVersion Include="MessagePack" Version="2.5.307" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.13.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.DevUI" Version="1.13.0-preview.260703.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.Hosting" Version="1.13.0-preview.260703.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.Hosting.OpenAI" Version="1.13.0-alpha.260703.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.13.0" />
     <PackageVersion Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" Version="$(MicrosoftMLTokenizersVersion)" />
     <PackageVersion Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="$(MicrosoftMLTokenizersVersion)" />
-    <PackageVersion Include="Microsoft.SemanticKernel.Connectors.AzureAISearch" Version="1.67.1-preview" />
-    <PackageVersion Include="Microsoft.SemanticKernel.Connectors.Qdrant" Version="1.67.1-preview" />
-    <PackageVersion Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="1.67.1-preview" />
-    <PackageVersion Include="ModelContextProtocol" Version="1.2.0" />
-    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="1.2.0" />
+    <PackageVersion Include="CommunityToolkit.VectorData.AzureAISearch" Version="1.0.0" />
+    <PackageVersion Include="CommunityToolkit.VectorData.Qdrant" Version="1.0.0" />
+    <PackageVersion Include="CommunityToolkit.VectorData.SqliteVec" Version="1.0.1-preview" />
+    <PackageVersion Update="System.Linq.AsyncEnumerable" Version="10.0.9" />
     <PackageVersion Include="OllamaSharp" Version="5.4.12" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.14.0" />
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.14.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.14.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.14.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.14.0" />
+    <PackageVersion Include="OpenTelemetry.Api" Version="1.15.3" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
     <PackageVersion Include="PdfPig" Version="0.1.12" />
   </ItemGroup>
 </Project>

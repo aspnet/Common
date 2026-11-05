@@ -383,4 +383,152 @@ public class ImageGeneratingChatClientTests
         var imageToolCallContent = Assert.IsType<ImageGenerationToolCallContent>(update.Contents[0]);
         Assert.Equal(callId, imageToolCallContent.CallId);
     }
+
+    [Theory]
+    [InlineData("at-start")]
+    [InlineData("in-middle")]
+    [InlineData("at-end")]
+    public async Task GetResponseAsync_FunctionCallContent_SurroundingContentPreservedInOrder(string position)
+    {
+        // Regression test for: image generation content duplicating preceding content and dropping following content.
+        // The image-generation FunctionCallContent should be replaced with ImageGenerationToolCallContent,
+        // while all other content items retain their original order and cardinality.
+        var imageCallId = "image-call-id";
+        var otherCallId = "other-call-id";
+
+        using var innerClient = new TestChatClient
+        {
+            GetResponseAsyncCallback = (messages, options, cancellationToken) =>
+            {
+                IList<AIContent> contents = position switch
+                {
+                    "at-start" => [new FunctionCallContent(imageCallId, "GenerateImage", new Dictionary<string, object?> { ["prompt"] = "a cat" }),
+                                   new FunctionResultContent(otherCallId, "other-result")],
+                    "at-end" => [new FunctionResultContent(otherCallId, "other-result"),
+                                 new FunctionCallContent(imageCallId, "GenerateImage", new Dictionary<string, object?> { ["prompt"] = "a cat" })],
+                    _ => [new FunctionResultContent(otherCallId, "before-result"),
+                          new FunctionCallContent(imageCallId, "GenerateImage", new Dictionary<string, object?> { ["prompt"] = "a cat" }),
+                          new UsageContent(new UsageDetails { InputTokenCount = 5 })],
+                };
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, contents)));
+            },
+        };
+
+        using var imageGenerator = new TestImageGenerator();
+        using var client = new ImageGeneratingChatClient(innerClient, imageGenerator);
+
+        var chatOptions = new ChatOptions
+        {
+            Tools = [new HostedImageGenerationTool()]
+        };
+
+        // Act
+        var response = await client.GetResponseAsync([new(ChatRole.User, "test")], chatOptions);
+
+        // Assert
+        Assert.NotNull(response);
+        Assert.Single(response.Messages);
+        var contents = response.Messages[0].Contents;
+
+        if (position == "at-start")
+        {
+            Assert.Equal(2, contents.Count);
+            Assert.IsType<ImageGenerationToolCallContent>(contents[0]);
+            var otherResult = Assert.IsType<FunctionResultContent>(contents[1]);
+            Assert.Equal(otherCallId, otherResult.CallId);
+        }
+        else if (position == "at-end")
+        {
+            Assert.Equal(2, contents.Count);
+            var otherResult = Assert.IsType<FunctionResultContent>(contents[0]);
+            Assert.Equal(otherCallId, otherResult.CallId);
+            Assert.IsType<ImageGenerationToolCallContent>(contents[1]);
+        }
+        else
+        {
+            Assert.Equal(3, contents.Count);
+            var beforeResult = Assert.IsType<FunctionResultContent>(contents[0]);
+            Assert.Equal(otherCallId, beforeResult.CallId);
+            Assert.IsType<ImageGenerationToolCallContent>(contents[1]);
+            var usageContent = Assert.IsType<UsageContent>(contents[2]);
+            Assert.Equal(5, usageContent.Details.InputTokenCount);
+        }
+    }
+
+    [Theory]
+    [InlineData("at-start")]
+    [InlineData("in-middle")]
+    [InlineData("at-end")]
+    public async Task GetStreamingResponseAsync_FunctionCallContent_SurroundingContentPreservedInOrder(string position)
+    {
+        // Regression test for: image generation content duplicating preceding content and dropping following content.
+        // The image-generation FunctionCallContent should be replaced with ImageGenerationToolCallContent,
+        // while all other content items retain their original order and cardinality.
+        var imageCallId = "image-call-id";
+        var otherCallId = "other-call-id";
+
+        using var innerClient = new TestChatClient
+        {
+            GetStreamingResponseAsyncCallback = (messages, options, cancellationToken) => GetUpdatesAsync()
+        };
+
+        async IAsyncEnumerable<ChatResponseUpdate> GetUpdatesAsync()
+        {
+            await Task.Yield();
+            IList<AIContent> contents = position switch
+            {
+                "at-start" => [new FunctionCallContent(imageCallId, "GenerateImage", new Dictionary<string, object?> { ["prompt"] = "a cat" }),
+                               new FunctionResultContent(otherCallId, "other-result")],
+                "at-end" => [new FunctionResultContent(otherCallId, "other-result"),
+                             new FunctionCallContent(imageCallId, "GenerateImage", new Dictionary<string, object?> { ["prompt"] = "a cat" })],
+                _ => [new FunctionResultContent(otherCallId, "before-result"),
+                      new FunctionCallContent(imageCallId, "GenerateImage", new Dictionary<string, object?> { ["prompt"] = "a cat" }),
+                      new UsageContent(new UsageDetails { InputTokenCount = 5 })],
+            };
+            yield return new ChatResponseUpdate(ChatRole.Assistant, contents);
+        }
+
+        using var imageGenerator = new TestImageGenerator();
+        using var client = new ImageGeneratingChatClient(innerClient, imageGenerator);
+
+        var chatOptions = new ChatOptions
+        {
+            Tools = [new HostedImageGenerationTool()]
+        };
+
+        // Act
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in client.GetStreamingResponseAsync([new(ChatRole.User, "test")], chatOptions))
+        {
+            updates.Add(update);
+        }
+
+        // Assert
+        Assert.Single(updates);
+        var contents = updates[0].Contents;
+
+        if (position == "at-start")
+        {
+            Assert.Equal(2, contents.Count);
+            Assert.IsType<ImageGenerationToolCallContent>(contents[0]);
+            var otherResult = Assert.IsType<FunctionResultContent>(contents[1]);
+            Assert.Equal(otherCallId, otherResult.CallId);
+        }
+        else if (position == "at-end")
+        {
+            Assert.Equal(2, contents.Count);
+            var otherResult = Assert.IsType<FunctionResultContent>(contents[0]);
+            Assert.Equal(otherCallId, otherResult.CallId);
+            Assert.IsType<ImageGenerationToolCallContent>(contents[1]);
+        }
+        else
+        {
+            Assert.Equal(3, contents.Count);
+            var beforeResult = Assert.IsType<FunctionResultContent>(contents[0]);
+            Assert.Equal(otherCallId, beforeResult.CallId);
+            Assert.IsType<ImageGenerationToolCallContent>(contents[1]);
+            var usageContent = Assert.IsType<UsageContent>(contents[2]);
+            Assert.Equal(5, usageContent.Details.InputTokenCount);
+        }
+    }
 }

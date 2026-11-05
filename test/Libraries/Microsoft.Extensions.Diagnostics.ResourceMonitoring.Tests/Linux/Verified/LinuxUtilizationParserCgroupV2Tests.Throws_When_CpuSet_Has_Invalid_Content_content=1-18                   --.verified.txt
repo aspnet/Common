@@ -7,6 +7,6 @@ Could not parse '/sys/fs/cgroup/cpuset.cpus.effective'. Expected comma-separated
 at Microsoft.Shared.Diagnostics.Throw.InvalidOperationException(String message)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.<GetHostCpuCount>g__ThrowException|35_0(ReadOnlySpan`1 content)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetHostCpuCount()
-at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass18_0.<Throws_When_CpuSet_Has_Invalid_Content>b__0()
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass19_0.<Throws_When_CpuSet_Has_Invalid_Content>b__0()
 at Xunit.Record.Exception(Func`1 testCode)
 }

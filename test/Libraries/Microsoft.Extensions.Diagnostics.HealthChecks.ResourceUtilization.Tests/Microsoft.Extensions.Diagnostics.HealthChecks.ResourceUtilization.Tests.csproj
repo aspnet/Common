@@ -6,7 +6,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.Diagnostics.HealthChecks.ResourceUtilization\Microsoft.Extensions.Diagnostics.HealthChecks.ResourceUtilization.csproj" ProjectUnderTest="true" />
-    <ProjectReference Include="..\..\TestUtilities\TestUtilities.csproj" />
     <ProjectReference Include="..\Microsoft.Extensions.Diagnostics.ResourceMonitoring.Tests\Microsoft.Extensions.Diagnostics.ResourceMonitoring.Tests.csproj" />
   </ItemGroup>
   
@@ -15,7 +14,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Remove="Linux\**\*.cs" />
   </ItemGroup>
 </Project>

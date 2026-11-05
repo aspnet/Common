@@ -4,7 +4,7 @@
 type Dataset = {
     scenarioRunResults: ScenarioRunResult[];
     generatorVersion?: string;
-    createdAt?: string;
+    createdAt: string;
 };
 
 type ScenarioRunResult = {
@@ -17,7 +17,7 @@ type ScenarioRunResult = {
     evaluationResult: EvaluationResult;
     chatDetails?: ChatDetails;
     tags?: string[];
-    formatVersion: int;
+    formatVersion?: number;
 };
 
 type ChatResponse = {
@@ -29,7 +29,7 @@ type ChatResponse = {
 type ChatMessage = {
     authorName?: string;
     role: string;
-    contents: AIContent[];
+    contents: SerializedAIContent[];
 };
 
 type ChatDetails = {
@@ -52,10 +52,9 @@ type UsageDetails = {
 };
 
 type AIContent = {
-    $type: string;
+    $type?: string;
 };
 
-// TODO: Model other types of AIContent such as function calls, function call results, audio etc.
 type TextContent = AIContent & {
     $type: "text";
     text: string;
@@ -72,6 +71,28 @@ type DataContent = AIContent & {
     uri: string;
 };
 
+type FunctionCallContent = AIContent & {
+    $type: "functionCall";
+    callId: string;
+    name: string;
+    arguments?: { [K: string]: unknown };
+    informationalOnly: boolean;
+};
+
+type FunctionResultContent = AIContent & {
+    $type: "functionResult";
+    callId: string;
+    result?: unknown;
+};
+
+type SerializedAIContent =
+    | AIContent
+    | TextContent
+    | UriContent
+    | DataContent
+    | FunctionCallContent
+    | FunctionResultContent;
+
 type EvaluationResult = {
     metrics: {
         [K: string]: MetricWithNoValue | NumericMetric | BooleanMetric | StringMetric;
@@ -80,7 +101,7 @@ type EvaluationResult = {
 
 type EvaluationContext = {
     name: string;
-    contents: AIContent[];
+    contents: SerializedAIContent[];
 }
 
 type EvaluationDiagnostic = {
@@ -104,15 +125,14 @@ type BaseEvaluationMetric = {
         [K: string]: EvaluationContext;
     };
     diagnostics?: EvaluationDiagnostic[];
-    metadata: { 
-        [K: string]: string 
+    metadata?: {
+        [K: string]: string
     };
 };
 
 type MetricWithNoValue = BaseEvaluationMetric & {
     $type: "none";
     reason?: string;
-    value: undefined;
 };
 
 type NumericMetric = BaseEvaluationMetric & {

@@ -8,6 +8,6 @@ We tried to read '/sys/fs/cgroup/memory.current', and we expected to get a posit
 at Microsoft.Shared.Diagnostics.Throw.InvalidOperationException(String message)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetMemoryUsageInBytesPod()
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetMemoryUsageInBytes()
-at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass5_0.<Throws_When_UsageInBytes_Is_Invalid>b__0()
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass6_0.<Throws_When_UsageInBytes_Is_Invalid>b__0()
 at Xunit.Record.Exception(Func`1 testCode)
 }

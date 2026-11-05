@@ -2,11 +2,12 @@
   <PropertyGroup>
     <RootNamespace>Microsoft.Gen.Logging.Test</RootNamespace>
     <Description>Test classes for Microsoft.Gen.Logging.Generated.Tests.</Description>
+    <OutputType>Library</OutputType>
+    <IsTestProject>false</IsTestProject>
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFrameworks>$(TestNetCoreTargetFrameworks)</TargetFrameworks>
-    <TargetFrameworks Condition=" '$(IsWindowsBuild)' == 'true' ">$(TestNetCoreTargetFrameworks)$(ConditionalNet462)</TargetFrameworks>
+    <TargetFrameworks>$(TestNetCoreTargetFrameworks)$(ConditionalNet472)</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>

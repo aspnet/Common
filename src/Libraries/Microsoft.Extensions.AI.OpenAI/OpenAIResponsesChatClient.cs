@@ -17,12 +17,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Shared.DiagnosticIds;
 using Microsoft.Shared.Diagnostics;
+using OpenAI;
 using OpenAI.Responses;
 
 #pragma warning disable S1226 // Method parameters, caught exceptions and foreach variables' initial values should not be ignored
 #pragma warning disable S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
 #pragma warning disable S3254 // Default parameter values should not be passed as arguments
 #pragma warning disable SA1204 // Static elements should appear before instance elements
+#pragma warning disable MEAI001 // OpenAIRequestPolicies is experimental
 
 namespace Microsoft.Extensions.AI;
 
@@ -30,6 +32,12 @@ namespace Microsoft.Extensions.AI;
 [Experimental(DiagnosticIds.Experiments.AIOpenAIResponses)]
 internal sealed class OpenAIResponsesChatClient : IChatClient
 {
+    // AdditionalProperties key used to roundtrip a reasoning item's service-assigned id. Unlike
+    // RawRepresentation, AdditionalProperties survives both content coalescing and JSON serialization of the
+    // chat history, so the id is available when reconstructing the reasoning item for a subsequent request.
+    // Stateless (store=false) resume of encrypted reasoning requires this id or the service rejects the item.
+    private const string ReasoningItemIdKey = "reasoningItemId";
+
     // These delegate instances are used to call the internal overloads of CreateResponseAsync and CreateResponseStreamingAsync that accept
     // a RequestOptions. These should be replaced once a better way to pass RequestOptions is available.
 
@@ -58,6 +66,9 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
     /// <summary>The default model ID to use for the chat client.</summary>
     private readonly string? _defaultModelId;
 
+    /// <summary>Caller-registered policies applied to every <see cref="RequestOptions"/>.</summary>
+    private readonly OpenAIRequestPolicies _requestPolicies = new();
+
     /// <summary>Initializes a new instance of the <see cref="OpenAIResponsesChatClient"/> class for the specified <see cref="ResponsesClient"/>.</summary>
     /// <param name="responseClient">The underlying client.</param>
     /// <param name="defaultModelId">The default model ID to use for the chat client.</param>
@@ -81,6 +92,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
             serviceKey is not null ? null :
             serviceType == typeof(ChatClientMetadata) ? _metadata :
             serviceType == typeof(ResponsesClient) ? _responseClient :
+            serviceType == typeof(OpenAIRequestPolicies) ? _requestPolicies :
             serviceType.IsInstanceOfType(this) ? this :
             null;
     }
@@ -99,7 +111,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
         // Provided continuation token signals that an existing background response should be fetched.
         if (GetContinuationToken(messages, options) is { } token)
         {
-            var getTask = _responseClient.GetResponseAsync(token.ResponseId, include: null, stream: null, startingAfter: null, includeObfuscation: null, cancellationToken.ToRequestOptions(streaming: false));
+            var getTask = _responseClient.GetResponseAsync(token.ResponseId, include: null, stream: null, startingAfter: null, includeObfuscation: null, cancellationToken.ToRequestOptions(streaming: false, _requestPolicies));
             var response = (ResponseResult)await getTask.ConfigureAwait(false);
             return FromOpenAIResponse(response, openAIOptions, openAIConversationId);
         }
@@ -110,7 +122,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
         }
 
         // Make the call to the ResponsesClient.
-        var createTask = _responseClient.CreateResponseAsync((BinaryContent)openAIOptions, cancellationToken.ToRequestOptions(streaming: false));
+        var createTask = _responseClient.CreateResponseAsync((BinaryContent)openAIOptions, cancellationToken.ToRequestOptions(streaming: false, _requestPolicies));
         var openAIResponsesResult = (ResponseResult)await createTask.ConfigureAwait(false);
 
         // Convert the response to a ChatResponse.
@@ -119,6 +131,8 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
 
     internal static ChatResponse FromOpenAIResponse(ResponseResult responseResult, CreateResponseOptions? openAIOptions, string? conversationId)
     {
+        OpenAIClientExtensions.AddOpenAIResponseAttributes(responseResult.ServiceTier?.ToString(), systemFingerprint: null);
+
         // Convert and return the results.
         ChatResponse response = new()
         {
@@ -190,11 +204,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                     break;
 
                 case ReasoningResponseItem reasoningItem:
-                    message.Contents.Add(new TextReasoningContent(reasoningItem.GetSummaryText())
-                    {
-                        ProtectedData = reasoningItem.EncryptedContent,
-                        RawRepresentation = outputItem,
-                    });
+                    message.Contents.Add(CreateReasoningContent(reasoningItem.GetSummaryText(), reasoningItem.EncryptedContent, reasoningItem.Id, outputItem));
                     break;
 
                 case FunctionCallResponseItem functionCall:
@@ -271,7 +281,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
 
                     message.Contents.Add(new WebSearchToolResultContent(wscri.Id)
                     {
-                        Results = GetWebSearchSources(wscri),
+                        Outputs = GetWebSearchSources(wscri),
                         RawRepresentation = wscri,
                     });
                     break;
@@ -329,7 +339,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
 
             Debug.Assert(_getResponseStreamingAsync is not null, $"Unable to find {nameof(_getResponseStreamingAsync)} method");
             IAsyncEnumerable<StreamingResponseUpdate> getUpdates = _getResponseStreamingAsync is not null ?
-                _getResponseStreamingAsync(_responseClient, getOptions, cancellationToken.ToRequestOptions(streaming: true)) :
+                _getResponseStreamingAsync(_responseClient, getOptions, cancellationToken.ToRequestOptions(streaming: true, _requestPolicies)) :
                 _responseClient.GetResponseStreamingAsync(getOptions, cancellationToken);
 
             return FromOpenAIStreamingResponseUpdatesAsync(getUpdates, openAIOptions, openAIConversationId, token.ResponseId, cancellationToken);
@@ -342,7 +352,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
 
         Debug.Assert(_createResponseStreamingAsync is not null, $"Unable to find {nameof(_createResponseStreamingAsync)} method");
         AsyncCollectionResult<StreamingResponseUpdate> createUpdates = _createResponseStreamingAsync is not null ?
-            _createResponseStreamingAsync(_responseClient, openAIOptions, cancellationToken.ToRequestOptions(streaming: true)) :
+            _createResponseStreamingAsync(_responseClient, openAIOptions, cancellationToken.ToRequestOptions(streaming: true, _requestPolicies)) :
             _responseClient.CreateResponseStreamingAsync(openAIOptions, cancellationToken);
 
         return FromOpenAIStreamingResponseUpdatesAsync(createUpdates, openAIOptions, openAIConversationId, cancellationToken: cancellationToken);
@@ -362,6 +372,8 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
         ChatRole? lastRole = null;
         bool anyFunctions = false;
         bool storedOutputDisabled = false;
+        string? serviceTier = null;
+        string? systemFingerprint = null;
         ResponseStatus? latestResponseStatus = null;
         Dictionary<string, ToolApprovalRequestContent>? mcpApprovalRequests = null;
 
@@ -465,11 +477,11 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                     break;
 
                 case StreamingResponseReasoningSummaryTextDeltaUpdate reasoningSummaryTextDeltaUpdate:
-                    yield return CreateUpdate(new TextReasoningContent(reasoningSummaryTextDeltaUpdate.Delta));
+                    yield return CreateUpdate(CreateReasoningContent(reasoningSummaryTextDeltaUpdate.Delta, protectedData: null, reasoningSummaryTextDeltaUpdate.ItemId));
                     break;
 
                 case StreamingResponseReasoningTextDeltaUpdate reasoningTextDeltaUpdate:
-                    yield return CreateUpdate(new TextReasoningContent(reasoningTextDeltaUpdate.Delta));
+                    yield return CreateUpdate(CreateReasoningContent(reasoningTextDeltaUpdate.Delta, protectedData: null, reasoningTextDeltaUpdate.ItemId));
                     break;
 
                 case StreamingResponseImageGenerationCallInProgressUpdate imageGenInProgress:
@@ -565,7 +577,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                             // Also yield the WebSearchToolResultContent.
                             yield return CreateUpdate(new WebSearchToolResultContent(wscri.Id)
                             {
-                                Results = GetWebSearchSources(wscri),
+                                Outputs = GetWebSearchSources(wscri),
                                 RawRepresentation = wscri,
                             });
                             break;
@@ -585,9 +597,21 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                         // so that it can be coalesced with the streamed text deltas and roundtripped.
                         // Since we may have already yielded reasoning deltas, we explicitly avoid setting
                         // the RawRepresentation here to avoid duplication, as when roundtripping that
-                        // raw representation will be preferred.
+                        // raw representation will be preferred. The reasoning item's id is stashed in
+                        // AdditionalProperties (which survives coalescing and serialization, unlike
+                        // RawRepresentation) so that it can be sent back on a subsequent request; stateless
+                        // (store=false) resume of encrypted reasoning is rejected by the service without it.
                         case ReasoningResponseItem rri when rri.EncryptedContent is { Length: > 0 } encryptedContent:
-                            yield return CreateUpdate(new TextReasoningContent(null) { ProtectedData = encryptedContent });
+                            yield return CreateUpdate(CreateReasoningContent(text: null, protectedData: encryptedContent, itemId: rri.Id));
+                            break;
+
+                        // The ImageGenerationToolCallContent has already been yielded as part of in-progress updates,
+                        // but any partial images yielded along the way are lower-quality intermediate renders rather than
+                        // deltas of the final image. Yield the final image here; coalescing will replace the partial
+                        // results with this one, since they share the same CallId. This mirrors the non-streaming path,
+                        // which produces a result for every ImageGenerationCallResponseItem.
+                        case ImageGenerationCallResponseItem imageGenItem:
+                            yield return CreateUpdate(CreateImageGenerationResultContent(imageGenItem, options));
                             break;
 
                         // For ResponseItems where we've already yielded partial deltas for the whole content,
@@ -673,6 +697,11 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
 
         void UpdateConversationId(string? id, ResponseResult? response = null)
         {
+            // Record the service tier and system fingerprint each once if not yet recorded.
+            OpenAIClientExtensions.AddOpenAIResponseAttributes(
+                response?.ServiceTier?.ToString(), systemFingerprint: null,
+                ref serviceTier, ref systemFingerprint);
+
             storedOutputDisabled |= IsStoredOutputDisabled(options, response);
             if (storedOutputDisabled)
             {
@@ -701,7 +730,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
         (response is not null && response.Patch.TryGetValue("$.store"u8, out bool store) && !store);
 #pragma warning restore SCME0001
 
-    internal static ResponseTool? ToResponseTool(AITool tool, ChatOptions? options = null)
+    internal static ResponseTool? ToResponseTool(AITool tool, ChatOptions? options = null, ToolSearchLookup? toolSearchLookup = null)
     {
         switch (tool)
         {
@@ -709,7 +738,18 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                 return rtat.Tool;
 
             case AIFunctionDeclaration aiFunction:
-                return ToResponseTool(aiFunction, options);
+                var functionTool = ToResponseTool(aiFunction, options);
+                if ((toolSearchLookup ??= ToolSearchLookup.Create(options?.Tools)).IsDeferred(aiFunction.Name))
+                {
+                    functionTool.Patch.Set("$.defer_loading"u8, "true"u8);
+                }
+
+                return functionTool;
+
+            case HostedToolSearchTool:
+                // Workaround: The OpenAI .NET SDK doesn't yet expose a ToolSearchTool type.
+                // See https://github.com/openai/openai-dotnet/issues/1053
+                return ModelReaderWriter.Read<ResponseTool>(BinaryData.FromString("""{"type": "tool_search"}"""), ModelReaderWriterOptions.Json, OpenAIContext.Default)!;
 
             case HostedWebSearchTool webSearchTool:
                 return new WebSearchTool
@@ -749,7 +789,10 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                             "image/png" => ImageGenerationToolOutputFileFormat.Png,
                             "image/jpeg" => ImageGenerationToolOutputFileFormat.Jpeg,
                             "image/webp" => ImageGenerationToolOutputFileFormat.Webp,
-                            _ => null,
+
+                            // The SDK defines nullable and non-nullable op_Implicit conversions from string. Force a nullable result so
+                            // null does not bind to the non-nullable conversion, which throws ArgumentNullException.
+                            _ => (ImageGenerationToolOutputFileFormat?)null,
                         } :
                         null,
                     PartialImageCount = igo?.StreamingCount,
@@ -796,11 +839,11 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                 switch (mcpTool.ApprovalMode)
                 {
                     case HostedMcpServerToolAlwaysRequireApprovalMode:
-                        responsesMcpTool.ToolCallApprovalPolicy = new McpToolCallApprovalPolicy(GlobalMcpToolCallApprovalPolicy.AlwaysRequireApproval);
+                        responsesMcpTool.ToolCallApprovalPolicy = new McpToolCallApprovalPolicy(DefaultMcpToolCallApprovalPolicy.AlwaysRequireApproval);
                         break;
 
                     case HostedMcpServerToolNeverRequireApprovalMode:
-                        responsesMcpTool.ToolCallApprovalPolicy = new McpToolCallApprovalPolicy(GlobalMcpToolCallApprovalPolicy.NeverRequireApproval);
+                        responsesMcpTool.ToolCallApprovalPolicy = new McpToolCallApprovalPolicy(DefaultMcpToolCallApprovalPolicy.NeverRequireApproval);
                         break;
 
                     case HostedMcpServerToolRequireSpecificApprovalMode specificMode:
@@ -819,6 +862,11 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                         }
 
                         break;
+                }
+
+                if ((toolSearchLookup ??= ToolSearchLookup.Create(options?.Tools)).IsDeferred(mcpTool.ServerName))
+                {
+                    responsesMcpTool.Patch.Set("$.defer_loading"u8, "true"u8);
                 }
 
                 return responsesMcpTool;
@@ -843,6 +891,39 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
         };
     }
 
+    /// <summary>
+    /// Builds a <c>{"type":"namespace"}</c> <see cref="ResponseTool"/> from a name and set of tools.
+    /// The OpenAI .NET SDK doesn't expose a NamespaceTool type, so we construct the JSON manually.
+    /// </summary>
+    internal static ResponseTool ToNamespaceResponseTool(string name, string? description, IEnumerable<ResponseTool> namespacedTools)
+    {
+        using var stream = new System.IO.MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("type"u8, "namespace"u8);
+            writer.WriteString("name"u8, name);
+
+            if (!string.IsNullOrEmpty(description))
+            {
+                writer.WriteString("description"u8, description);
+            }
+
+            writer.WriteStartArray("tools"u8);
+            foreach (var namespacedTool in namespacedTools)
+            {
+                var toolData = ModelReaderWriter.Write(namespacedTool, ModelReaderWriterOptions.Json, OpenAIContext.Default);
+                using var doc = JsonDocument.Parse(toolData);
+                doc.RootElement.WriteTo(writer);
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        return ModelReaderWriter.Read<ResponseTool>(BinaryData.FromBytes(stream.ToArray()), ModelReaderWriterOptions.Json, OpenAIContext.Default)!;
+    }
+
     /// <summary>Creates a <see cref="ChatRole"/> from a <see cref="MessageRole"/>.</summary>
     private static ChatRole AsChatRole(MessageRole? role) =>
         role switch
@@ -852,6 +933,24 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
             MessageRole.User => ChatRole.User,
             _ => ChatRole.Assistant,
         };
+
+    /// <summary>Creates a <see cref="TextReasoningContent"/>, stashing the reasoning item's id (when available)
+    /// in <see cref="AIContent.AdditionalProperties"/> so it roundtrips back to the service.</summary>
+    private static TextReasoningContent CreateReasoningContent(string? text, string? protectedData, string? itemId, object? rawRepresentation = null)
+    {
+        TextReasoningContent content = new(text)
+        {
+            ProtectedData = protectedData,
+            RawRepresentation = rawRepresentation,
+        };
+
+        if (!string.IsNullOrEmpty(itemId))
+        {
+            (content.AdditionalProperties ??= [])[ReasoningItemIdKey] = itemId;
+        }
+
+        return content;
+    }
 
     /// <summary>Creates a <see cref="ChatFinishReason"/> from a <see cref="ResponseIncompleteStatusReason"/>.</summary>
     private static ChatFinishReason? AsFinishReason(ResponseIncompleteStatusReason? statusReason) =>
@@ -926,11 +1025,55 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
         // Populate tools if there are any.
         if (options.Tools is { Count: > 0 } tools)
         {
+            ToolSearchLookup toolSearchLookup = ToolSearchLookup.Create(tools);
+            Dictionary<ToolSearchLookup.Namespace, List<ResponseTool>>? namespaceGroups = null;
+            bool toolSearchAdded = false;
+
             foreach (AITool tool in tools)
             {
-                if (ToResponseTool(tool, options) is { } responseTool)
+                if (ToResponseTool(tool, options, toolSearchLookup) is { } responseTool)
                 {
+                    // Avoid sending multiple tool_search entries when callers supply more than one
+                    // HostedToolSearchTool; the OpenAI Responses API only accepts one.
+                    if (tool is HostedToolSearchTool)
+                    {
+                        if (toolSearchAdded)
+                        {
+                            continue;
+                        }
+
+                        toolSearchAdded = true;
+                    }
+
+                    // When a namespaced HostedToolSearchTool claims this deferred tool,
+                    // collect it for later wrapping in a namespace container.
+                    string? responseToolName = responseTool is FunctionTool ft ? ft.FunctionName
+                        : responseTool is McpTool mcp ? mcp.ServerLabel
+                        : null;
+
+                    if (responseToolName is not null
+                        && toolSearchLookup.GetNamespace(responseToolName) is { } ns)
+                    {
+                        namespaceGroups ??= new();
+                        if (!namespaceGroups.TryGetValue(ns, out var group))
+                        {
+                            group = new();
+                            namespaceGroups[ns] = group;
+                        }
+
+                        group.Add(responseTool);
+                        continue;
+                    }
+
                     result.Tools.Add(responseTool);
+                }
+            }
+
+            if (namespaceGroups is not null)
+            {
+                foreach (KeyValuePair<ToolSearchLookup.Namespace, List<ResponseTool>> kvp in namespaceGroups)
+                {
+                    result.Tools.Add(ToNamespaceResponseTool(kvp.Key.Name, kvp.Key.Description, kvp.Value));
                 }
             }
 
@@ -967,6 +1110,132 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
         }
 
         return result;
+    }
+
+    internal sealed class ToolSearchLookup
+    {
+        private static readonly ToolSearchLookup _empty = new(deferAll: false, deferredToolNames: [], namespacedToolNames: []);
+        private readonly bool _deferAll;
+        private readonly HashSet<string> _deferredToolNames;
+        private readonly Dictionary<string, Namespace> _namespacedToolNames;
+
+        private ToolSearchLookup(bool deferAll, HashSet<string> deferredToolNames, Dictionary<string, Namespace> namespacedToolNames)
+        {
+            _deferAll = deferAll;
+            _deferredToolNames = deferredToolNames;
+            _namespacedToolNames = namespacedToolNames;
+        }
+
+        public static ToolSearchLookup Create(IList<AITool>? tools)
+        {
+            if (tools is not { Count: > 0 })
+            {
+                return _empty;
+            }
+
+            HashSet<string> functionAndMcpToolNames = new(
+                tools.Select(
+                    static tool => tool switch
+                    {
+                        AIFunctionDeclaration aiFunction => aiFunction.Name,
+                        HostedMcpServerTool mcpTool => mcpTool.ServerName,
+                        _ => null,
+                    })
+                .OfType<string>(),
+                StringComparer.Ordinal);
+
+            if (functionAndMcpToolNames.Count == 0)
+            {
+                return _empty;
+            }
+
+            bool deferAll = false;
+            HashSet<string> deferredToolNames = new(StringComparer.Ordinal);
+            Dictionary<string, Namespace> namespacedToolNames = new(StringComparer.Ordinal);
+            Dictionary<string, Namespace> namespacesByName = new(StringComparer.Ordinal);
+            HashSet<string> unclaimedToolNames = new(functionAndMcpToolNames, StringComparer.Ordinal);
+
+            foreach (AITool tool in tools)
+            {
+                if (tool is not HostedToolSearchTool toolSearch)
+                {
+                    continue;
+                }
+
+                if (toolSearch.DeferredTools is not { } deferredTools)
+                {
+                    deferAll = true;
+                    deferredToolNames.UnionWith(functionAndMcpToolNames);
+
+                    if (toolSearch.Namespace is { } nsName && unclaimedToolNames.Count > 0)
+                    {
+                        Namespace ns = GetOrCreateNamespace(namespacesByName, nsName, toolSearch.NamespaceDescription);
+                        foreach (string toolName in unclaimedToolNames)
+                        {
+                            namespacedToolNames[toolName] = ns;
+                        }
+
+                        unclaimedToolNames.Clear();
+                    }
+
+                    continue;
+                }
+
+                foreach (string deferredTool in deferredTools)
+                {
+                    if (!functionAndMcpToolNames.Contains(deferredTool))
+                    {
+                        continue;
+                    }
+
+                    _ = deferredToolNames.Add(deferredTool);
+                    if (toolSearch.Namespace is { } nsName && unclaimedToolNames.Remove(deferredTool))
+                    {
+                        namespacedToolNames[deferredTool] = GetOrCreateNamespace(namespacesByName, nsName, toolSearch.NamespaceDescription);
+                    }
+                }
+            }
+
+            return new(deferAll, deferredToolNames, namespacedToolNames);
+        }
+
+        public bool IsDeferred(string toolName) =>
+            _deferAll || _deferredToolNames.Contains(toolName);
+
+        public Namespace? GetNamespace(string toolName) =>
+            _namespacedToolNames.TryGetValue(toolName, out Namespace? ns) ? ns : null;
+
+        // Prefers the first non-empty description supplied for a given namespace name; later
+        // HostedToolSearchTool instances may upgrade a previously-empty description but cannot
+        // overwrite one that's already set.
+        private static Namespace GetOrCreateNamespace(Dictionary<string, Namespace> namespacesByName, string name, string? description)
+        {
+            if (!namespacesByName.TryGetValue(name, out Namespace? existing))
+            {
+                existing = new Namespace(name) { Description = description };
+                namespacesByName[name] = existing;
+            }
+            else if (string.IsNullOrEmpty(existing.Description))
+            {
+                existing.Description = description;
+            }
+
+            return existing;
+        }
+
+        // A class (not a record) so that all entries in _namespacedToolNames sharing a namespace
+        // name reference the same instance; updating Description in place propagates to every
+        // tool already grouped under it.
+        internal sealed class Namespace
+        {
+            public Namespace(string name)
+            {
+                Name = name;
+            }
+
+            public string Name { get; }
+            public string? Description { get; set; }
+        }
     }
 
     internal static ResponseTextFormat? ToOpenAIResponseTextFormat(ChatResponseFormat? format, ChatOptions? options = null) =>
@@ -1289,10 +1558,29 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                             break;
 
                         case TextReasoningContent reasoningContent:
-                            yield return new ReasoningResponseItem(reasoningContent.Text)
+                            ReasoningResponseItem reasoningResponseItem = new(reasoningContent.Text)
                             {
                                 EncryptedContent = reasoningContent.ProtectedData,
                             };
+
+                            // Restore the reasoning item's id (stashed in AdditionalProperties on the way in)
+                            // so that encrypted reasoning roundtrips in stateless (store=false) scenarios,
+                            // where the service rejects a reasoning item that is missing its id. The value may
+                            // be a string (in-process) or a JsonElement (after the history has been serialized
+                            // and rehydrated, e.g. a persisted human-in-the-loop approval session).
+                            if (reasoningContent.AdditionalProperties?.TryGetValue(ReasoningItemIdKey, out object? reasoningItemIdValue) is true)
+                            {
+                                string? reasoningItemId =
+                                    reasoningItemIdValue as string ??
+                                    (reasoningItemIdValue is JsonElement { ValueKind: JsonValueKind.String } jsonElement ? jsonElement.GetString() : null);
+
+                                if (!string.IsNullOrEmpty(reasoningItemId))
+                                {
+                                    reasoningResponseItem.Id = reasoningItemId;
+                                }
+                            }
+
+                            yield return reasoningResponseItem;
                             break;
 
                         case McpServerToolCallContent mstcc:
@@ -1688,16 +1976,20 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
 
     private static void AddImageGenerationContents(ImageGenerationCallResponseItem outputItem, CreateResponseOptions? options, IList<AIContent> contents)
     {
+        contents.Add(new ImageGenerationToolCallContent(outputItem.Id));
+        contents.Add(CreateImageGenerationResultContent(outputItem, options));
+    }
+
+    private static ImageGenerationToolResultContent CreateImageGenerationResultContent(ImageGenerationCallResponseItem outputItem, CreateResponseOptions? options)
+    {
         var imageGenTool = options?.Tools.OfType<ImageGenerationTool>().FirstOrDefault();
         string outputFormat = imageGenTool?.OutputFileFormat?.ToString() ?? "png";
 
-        contents.Add(new ImageGenerationToolCallContent(outputItem.Id));
-
-        contents.Add(new ImageGenerationToolResultContent(outputItem.Id)
+        return new ImageGenerationToolResultContent(outputItem.Id)
         {
             RawRepresentation = outputItem,
             Outputs = [new DataContent(outputItem.ImageResultBytes, $"image/{outputFormat}")]
-        });
+        };
     }
 
     private static ImageGenerationToolResultContent GetImageGenerationResult(StreamingResponseImageGenerationCallPartialImageUpdate update, CreateResponseOptions? options)
@@ -1782,7 +2074,10 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
             {
                 string detailString => new ResponseImageDetailLevel(detailString),
                 ResponseImageDetailLevel detail => detail,
-                _ => null
+
+                // The SDK defines nullable and non-nullable op_Implicit conversions from string. Force a nullable result so
+                // null does not bind to the non-nullable conversion, which throws ArgumentNullException.
+                _ => (ResponseImageDetailLevel?)null
             };
         }
 

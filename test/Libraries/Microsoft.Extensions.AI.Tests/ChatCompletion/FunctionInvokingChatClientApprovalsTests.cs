@@ -83,6 +83,9 @@ public class FunctionInvokingChatClientApprovalsTests
             [
                 new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
                 new ToolApprovalRequestContent("ficc_callId2", new FunctionCallContent("callId2", "Func2", arguments: new Dictionary<string, object?> { { "i", 42 } }))
+                {
+                    RequiresConfirmation = false,
+                }
             ])
         ];
 
@@ -121,18 +124,119 @@ public class FunctionInvokingChatClientApprovalsTests
             new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1"), new FunctionCallContent("callId2", "Func2", arguments: new Dictionary<string, object?> { { "i", 42 } })]),
         ];
 
+        // When additionalToolsRequireApproval is true: Func1 (additional tools) requires approval and Func2 (options.Tools) does not.
+        // When false: Func2 (options.Tools) requires approval and Func1 (additional tools) does not.
         List<ChatMessage> expectedOutput =
         [
             new ChatMessage(ChatRole.Assistant,
             [
-                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1"))
+                {
+                    RequiresConfirmation = additionalToolsRequireApproval,
+                },
                 new ToolApprovalRequestContent("ficc_callId2", new FunctionCallContent("callId2", "Func2", arguments: new Dictionary<string, object?> { { "i", 42 } }))
+                {
+                    RequiresConfirmation = !additionalToolsRequireApproval,
+                }
             ])
         ];
 
         await InvokeAndAssertAsync(options, input, downstreamClientOutput, expectedOutput, additionalTools: additionalTools);
 
         await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, expectedOutput, additionalTools: additionalTools);
+    }
+
+    private sealed class PassThroughDelegatingAIFunction(AIFunction inner) : DelegatingAIFunction(inner);
+
+    [Fact]
+    public async Task RequiresConfirmation_IsTrueForApprovalRequiredFunctionNestedInDelegatingWrapperAsync()
+    {
+        // Wrap the ApprovalRequiredAIFunction in another DelegatingAIFunction (e.g. a telemetry decorator).
+        // FICC must still classify the call as approval-required (RequiresConfirmation = true, the default)
+        // by walking the delegation chain via GetService<ApprovalRequiredAIFunction>().
+        AITool[] tools =
+        [
+            new PassThroughDelegatingAIFunction(
+                new ApprovalRequiredAIFunction(
+                    AIFunctionFactory.Create(() => "Result 1", "Func1"))),
+            AIFunctionFactory.Create((int i) => $"Result 2: {i}", "Func2"),
+        ];
+
+        var options = new ChatOptions { Tools = tools };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+        ];
+
+        List<ChatMessage> downstreamClientOutput =
+        [
+            new ChatMessage(ChatRole.Assistant, [
+                new FunctionCallContent("callId1", "Func1"),
+                new FunctionCallContent("callId2", "Func2", arguments: new Dictionary<string, object?> { { "i", 42 } })
+            ]),
+        ];
+
+        List<ChatMessage> expectedOutput =
+        [
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+                new ToolApprovalRequestContent("ficc_callId2", new FunctionCallContent("callId2", "Func2", arguments: new Dictionary<string, object?> { { "i", 42 } }))
+                {
+                    RequiresConfirmation = false,
+                }
+            ])
+        ];
+
+        await InvokeAndAssertAsync(options, input, downstreamClientOutput, expectedOutput);
+
+        await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, expectedOutput);
+    }
+
+    [Fact]
+    public async Task RequiresConfirmation_IsFalseForFunctionCallWithNoMatchingToolWhenPeerRequiresApprovalAsync()
+    {
+        // The downstream client emits an FCC referencing a tool name that is not in the tools list.
+        // Because a peer call (Func1) requires approval, FICC still wraps the unknown call.
+        // Since no matching tool is found (and therefore no ApprovalRequiredAIFunction is detected),
+        // the resulting approval request must carry RequiresConfirmation = false.
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 1", "Func1")),
+            ]
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+        ];
+
+        List<ChatMessage> downstreamClientOutput =
+        [
+            new ChatMessage(ChatRole.Assistant, [
+                new FunctionCallContent("callId1", "Func1"),
+                new FunctionCallContent("callId2", "Unknown"),
+            ]),
+        ];
+
+        List<ChatMessage> expectedOutput =
+        [
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+                new ToolApprovalRequestContent("ficc_callId2", new FunctionCallContent("callId2", "Unknown"))
+                {
+                    RequiresConfirmation = false,
+                }
+            ])
+        ];
+
+        await InvokeAndAssertAsync(options, input, downstreamClientOutput, expectedOutput);
+
+        await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, expectedOutput);
     }
 
     [Fact]
@@ -755,6 +859,151 @@ public class FunctionInvokingChatClientApprovalsTests
     }
 
     /// <summary>
+    /// After serialization/deserialization, the TARC and TAResp may contain separate FCC object instances
+    /// for the same call. When a rejection is processed, GenerateRejectedFunctionResults must set
+    /// InformationalOnly=true on BOTH the TAResp's FCC and the TARC's FCC to ensure consistency
+    /// across serialization boundaries. This test verifies that both FCC instances are correctly
+    /// marked after rejection processing.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RejectionSetsInformationalOnlyOnBothRequestAndResponseFccInstancesAsync(bool streaming)
+    {
+        // Create two separate FCC objects for the same call — simulating deserialization
+        // where TARC and TAResp hold different FCC instances with the same CallId.
+        var requestFcc = new FunctionCallContent("callId1", "Func1");
+        var responseFcc = new FunctionCallContent("callId1", "Func1");
+
+        Assert.False(requestFcc.InformationalOnly);
+        Assert.False(responseFcc.InformationalOnly);
+
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 1", "Func1")),
+            ]
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new ToolApprovalRequestContent("ficc_callId1", requestFcc),
+            ]) { MessageId = "resp1" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", false, responseFcc),
+            ]),
+        ];
+
+        using var innerClient = new TestChatClient
+        {
+            GetResponseAsyncCallback = (contents, actualOptions, actualCancellationToken) =>
+                Task.FromResult(new ChatResponse([new ChatMessage(ChatRole.Assistant, "world")])),
+            GetStreamingResponseAsyncCallback = (contents, actualOptions, actualCancellationToken) =>
+                YieldAsync(new ChatResponse([new ChatMessage(ChatRole.Assistant, "world")]).ToChatResponseUpdates()),
+        };
+
+        IChatClient service = innerClient.AsBuilder()
+            .Use(s => new FunctionInvokingChatClient(s))
+            .Build();
+
+        if (streaming)
+        {
+            await service.GetStreamingResponseAsync(input, options).ToChatResponseAsync();
+        }
+        else
+        {
+            await service.GetResponseAsync(input, options);
+        }
+
+        // The fix ensures both FCC instances are marked InformationalOnly=true,
+        // even when they are separate objects (as happens after serialization).
+        Assert.True(requestFcc.InformationalOnly);
+        Assert.True(responseFcc.InformationalOnly);
+    }
+
+    /// <summary>
+    /// After serialization/deserialization, the TARC and TAResp may contain separate FCC object instances
+    /// for the same call. When a rejection is processed, GenerateRejectedFunctionResults must set
+    /// InformationalOnly=true on BOTH the TAResp's FCC and the TARC's FCC to ensure consistency
+    /// across serialization boundaries. Previously, this was not always happening, so adding
+    /// a test to ensure that this case does not throw.
+    /// See https://github.com/dotnet/extensions/pull/7468.
+    /// Workaround: Use a middleware to normalize InformationalOnly flags on deserialized sessions.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MixedInformationalOnlyWorkaroundWithMiddlewareAsync(bool streaming)
+    {
+        // Create two separate FCC objects for the same call — simulating deserialization
+        // where TARC and TAResp hold different FCC instances with the same CallId.
+        var request1Fcc = new FunctionCallContent("callId1", "Func1");
+        var response1Fcc = new FunctionCallContent("callId1", "Func1") { InformationalOnly = true };
+
+        var request2Fcc = new FunctionCallContent("callId2", "Func1");
+
+        Assert.False(request1Fcc.InformationalOnly);
+        Assert.True(response1Fcc.InformationalOnly);
+
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 1", "Func1")),
+            ]
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new ToolApprovalRequestContent("ficc_callId1", request1Fcc),
+            ]) { MessageId = "resp1" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", false, response1Fcc),
+            ]),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new ToolApprovalRequestContent("ficc_callId2", request2Fcc),
+            ]) { MessageId = "resp2" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId2", false, request2Fcc),
+            ]),
+        ];
+
+        using var innerClient = new TestChatClient
+        {
+            GetResponseAsyncCallback = (contents, actualOptions, actualCancellationToken) =>
+                Task.FromResult(new ChatResponse([new ChatMessage(ChatRole.Assistant, "world")])),
+            GetStreamingResponseAsyncCallback = (contents, actualOptions, actualCancellationToken) =>
+                YieldAsync(new ChatResponse([new ChatMessage(ChatRole.Assistant, "world")]).ToChatResponseUpdates()),
+        };
+
+        // Use a middleware to normalize InformationalOnly flags before FICC processes the messages.
+        IChatClient service = innerClient.AsBuilder()
+            .Use(s => new ApprovalHistoryNormalizingChatClient(s))
+            .Use(s => new FunctionInvokingChatClient(s))
+            .Build();
+
+        if (streaming)
+        {
+            await service.GetStreamingResponseAsync(input, options).ToChatResponseAsync();
+        }
+        else
+        {
+            await service.GetResponseAsync(input, options);
+        }
+    }
+
+    /// <summary>
     /// This verifies the following scenario:
     /// 1. We are streaming (also including non-streaming in the test for completeness).
     /// 2. There is one function that requires approval and one that does not.
@@ -937,8 +1186,326 @@ public class FunctionInvokingChatClientApprovalsTests
         await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
     }
 
-    /// <summary>
-    /// FunctionCallContent updates are buffered until the end of the stream so that the client can check
+    [Fact]
+    public async Task ApprovedResponsesStayAdjacentToToolCallWhenTrailingMessagesPresentWithServiceThreadsAsync()
+    {
+        // Service-managed history: only the new messages are passed and a ConversationId is set. The service
+        // holds the assistant tool-call, so the reconstructed tool result must be positioned ahead of any
+        // trailing caller-supplied message, otherwise the effective ordering seen by the provider becomes
+        // assistant(tool_calls) -> user(trailing) -> tool(result), which breaks tool_calls->tool adjacency.
+        var options = new ChatOptions
+        {
+            Tools = [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 1", "Func1"))],
+            ConversationId = "test-conversation",
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", true, new FunctionCallContent("callId1", "Func1")),
+            ]),
+
+            // A caller-supplied message after the approval response.
+            new ChatMessage(ChatRole.User, "By the way, please keep the answer concise."),
+        ];
+
+        // The tool result must come before the trailing caller message, and the assistant tool-call is not
+        // re-sent because the service already holds it.
+        List<ChatMessage> expectedDownstreamClientInput =
+        [
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+            new ChatMessage(ChatRole.User, "By the way, please keep the answer concise."),
+        ];
+
+        List<ChatMessage> downstreamClientOutput =
+        [
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        List<ChatMessage> output =
+        [
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        await InvokeAndAssertAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
+
+        await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
+    }
+
+    [Fact]
+    public async Task ApprovedResponseStaysAdjacentToToolCallWhenApprovalMessageHasOtherContentWithServiceThreadsAsync()
+    {
+        // Regression: the approval response shares a message with other caller content. Extraction removes the
+        // approval response but leaves the other content ("please proceed") in place. In service-managed mode the
+        // service holds the assistant tool-call, so the reconstructed tool result must still be placed ahead of that
+        // residual content, otherwise the effective ordering becomes
+        // assistant(tool_calls) -> user("please proceed") -> tool(result), which breaks tool_calls->tool adjacency.
+        var options = new ChatOptions
+        {
+            Tools = [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 1", "Func1"))],
+            ConversationId = "test-conversation",
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", true, new FunctionCallContent("callId1", "Func1")),
+                new TextContent("please proceed"),
+            ]),
+        ];
+
+        // The tool result is positioned at the front, ahead of the residual "please proceed" content that was left
+        // behind in the approval message after the approval response was extracted.
+        List<ChatMessage> expectedDownstreamClientInput =
+        [
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+            new ChatMessage(ChatRole.User, "please proceed"),
+        ];
+
+        List<ChatMessage> downstreamClientOutput =
+        [
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        List<ChatMessage> output =
+        [
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        await InvokeAndAssertAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
+
+        await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
+    }
+
+    [Fact]
+    public async Task ApprovedResponsesStayAdjacentToToolCallWhenTrailingMessagesPresentWithClientHistoryAsync()
+    {
+        // Client-managed history: the full history is passed and there is no ConversationId. The reconstructed
+        // assistant tool-call and tool result are inserted at the approval anchor, so trailing caller-supplied
+        // messages end up after the tool result while adjacency is preserved.
+        var options = new ChatOptions
+        {
+            Tools = [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 1", "Func1"))],
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+            ]) { MessageId = "resp1" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", true, new FunctionCallContent("callId1", "Func1")),
+            ]),
+
+            // A caller-supplied message after the approval response.
+            new ChatMessage(ChatRole.User, "By the way, please keep the answer concise."),
+        ];
+
+        // The reconstructed assistant tool-call and tool result are inserted at the approval anchor, so they
+        // remain adjacent and the trailing caller message follows the tool result.
+        List<ChatMessage> expectedDownstreamClientInput =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+            new ChatMessage(ChatRole.User, "By the way, please keep the answer concise."),
+        ];
+
+        List<ChatMessage> downstreamClientOutput =
+        [
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        List<ChatMessage> output =
+        [
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        await InvokeAndAssertAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
+
+        await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
+    }
+
+    [Fact]
+    public async Task ApprovedResponseStaysAdjacentToToolCallWhenApprovalMessageHasOtherContentWithClientHistoryAsync()
+    {
+        // Client-managed history where the approval response shares a message with other caller content. The
+        // reconstructed tool-call/result block is inserted just before that approval message, so the residual
+        // content ("please proceed") that survives extraction ends up after the reconstructed assistant tool-call
+        // and tool result rather than wedged before them.
+        var options = new ChatOptions
+        {
+            Tools = [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 1", "Func1"))],
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+            ]) { MessageId = "resp1" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", true, new FunctionCallContent("callId1", "Func1")),
+                new TextContent("please proceed"),
+            ]),
+        ];
+
+        List<ChatMessage> expectedDownstreamClientInput =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+            new ChatMessage(ChatRole.User, "please proceed"),
+        ];
+
+        List<ChatMessage> downstreamClientOutput =
+        [
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        List<ChatMessage> output =
+        [
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        await InvokeAndAssertAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
+
+        await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
+    }
+
+    [Fact]
+    public async Task ApprovedResponseThatRequestsTerminationStopsBeforeCallingInnerClientAsync()
+    {
+        // An approved function requests termination of the processing loop. Approval responses are handled before
+        // the main loop, so processing must stop right after the approval block - yielding the reconstructed
+        // tool-call and tool result but never calling the inner client. This covers the streaming yield break and
+        // non-streaming return that fire even though the approval block produced messages.
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() =>
+                {
+                    FunctionInvokingChatClient.CurrentContext!.Terminate = true;
+                    return "Result 1";
+                }, "Func1")),
+            ],
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+            ]) { MessageId = "resp1" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", true, new FunctionCallContent("callId1", "Func1")),
+            ]),
+        ];
+
+        List<ChatMessage> expectedOutput =
+        [
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+        ];
+
+        using (var innerClient = new TestChatClient
+        {
+            GetResponseAsyncCallback = (_, _, _) =>
+                throw new InvalidOperationException("The inner client must not be called after the approved function requests termination."),
+        })
+        {
+            using var service = new FunctionInvokingChatClient(innerClient);
+            var result = await service.GetResponseAsync(CloneInput(input), options);
+            AssertExtensions.EqualMessageLists(expectedOutput, result.Messages.ToList());
+        }
+
+        using (var innerClient = new TestChatClient
+        {
+            GetStreamingResponseAsyncCallback = (_, _, _) =>
+                throw new InvalidOperationException("The inner client must not be called after the approved function requests termination."),
+        })
+        {
+            using var service = new FunctionInvokingChatClient(innerClient);
+            var result = await service.GetStreamingResponseAsync(CloneInput(input), options).ToChatResponseAsync();
+            AssertExtensions.EqualMessageLists(expectedOutput, result.Messages.ToList());
+        }
+    }
+
+    [Fact]
+    public async Task ApprovedResponseThatRequestsTerminationAndThrowsStopsBeforeCallingInnerClientAsync()
+    {
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                new ApprovalRequiredAIFunction(AIFunctionFactory.Create(string () =>
+                {
+                    FunctionInvokingChatClient.CurrentContext!.Terminate = true;
+                    throw new InvalidOperationException("Oh no!");
+                }, "Func1")),
+            ],
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+            ]) { MessageId = "resp1" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", true, new FunctionCallContent("callId1", "Func1")),
+            ]),
+        ];
+
+        List<ChatMessage> expectedOutput =
+        [
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Error: Function failed.")]),
+        ];
+
+        using (var innerClient = new TestChatClient
+        {
+            GetResponseAsyncCallback = (_, _, _) =>
+                throw new InvalidOperationException("The inner client must not be called after the approved function requests termination."),
+        })
+        {
+            using var service = new FunctionInvokingChatClient(innerClient);
+            var result = await service.GetResponseAsync(CloneInput(input), options);
+            AssertExtensions.EqualMessageLists(expectedOutput, result.Messages.ToList());
+        }
+
+        using (var innerClient = new TestChatClient
+        {
+            GetStreamingResponseAsyncCallback = (_, _, _) =>
+                throw new InvalidOperationException("The inner client must not be called after the approved function requests termination."),
+        })
+        {
+            using var service = new FunctionInvokingChatClient(innerClient);
+            var result = await service.GetStreamingResponseAsync(CloneInput(input), options).ToChatResponseAsync();
+            AssertExtensions.EqualMessageLists(expectedOutput, result.Messages.ToList());
+        }
+    }
+
     /// for matching FunctionResultContent from server-handled function calls and mark those FCCs as
     /// InformationalOnly. This means FCCs are not yielded immediately, even when no approval is required.
     /// </summary>
@@ -1286,10 +1853,6 @@ public class FunctionInvokingChatClientApprovalsTests
             [
                 new ToolApprovalRequestContent("callId2", new McpServerToolCallContent("callId2", "McpCall", "myServer"))
             ]),
-            new ChatMessage(ChatRole.User,
-            [
-                new ToolApprovalResponseContent("callId2", true, new McpServerToolCallContent("callId2", "McpCall", "myServer"))
-            ]),
             new ChatMessage(ChatRole.Assistant,
             [
                 new FunctionCallContent("callId1", "Func")
@@ -1297,6 +1860,10 @@ public class FunctionInvokingChatClientApprovalsTests
             new ChatMessage(ChatRole.Tool,
             [
                 new FunctionResultContent("callId1", result: "Result 1")
+            ]),
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("callId2", true, new McpServerToolCallContent("callId2", "McpCall", "myServer"))
             ]),
         ];
 
@@ -1369,10 +1936,6 @@ public class FunctionInvokingChatClientApprovalsTests
                 [
                     new ToolApprovalRequestContent("callId2", new McpServerToolCallContent("callId2", "McpCall", "myServer"))
                 ]),
-                new ChatMessage(ChatRole.User,
-                [
-                    new ToolApprovalResponseContent("callId2", approveMcpCall, new McpServerToolCallContent("callId2", "McpCall", "myServer"))
-                ]),
                 new ChatMessage(ChatRole.Assistant,
                 [
                     new FunctionCallContent("callId1", "Func")
@@ -1382,6 +1945,10 @@ public class FunctionInvokingChatClientApprovalsTests
                     approveFuncCall ?
                         new FunctionResultContent("callId1", result: "Result 1") :
                         new FunctionResultContent("callId1", result: "Tool call invocation rejected.")
+                ]),
+                new ChatMessage(ChatRole.User,
+                [
+                    new ToolApprovalResponseContent("callId2", approveMcpCall, new McpServerToolCallContent("callId2", "McpCall", "myServer"))
                 ]),
             ];
 
@@ -1590,7 +2157,10 @@ public class FunctionInvokingChatClientApprovalsTests
             InformationalOnly = fcc.InformationalOnly
         },
         ToolApprovalRequestContent tarc =>
-            new ToolApprovalRequestContent(tarc.RequestId, (ToolCallContent)CloneFcc(tarc.ToolCall)),
+            new ToolApprovalRequestContent(tarc.RequestId, (ToolCallContent)CloneFcc(tarc.ToolCall))
+            {
+                RequiresConfirmation = tarc.RequiresConfirmation,
+            },
         ToolApprovalResponseContent tarc =>
             new ToolApprovalResponseContent(tarc.RequestId, tarc.Approved, (ToolCallContent)CloneFcc(tarc.ToolCall))
             {
@@ -1598,5 +2168,54 @@ public class FunctionInvokingChatClientApprovalsTests
             },
         _ => c
     };
+
+    /// <summary>
+    /// Workaround middleware for sessions serialized before
+    /// https://github.com/dotnet/extensions/pull/7468.
+    /// Normalizes InformationalOnly flags so TARC/TAResp pairs stay consistent.
+    /// </summary>
+#pragma warning disable SA1402 // File may only contain a single type
+    private sealed class ApprovalHistoryNormalizingChatClient(IChatClient inner) : DelegatingChatClient(inner)
+#pragma warning restore SA1402
+    {
+        public override Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            NormalizeApprovalFlags(messages);
+            return base.GetResponseAsync(messages, options, cancellationToken);
+        }
+
+        public override IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            NormalizeApprovalFlags(messages);
+            return base.GetStreamingResponseAsync(messages, options, cancellationToken);
+        }
+
+        private static void NormalizeApprovalFlags(IEnumerable<ChatMessage> messages)
+        {
+            var allContents = messages.SelectMany(m => m.Contents);
+
+            var processedCallIds = new HashSet<string>(
+                allContents
+                    .OfType<ToolApprovalResponseContent>()
+                    .Where(t => t.ToolCall is FunctionCallContent { InformationalOnly: true })
+                    .Select(t => t.ToolCall.CallId));
+
+            if (processedCallIds.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var fcc in allContents
+                .OfType<ToolApprovalRequestContent>()
+                .Select(t => t.ToolCall)
+                .OfType<FunctionCallContent>()
+                .Where(fcc => !fcc.InformationalOnly && processedCallIds.Contains(fcc.CallId)))
+            {
+                fcc.InformationalOnly = true;
+            }
+        }
+    }
 }
 

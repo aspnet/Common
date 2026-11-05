@@ -1,17 +1,21 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring.Windows.Test;
 
 [SupportedOSPlatform("windows")]
-[OSSkipCondition(OperatingSystems.Linux | OperatingSystems.MacOSX, SkipReason = "Windows specific.")]
 public class PerformanceCounterWrapperTests
 {
-    [ConditionalFact]
+    public PerformanceCounterWrapperTests()
+    {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Windows), "Skipped on Linux/macOS");
+    }
+
+    [Fact]
     public void GetInstanceNameTest()
     {
         var wrapper = new PerformanceCounterWrapper("Processor", "% Processor Time", "_Total");

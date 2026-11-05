@@ -20,23 +20,28 @@ namespace Test
                 }
 
                 var state = global::Microsoft.Extensions.Logging.LoggerMessageHelper.ThreadLocalState;
+                try
+                {
 
-                _ = state.ReserveTagSpace(3);
-                state.TagArray[2] = new("{OriginalFormat}", "Testing nullable property within class here...");
-                state.TagArray[1] = new("classWithNullablePropertyParam.NullableDateTime", classWithNullablePropertyParam?.NullableDateTime);
-                state.TagArray[0] = new("classWithNullablePropertyParam.NonNullableDateTime", classWithNullablePropertyParam?.NonNullableDateTime);
+                    _ = state.ReserveTagSpace(3);
+                    state.TagArray[2] = new("{OriginalFormat}", "Testing nullable property within class here...");
+                    state.TagArray[1] = new("classWithNullablePropertyParam.NullableDateTime", classWithNullablePropertyParam?.NullableDateTime);
+                    state.TagArray[0] = new("classWithNullablePropertyParam.NonNullableDateTime", classWithNullablePropertyParam?.NonNullableDateTime);
 
-                logger.Log(
-                    global::Microsoft.Extensions.Logging.LogLevel.Information,
-                    new(0, nameof(LogMethodNullablePropertyInClassMatchesNonNullable)),
-                    state,
-                    null,
-                    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Gen.Logging", "VERSION")] static string (s, _) =>
-                    {
-                        return "Testing nullable property within class here...";
-                    });
-
-                state.Clear();
+                    logger.Log(
+                        global::Microsoft.Extensions.Logging.LogLevel.Information,
+                        new(0, nameof(LogMethodNullablePropertyInClassMatchesNonNullable)),
+                        state,
+                        null,
+                        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Gen.Logging", "VERSION")] static string (s, _) =>
+                        {
+                            return "Testing nullable property within class here...";
+                        });
+                }
+                finally
+                {
+                    state.Clear();
+                }
             }
         }
     }

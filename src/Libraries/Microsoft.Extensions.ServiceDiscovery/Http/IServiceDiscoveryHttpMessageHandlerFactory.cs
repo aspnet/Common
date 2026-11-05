@@ -4,13 +4,13 @@
 namespace Microsoft.Extensions.ServiceDiscovery.Http;
 
 /// <summary>
-/// Factory which creates <see cref="HttpMessageHandler"/> instances which resolve endpoints using service discovery
+/// Represents a factory that creates <see cref="HttpMessageHandler"/> instances that resolve endpoints using service discovery
 /// before delegating to a provided handler.
 /// </summary>
 public interface IServiceDiscoveryHttpMessageHandlerFactory
 {
     /// <summary>
-    /// Creates an <see cref="HttpMessageHandler"/> instance which resolve endpoints using service discovery before
+    /// Creates an <see cref="HttpMessageHandler"/> instance that resolves endpoints using service discovery before
     /// delegating to a provided handler.
     /// </summary>
     /// <param name="handler">The handler to delegate to.</param>

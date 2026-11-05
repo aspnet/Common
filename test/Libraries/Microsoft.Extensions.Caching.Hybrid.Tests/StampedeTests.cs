@@ -7,6 +7,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Hybrid.Internal;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Microsoft.Extensions.Caching.Hybrid.Tests;
 
@@ -215,12 +216,15 @@ public class StampedeTests : IClassFixture<TestEventListener>
             cancel.Cancel();
         }
 
-        await Task.Delay(500); // cancellation happens on a worker; need to allow a moment
+        // allow the shared underlying task time to enter its semaphore wait
+        await Task.Delay(500);
+
         for (var i = 0; i < callerCount; i++)
         {
             var result = results[i];
 
-            // should have already cancelled, even though underlying task hasn't finished yet
+            // cancellation happens on a worker; wait up to 5 seconds total for the caller's task to observe its cancel
+            await WaitForCompletionAsync(result, 5_000);
             Assert.Equal(TaskStatus.Canceled, result.Status);
             var ex = Assert.Throws<OperationCanceledException>(() => result.GetAwaiter().GetResult());
             Assert.Equal(cancels[i].Token, ex.CancellationToken); // each gets the correct blame
@@ -296,14 +300,17 @@ public class StampedeTests : IClassFixture<TestEventListener>
             }
         }
 
-        await Task.Delay(500); // cancellation happens on a worker; need to allow a moment
+        // allow the shared underlying task time to enter its semaphore wait
+        await Task.Delay(500);
+
         for (var i = 0; i < callerCount; i++)
         {
             if (i != remaining)
             {
                 var result = results[i];
 
-                // should have already cancelled, even though underlying task hasn't finished yet
+                // cancellation happens on a worker; wait up to 5 seconds total for the caller's task to observe its cancel
+                await WaitForCompletionAsync(result, 5_000);
                 Assert.Equal(TaskStatus.Canceled, result.Status);
                 var ex = Assert.Throws<OperationCanceledException>(() => result.GetAwaiter().GetResult());
                 Assert.Equal(cancels[i].Token, ex.CancellationToken); // each gets the correct blame
@@ -479,6 +486,53 @@ public class StampedeTests : IClassFixture<TestEventListener>
         }
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(10)]
+    public Task JoinedCallersWithoutUnderlyingDataBalanceReservations_Immutable(int callerCount)
+        => JoinedCallersWithoutUnderlyingDataBalanceReservationsAsync<Immutable>(callerCount);
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(10)]
+    public Task JoinedCallersWithoutUnderlyingDataBalanceReservations_Mutable(int callerCount)
+        => JoinedCallersWithoutUnderlyingDataBalanceReservationsAsync<Mutable>(callerCount);
+
+    private static async Task JoinedCallersWithoutUnderlyingDataBalanceReservationsAsync<T>(int callerCount)
+        where T : class
+    {
+        // regression: a miss with DisableUnderlyingData used to complete every joined caller with one shared item
+        // that held a single reservation, so each extra caller over-released it
+        using var scope = GetDefaultCache(out var cache);
+        const HybridCacheEntryFlags Flags = HybridCacheEntryFlags.DisableDistributedCache | HybridCacheEntryFlags.DisableLocalCache
+            | HybridCacheEntryFlags.DisableUnderlyingData;
+
+        Assert.True(cache.GetOrCreateStampedeState<int, T>(Me(), Flags, out var stampede, canBeCanceled: true, tags: null));
+        for (int i = 1; i < callerCount; i++)
+        {
+            Assert.False(cache.GetOrCreateStampedeState<int, T>(Me(), Flags, out var joined, canBeCanceled: true, tags: null));
+            Assert.Same(stampede, joined);
+        }
+
+        Assert.Equal(callerCount, cache.DebugGetCallerCount(Me(), Flags));
+
+        await stampede.ExecuteDirectAsync(0, static (_, _) => throw new InvalidOperationException("Underlying data should not be invoked"), options: null);
+        Assert.Equal(0, cache.DebugGetCallerCount(Me(), Flags)); // no longer an active operation
+
+        // every caller must receive an item that holds a reservation for it
+#pragma warning disable VSTHRD003 // Avoid awaiting foreign Tasks
+        DefaultHybridCache.CacheItem<T> item = await stampede.Task;
+#pragma warning restore VSTHRD003
+        Assert.Equal(callerCount, item.RefCount);
+
+        for (int i = 0; i < callerCount; i++)
+        {
+            Assert.Null(await stampede.JoinAsync(NullLogger.Instance, CancellationToken.None));
+        }
+
+        Assert.Equal(0, item.RefCount);
+    }
+
     private class Mutable(Guid value)
     {
         public Guid Value => value;
@@ -491,4 +545,23 @@ public class StampedeTests : IClassFixture<TestEventListener>
     }
 
     private static string Me([CallerMemberName] string caller = "") => caller;
+
+    private static async Task WaitForCompletionAsync(
+        Task task,
+        int timeoutMs,
+        [CallerArgumentExpression(nameof(task))] string? expression = null)
+    {
+        if (task.IsCompleted)
+        {
+            return;
+        }
+
+#pragma warning disable VSTHRD003 // Avoid awaiting foreign Tasks
+        var completed = await Task.WhenAny(task, Task.Delay(timeoutMs));
+#pragma warning restore VSTHRD003
+        if (completed != task)
+        {
+            throw new TimeoutException($"Task '{expression}' did not complete within {timeoutMs}ms");
+        }
+    }
 }

@@ -10,6 +10,7 @@ using System.Reflection.Emit;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +19,7 @@ using Xunit;
 #pragma warning disable IDE0004 // Remove Unnecessary Cast
 #pragma warning disable S103 // Lines should not be too long
 #pragma warning disable S107 // Methods should not have too many parameters
+#pragma warning disable S1144 // Unused private types or members should be removed (accessed via reflection)
 #pragma warning disable S2760 // Sequential tests should not check the same condition
 #pragma warning disable S3358 // Ternary operators should not be nested
 #pragma warning disable S5034 // "ValueTask" should be consumed correctly
@@ -115,6 +117,7 @@ public partial class AIFunctionFactoryTest
             AIFunctionFactory.Create((string? theParam) => theParam + " " + theParam),
             AIFunctionFactory.Create((int theParam) => theParam * 2),
             AIFunctionFactory.Create((int? theParam) => theParam * 2),
+            AIFunctionFactory.Create(([AIParameterName("theParam")] string otherName) => otherName),
         ];
 
         foreach (AIFunction f in funcs)
@@ -316,6 +319,172 @@ public partial class AIFunctionFactoryTest
     }
 
     [Fact]
+    public void Metadata_AIFunctionNameAttribute()
+    {
+        Func<string> funcWithAttribute = [AIFunctionName("get_user")] () => "test";
+        AIFunction func = AIFunctionFactory.Create(funcWithAttribute);
+        Assert.Equal("get_user", func.Name);
+
+        Func<string> funcWithBoth = [AIFunctionName("my_function")][DisplayName("display_name")] () => "test";
+        func = AIFunctionFactory.Create(funcWithBoth);
+        Assert.Equal("my_function", func.Name);
+
+        func = AIFunctionFactory.Create(funcWithAttribute, name: "explicit_name");
+        Assert.Equal("explicit_name", func.Name);
+
+        func = AIFunctionFactory.Create(funcWithAttribute, new AIFunctionFactoryOptions { Name = "options_name" });
+        Assert.Equal("options_name", func.Name);
+    }
+
+    [Fact]
+    public void Metadata_AIFunctionAndParameterNameAttributes_PreservedByAsDeclarationOnly()
+    {
+        AIFunction func = AIFunctionFactory.Create([AIFunctionName("my_tool")] ([AIParameterName("my_param")] string myParam) => myParam);
+
+        AIFunctionDeclaration declaration = func.AsDeclarationOnly();
+
+        Assert.Equal("my_tool", declaration.Name);
+        Assert.Equal(func.JsonSchema.ToString(), declaration.JsonSchema.ToString());
+        Assert.Contains("my_param", declaration.JsonSchema.ToString());
+        Assert.IsNotAssignableFrom<AIFunction>(declaration);
+    }
+
+    [Fact]
+    public async Task Parameters_MappedByAIParameterNameAttribute_Async()
+    {
+        AIFunction func = AIFunctionFactory.Create(([AIParameterName("$select")] string select, int top) => select + top);
+
+        AssertExtensions.EqualFunctionCallResults("Name2", await func.InvokeAsync(new() { ["$select"] = "Name", ["top"] = 2 }));
+    }
+
+    [Fact]
+    public void Parameters_AIParameterNameAttribute_OverridesSchemaPropertyName()
+    {
+        AIFunction func = AIFunctionFactory.Create(
+            ([AIParameterName("my_param")] string myParam, int top) => myParam + top);
+
+        JsonElement expectedSchema = JsonDocument.Parse("""
+            {
+                "type": "object",
+                "properties": {
+                    "my_param": { "type": "string" },
+                    "top": { "type": "integer" }
+                },
+                "required": ["my_param", "top"]
+            }
+            """).RootElement;
+
+        AssertExtensions.EqualJsonValues(expectedSchema, func.JsonSchema);
+    }
+
+    [Fact]
+    public async Task Parameters_AIParameterNameAttribute_StrictUnmappedMemberHandling_Async()
+    {
+        JsonSerializerOptions strictOptions = new(AIJsonUtilities.DefaultOptions)
+        {
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        };
+
+        AIFunction func = AIFunctionFactory.Create(
+            ([AIParameterName("my_param")] string myParam) => myParam,
+            new AIFunctionFactoryOptions { SerializerOptions = strictOptions });
+
+        // The overridden name is "expected", so it passes strict validation.
+        AssertExtensions.EqualFunctionCallResults("Name", await func.InvokeAsync(new() { ["my_param"] = "Name" }));
+
+        // The underlying C# name is now an unexpected argument.
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>("arguments", async () =>
+            await func.InvokeAsync(new() { ["myParam"] = "Name" }));
+        Assert.Contains("myParam", ex.Message);
+    }
+
+    [Fact]
+    public async Task Parameters_AIParameterNameAttribute_InheritedByOverride_Async()
+    {
+        MethodInfo overrideMethod = typeof(MyDerivedType).GetMethod(nameof(MyDerivedType.Method))!;
+        AIFunction func = AIFunctionFactory.Create(overrideMethod, new MyDerivedType());
+
+        Assert.Contains("my_param", func.JsonSchema.ToString());
+        Assert.DoesNotContain("\"myParam\"", func.JsonSchema.ToString());
+
+        AssertExtensions.EqualFunctionCallResults("param='Name'", await func.InvokeAsync(new() { ["my_param"] = "Name" }));
+    }
+
+    [Fact]
+    public void Parameters_AIParameterNameAttribute_EscapesJsonPointerRef()
+    {
+        JsonSerializerOptions options = new(AIJsonUtilities.DefaultOptions) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() };
+
+        AIFunction func = AIFunctionFactory.Create(
+            ([AIParameterName("a/b~c")] AIParameterNameAttributeRecursiveNode node) => node.ToString(),
+            new AIFunctionFactoryOptions { SerializerOptions = options });
+
+        string schema = func.JsonSchema.ToString();
+
+        Assert.Contains("#/properties/a~1b~0c", schema);
+        Assert.DoesNotContain("#/properties/a/b~c", schema);
+    }
+
+    [Fact]
+    public void Parameters_AIParameterNameAttribute_DuplicateNames_Throw()
+    {
+        ArgumentException ex = Assert.Throws<ArgumentException>(() => AIFunctionFactory.Create(
+            ([AIParameterName("dup")] string first, [AIParameterName("dup")] string second) => first + second));
+        Assert.Contains("dup", ex.Message);
+        Assert.Equal("method", ex.ParamName);
+
+        ArgumentException ex2 = Assert.Throws<ArgumentException>(() => AIFunctionFactory.Create(
+            ([AIParameterName("filter")] string select, string filter) => select + filter));
+        Assert.Contains("filter", ex2.Message);
+        Assert.Equal("method", ex2.ParamName);
+    }
+
+    [Fact]
+    public void Parameters_AIParameterNameAttribute_DuplicateNames_ExcludedFromSchema()
+    {
+        // Validates that collision detection occurs in ExpectedArgumentNames collection
+        // even when one of the colliding parameters is excluded from schema generation.
+        // This addresses the concern that collisions might go undetected when
+        // ExcludeFromSchema = true for one of the parameters.
+
+        var options = new AIFunctionFactoryOptions
+        {
+            ConfigureParameterBinding = p => p.Name == "second"
+                ? new AIFunctionFactoryOptions.ParameterBindingOptions { ExcludeFromSchema = true }
+                : default
+        };
+
+        ArgumentException ex = Assert.Throws<ArgumentException>(() => AIFunctionFactory.Create(
+            ([AIParameterName("dup")] string first, [AIParameterName("dup")] string second) => first + second,
+            options));
+        Assert.Contains("dup", ex.Message);
+        Assert.Contains("AIParameterNameAttribute", ex.Message);
+        Assert.Equal("method", ex.ParamName);
+    }
+
+    [Fact]
+    public void AIFunctionFactory_InheritedDescriptionAttributes_OnOverride()
+    {
+        MethodInfo overrideMethod = typeof(DerivedDescribed).GetMethod(nameof(DerivedDescribed.Compute))!;
+        AIFunction f = AIFunctionFactory.Create(overrideMethod, new DerivedDescribed());
+
+        Assert.Equal("The compute method", f.Description);
+
+        JsonElement valueParam = f.JsonSchema.GetProperty("properties").GetProperty("value");
+        Assert.Equal("The input value", valueParam.GetProperty("description").GetString());
+
+        Assert.NotNull(f.ReturnJsonSchema);
+        Assert.Equal("integer", f.ReturnJsonSchema!.Value.GetProperty("type").GetString());
+#if NET
+        // On modern .NET the return-parameter inheritance walk is fixed, so the inherited description is read.
+        Assert.Equal("The computed result", f.ReturnJsonSchema!.Value.GetProperty("description").GetString());
+#else
+        // On .NET Framework the inherited return-parameter description cannot be read and is silently dropped.
+        Assert.False(f.ReturnJsonSchema!.Value.TryGetProperty("description", out _));
+#endif
+    }
+
+    [Fact]
     public void AIFunctionFactoryCreateOptions_ValuesPropagateToAIFunction()
     {
         IReadOnlyDictionary<string, object?> metadata = new Dictionary<string, object?> { ["a"] = "b" };
@@ -380,6 +549,67 @@ public partial class AIFunctionFactoryTest
         });
         Assert.NotNull(result);
         Assert.Contains("test42", result.ToString());
+    }
+
+    [Fact]
+    public void AIFunctionFactoryOptions_ExcludeFromSchema_HonoredUnderConcurrentCreation()
+    {
+        MethodInfo[] methods = typeof(ExcludeFromSchemaConcurrencyTools)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static);
+        IExcludedService service = new ExcludedService();
+        int leaks = 0;
+
+        Parallel.For(0, 64, _ =>
+        {
+            foreach (MethodInfo method in methods)
+            {
+                AIFunctionFactoryOptions options = new()
+                {
+                    ConfigureParameterBinding = p => p.ParameterType == typeof(IExcludedService)
+                        ? new AIFunctionFactoryOptions.ParameterBindingOptions
+                        {
+                            ExcludeFromSchema = true,
+                            BindParameter = (_, _) => service,
+                        }
+                        : default,
+                };
+
+                JsonElement schema = AIFunctionFactory.Create(method, target: null, options).JsonSchema;
+
+                bool inRequired = schema.TryGetProperty("required", out JsonElement required) &&
+                    required.EnumerateArray().Any(e => e.GetString() == "service");
+                bool inProperties = schema.TryGetProperty("properties", out JsonElement properties) &&
+                    properties.TryGetProperty("service", out JsonElement _);
+                if (inRequired || inProperties)
+                {
+                    Interlocked.Increment(ref leaks);
+                }
+            }
+        });
+
+        Assert.Equal(0, leaks);
+    }
+
+    private interface IExcludedService
+    {
+        string Value { get; }
+    }
+
+    private static class ExcludeFromSchemaConcurrencyTools
+    {
+        public static string One(IExcludedService service, [Description("q")] string query, [Description("o")] string? optional = null) => $"{service.Value}{query}{optional}";
+        public static string Two(IExcludedService service, [Description("o")] string? optional = null) => $"{service.Value}{optional}";
+        public static string Three(IExcludedService service, [Description("n")] string name) => $"{service.Value}{name}";
+        public static string Four(IExcludedService service, [Description("n")] string name, [Description("a")] string? aspect = null) => $"{service.Value}{name}{aspect}";
+        public static string Five(IExcludedService service, [Description("q")] string query, [Description("f")] string framework) => $"{service.Value}{query}{framework}";
+        public static string Six(IExcludedService service, [Description("c")] string? category = null) => $"{service.Value}{category}";
+        public static string Seven(IExcludedService service, [Description("t")] string? topic = null) => $"{service.Value}{topic}";
+        public static string Eight(IExcludedService service) => service.Value;
+    }
+
+    private sealed class ExcludedService : IExcludedService
+    {
+        public string Value => "service";
     }
 
     [Fact]
@@ -1455,6 +1685,134 @@ public partial class AIFunctionFactoryTest
 #endif
     }
 
+    [Fact]
+    public async Task Parameters_UnmappedMemberHandlingDisallow_ThrowsOnExtraArgument_Async()
+    {
+        JsonSerializerOptions strictOptions = new(AIJsonUtilities.DefaultOptions)
+        {
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        };
+
+        AIFunction func = AIFunctionFactory.Create(
+            (string taskId, string update, bool markComplete = false) => $"{taskId}:{update}:{markComplete}",
+            new AIFunctionFactoryOptions { SerializerOptions = strictOptions });
+
+        // Extra, unrecognized argument causes a throw.
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>("arguments", async () =>
+            await func.InvokeAsync(new()
+            {
+                ["taskId"] = "abc",
+                ["update"] = "Done",
+                ["phase"] = "completed",
+            }));
+        Assert.Contains("phase", ex.Message);
+
+        // Still succeeds when no unexpected arguments are present (optional parameter omitted).
+        object? result = await func.InvokeAsync(new()
+        {
+            ["taskId"] = "abc",
+            ["update"] = "Done",
+        });
+        AssertExtensions.EqualFunctionCallResults("abc:Done:False", result);
+    }
+
+    [Fact]
+    public async Task Parameters_UnmappedMemberHandlingDefault_IgnoresExtraArgument_Async()
+    {
+        // Default behavior (Skip) should preserve pre-existing lenient binding.
+        AIFunction func = AIFunctionFactory.Create(
+            (string update, bool markComplete = false) => $"{update}:{markComplete}");
+
+        object? result = await func.InvokeAsync(new()
+        {
+            ["update"] = "Done",
+            ["phase"] = "completed",
+        });
+        AssertExtensions.EqualFunctionCallResults("Done:False", result);
+    }
+
+    [Fact]
+    public async Task Parameters_UnmappedMemberHandlingDisallow_HonorsArgumentsComparer_Async()
+    {
+        JsonSerializerOptions strictOptions = new(AIJsonUtilities.DefaultOptions)
+        {
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        };
+
+        AIFunction func = AIFunctionFactory.Create(
+            (string update, bool markComplete = false) => $"{update}:{markComplete}",
+            new AIFunctionFactoryOptions { SerializerOptions = strictOptions });
+
+        // Case-insensitive arguments dictionary: casing variations of the parameter name must not be
+        // flagged as unmapped, since the binding lookup itself is case-insensitive.
+        AIFunctionArguments caseInsensitive = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["UPDATE"] = "Done",
+            ["MarkComplete"] = true,
+        };
+        AssertExtensions.EqualFunctionCallResults("Done:True", await func.InvokeAsync(caseInsensitive));
+
+        // A genuinely unmapped key is still flagged even with a case-insensitive comparer.
+        AIFunctionArguments withExtra = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["update"] = "Done",
+            ["PHASE"] = "completed",
+        };
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>("arguments", async () =>
+            await func.InvokeAsync(withExtra));
+        Assert.Contains("PHASE", ex.Message);
+    }
+
+    [Fact]
+    public async Task Parameters_UnmappedMemberHandlingDisallow_ParameterlessMethod_ThrowsOnAnyArgument_Async()
+    {
+        JsonSerializerOptions strictOptions = new(AIJsonUtilities.DefaultOptions)
+        {
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        };
+
+        AIFunction func = AIFunctionFactory.Create(
+            () => "ok",
+            new AIFunctionFactoryOptions { SerializerOptions = strictOptions });
+
+        // No args is fine.
+        AssertExtensions.EqualFunctionCallResults("ok", await func.InvokeAsync());
+
+        // Any extra key is flagged.
+        ArgumentException ex = await Assert.ThrowsAsync<ArgumentException>("arguments", async () =>
+            await func.InvokeAsync(new() { ["phase"] = "completed" }));
+        Assert.Contains("phase", ex.Message);
+    }
+
+    [Fact]
+    public async Task Parameters_UnmappedMemberHandlingDisallow_CustomBindParameter_SkipsStrictValidation_Async()
+    {
+        JsonSerializerOptions strictOptions = new(AIJsonUtilities.DefaultOptions)
+        {
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        };
+
+        // A custom BindParameter callback sources its value from a key that does not correspond
+        // to the .NET parameter name. Strict validation must be skipped so such binders keep working.
+        AIFunction func = AIFunctionFactory.Create(
+            (string update) => $"update:{update}",
+            new AIFunctionFactoryOptions
+            {
+                SerializerOptions = strictOptions,
+                ConfigureParameterBinding = _ => new()
+                {
+                    BindParameter = (_, args) => args["aliasedKey"],
+                },
+            });
+
+        object? result = await func.InvokeAsync(new()
+        {
+            ["aliasedKey"] = "hello",
+            ["anotherKey"] = "world",
+        });
+        AssertExtensions.EqualFunctionCallResults("update:hello", result);
+    }
+
     [JsonSerializable(typeof(IAsyncEnumerable<int>))]
     [JsonSerializable(typeof(int[]))]
     [JsonSerializable(typeof(string))]
@@ -1464,4 +1822,31 @@ public partial class AIFunctionFactoryTest
     [JsonSerializable(typeof(int?))]
     [JsonSerializable(typeof(DateTime?))]
     private partial class JsonContext : JsonSerializerContext;
+
+    private abstract class MyBaseType
+    {
+        public abstract string Method([AIParameterName("my_param")] string myParam);
+    }
+
+    private sealed class MyDerivedType : MyBaseType
+    {
+        public override string Method(string myParam) => $"param='{myParam}'";
+    }
+
+    private sealed class AIParameterNameAttributeRecursiveNode
+    {
+        public AIParameterNameAttributeRecursiveNode? Next { get; set; }
+    }
+
+    private abstract class BaseDescribed
+    {
+        [Description("The compute method")]
+        [return: Description("The computed result")]
+        public abstract int Compute([Description("The input value")] int value);
+    }
+
+    private sealed class DerivedDescribed : BaseDescribed
+    {
+        public override int Compute(int value) => value;
+    }
 }

@@ -12,8 +12,9 @@ using Microsoft.Shared.Pools;
 
 namespace Microsoft.Extensions.Logging;
 
-// NOTE: This implementation uses thread local storage. As a result, it will fail if formatter code, enricher code, or
-//       redactor code calls recursively back into the logger. Don't do that.
+// NOTE: This implementation uses thread local storage, but nested logging calls on the same thread don't share it.
+//       Enricher or redactor code that logs back into the logger can run again for the nested call and recurse
+//       without end. Don't do that.
 //
 // NOTE: Unlike the original logger in dotnet/runtime, this logger eats exceptions thrown from invoked loggers, enrichers,
 //       and redactors, rather than forwarding the exceptions to the caller. The fact an exception occurred is recorded in
@@ -241,7 +242,7 @@ internal sealed partial class ExtendedLogger : ILogger
             }
         }
 
-        var joiner = ModernJoiner;
+        var joiner = RentModernJoiner();
         joiner.StaticTags = config.StaticTags;
         joiner.Formatter = formatter;
         joiner.State = msgState;
@@ -346,7 +347,7 @@ internal sealed partial class ExtendedLogger : ILogger
             }
         }
 
-        joiner.Clear();
+        ReturnModernJoiner(joiner);
 
         // return the jit redactors to the pool
         while (jitRedactors != null)
@@ -364,7 +365,7 @@ internal sealed partial class ExtendedLogger : ILogger
         var loggers = MessageLoggers;
         var config = _factory.Config;
 
-        var joiner = LegacyJoiner;
+        var joiner = RentLegacyJoiner();
         joiner.StaticTags = config.StaticTags;
         joiner.Formatter = formatter;
         joiner.State = state;
@@ -486,7 +487,7 @@ internal sealed partial class ExtendedLogger : ILogger
             }
         }
 
-        joiner.Clear();
+        ReturnLegacyJoiner(joiner);
         HandleExceptions(exceptions);
     }
 }

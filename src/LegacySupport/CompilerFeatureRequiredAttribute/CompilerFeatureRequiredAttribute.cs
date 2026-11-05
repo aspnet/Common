@@ -17,12 +17,12 @@ internal sealed class CompilerFeatureRequiredAttribute : Attribute
     }
 
     /// <summary>
-    /// The name of the compiler feature.
+    /// Gets the name of the compiler feature.
     /// </summary>
     public string FeatureName { get; }
 
     /// <summary>
-    /// If true, the compiler can choose to allow access to the location where this attribute is applied if it does not understand <see cref="FeatureName"/>.
+    /// Gets a value indicating whether the compiler can choose to allow access to the location where this attribute is applied if it does not understand <see cref="FeatureName"/>.
     /// </summary>
     public bool IsOptional { get; init; }
 

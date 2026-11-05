@@ -1,0 +1,15 @@
+{
+  "Name": "Microsoft.Extensions.Diagnostics.ResourceMonitoring.Kubernetes, Version=10.3.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+  "Types": [
+    {
+      "Type": "static class Microsoft.Extensions.DependencyInjection.KubernetesResourceQuotaServiceCollectionExtensions",
+      "Stage": "Stable",
+      "Methods": [
+        {
+          "Member": "static Microsoft.Extensions.DependencyInjection.IServiceCollection Microsoft.Extensions.DependencyInjection.KubernetesResourceQuotaServiceCollectionExtensions.AddKubernetesResourceMonitoring(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string? environmentVariablePrefix = null);",
+          "Stage": "Stable"
+        }
+      ]
+    }
+  ]
+}

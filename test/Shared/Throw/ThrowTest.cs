@@ -144,8 +144,10 @@ public class ThrowTest
         Random? somethingThatIsNull = null;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfNull(somethingThatIsNull));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfNull(somethingThatIsNull, nameof(somethingThatIsNull)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -157,9 +159,11 @@ public class ThrowTest
         object somethingThatIsNotNull = new();
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfNullOrMemberNull(somethingThatIsNull, somethingNestedThatIsNull));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(
             () => Throw.IfNullOrMemberNull(somethingThatIsNull, somethingNestedThatIsNull, nameof(somethingThatIsNull), nameof(somethingNestedThatIsNull)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -171,9 +175,11 @@ public class ThrowTest
         object somethingThatIsNotNull = new();
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfNullOrMemberNull(red, somethingNestedThatIsNull));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(
             () => Throw.IfNullOrMemberNull(red, somethingNestedThatIsNull, nameof(red), nameof(somethingNestedThatIsNull)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
 
         var expectedMessage = $"Member {nameof(somethingNestedThatIsNull)} of {nameof(red)} is null";
@@ -185,9 +191,11 @@ public class ThrowTest
         Assert.Equal(expectedMessage, exceptionImplicitArgumentName.Message);
 
         exceptionImplicitArgumentName = Record.Exception(() => Throw.IfMemberNull(somethingThatIsNotNull, somethingNestedThatIsNull));
+        Assert.NotNull(exceptionImplicitArgumentName);
         exceptionExplicitArgumentName = Record.Exception(
             () => Throw.IfMemberNull(somethingThatIsNotNull, somethingNestedThatIsNull, nameof(somethingThatIsNotNull), nameof(somethingNestedThatIsNull)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
 
         expectedMessage = $"Member {nameof(somethingNestedThatIsNull)} of {nameof(somethingThatIsNotNull)} is null";
@@ -268,8 +276,10 @@ public class ThrowTest
         string? somethingThatIsNull = null;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfNullOrWhitespace(somethingThatIsNull));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfNullOrWhitespace(somethingThatIsNull, nameof(somethingThatIsNull)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -279,8 +289,10 @@ public class ThrowTest
         string? somethingThatIsNull = null;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfNullOrEmpty(somethingThatIsNull));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfNullOrEmpty(somethingThatIsNull, nameof(somethingThatIsNull)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -379,6 +391,7 @@ public class ThrowTest
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfNullOrEmpty(listButActuallyNull!));
 
+        Assert.NotNull(exceptionImplicitArgumentName);
         Assert.Contains(nameof(listButActuallyNull), exceptionImplicitArgumentName.Message);
     }
 
@@ -415,8 +428,10 @@ public class ThrowTest
         Color? colorButNull = null;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfOutOfRange((Color)colorButNull!));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfOutOfRange((Color)colorButNull!, nameof(colorButNull)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 

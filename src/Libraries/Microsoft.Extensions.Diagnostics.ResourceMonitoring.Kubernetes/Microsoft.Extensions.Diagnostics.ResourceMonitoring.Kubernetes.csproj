@@ -7,14 +7,10 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <InjectExperimentalAttributeOnLegacy>true</InjectExperimentalAttributeOnLegacy>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <Stage>dev</Stage>
-    <StageDevDiagnosticId>EXTEXP0016</StageDevDiagnosticId>
+    <Stage>normal</Stage>
     <MinCodeCoverage>99</MinCodeCoverage>
-    <MinMutationScore>90</MinMutationScore>
+    <MinMutationScore>95</MinMutationScore>
+    <EnablePackageValidation>false</EnablePackageValidation> <!-- To be removed once released as stable -->
   </PropertyGroup>
 
   <ItemGroup>

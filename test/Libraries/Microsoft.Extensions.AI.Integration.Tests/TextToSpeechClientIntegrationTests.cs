@@ -1,11 +1,10 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.TestUtilities;
 using Xunit;
 
 #pragma warning disable CA2214 // Do not call overridable methods in constructors
@@ -29,7 +28,7 @@ public abstract class TextToSpeechClientIntegrationTests : IDisposable
 
     protected abstract ITextToSpeechClient? CreateClient();
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetAudioAsync_SimpleText_ReturnsAudio()
     {
         SkipIfNotEnabled();
@@ -45,7 +44,7 @@ public abstract class TextToSpeechClientIntegrationTests : IDisposable
         Assert.StartsWith("audio/", dataContent.MediaType, StringComparison.Ordinal);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetAudioAsync_WithVoice_ReturnsAudio()
     {
         SkipIfNotEnabled();
@@ -64,7 +63,7 @@ public abstract class TextToSpeechClientIntegrationTests : IDisposable
         Assert.StartsWith("audio/", dataContent.MediaType, StringComparison.Ordinal);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetAudioAsync_WithAudioFormat_ReturnsCorrectMediaType()
     {
         SkipIfNotEnabled();
@@ -83,7 +82,7 @@ public abstract class TextToSpeechClientIntegrationTests : IDisposable
         Assert.Equal("audio/opus", dataContent.MediaType);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetAudioAsync_WithSpeed_ReturnsAudio()
     {
         SkipIfNotEnabled();
@@ -101,7 +100,7 @@ public abstract class TextToSpeechClientIntegrationTests : IDisposable
         Assert.False(dataContent.Data.IsEmpty);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetStreamingAudioAsync_SimpleText_ReturnsUpdates()
     {
         SkipIfNotEnabled();
@@ -130,9 +129,6 @@ public abstract class TextToSpeechClientIntegrationTests : IDisposable
     {
         string? skipIntegration = TestRunnerConfiguration.Instance["SkipIntegrationTests"];
 
-        if (skipIntegration is not null || _client is null)
-        {
-            throw new SkipTestException("Client is not enabled.");
-        }
+        Assert.SkipUnless(skipIntegration is null && _client is not null, "Client is not enabled.");
     }
 }

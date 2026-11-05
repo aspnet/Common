@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>Microsoft.AspNetCore.Testing.Test</RootNamespace>
     <Description>Unit tests for Microsoft.AspNetCore.Testing</Description>
@@ -11,6 +11,5 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Libraries\Microsoft.AspNetCore.Testing\Microsoft.AspNetCore.Testing.csproj" ProjectUnderTest="true" />
     <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.Hosting.Testing\Microsoft.Extensions.Hosting.Testing.csproj" />
-    <ProjectReference Include="..\..\TestUtilities\TestUtilities.csproj" />
   </ItemGroup>
 </Project>

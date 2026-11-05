@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -18,7 +18,6 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
-using Microsoft.TestUtilities;
 using OpenTelemetry.Trace;
 using Xunit;
 
@@ -49,7 +48,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
 
     protected abstract IChatClient? CreateChatClient();
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_SingleRequestMessage()
     {
         SkipIfNotEnabled();
@@ -59,7 +58,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Contains("whale", response.Text, StringComparison.OrdinalIgnoreCase);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_MultipleRequestMessages()
     {
         SkipIfNotEnabled();
@@ -77,7 +76,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Contains("Asia", response.Text);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_WithEmptyMessage()
     {
         SkipIfNotEnabled();
@@ -93,7 +92,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Contains("3", response.Text);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetStreamingResponseAsync()
     {
         SkipIfNotEnabled();
@@ -114,7 +113,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Contains("one giant leap", responseText, StringComparison.OrdinalIgnoreCase);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_UsageDataAvailable()
     {
         SkipIfNotEnabled();
@@ -126,7 +125,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Equal(response.Usage?.InputTokenCount + response.Usage?.OutputTokenCount, response.Usage?.TotalTokenCount);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetStreamingResponseAsync_UsageDataAvailable()
     {
         SkipIfNotEnabled();
@@ -153,7 +152,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Equal(usage.Details.InputTokenCount + usage.Details.OutputTokenCount, usage.Details.TotalTokenCount);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetStreamingResponseAsync_AppendToHistory()
     {
         SkipIfNotEnabled();
@@ -174,7 +173,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
 
     protected virtual string? GetModel_MultiModal_DescribeImage() => null;
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task MultiModal_DescribeImage()
     {
         SkipIfNotEnabled();
@@ -192,7 +191,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.True(response.Text.IndexOf("net", StringComparison.OrdinalIgnoreCase) >= 0, response.Text);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task MultiModal_DescribePdf()
     {
         SkipIfNotEnabled();
@@ -210,7 +209,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.True(response.Text.IndexOf("hello", StringComparison.OrdinalIgnoreCase) >= 0, response.Text);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task FunctionInvocation_AutomaticallyInvokeFunction_Parameterless()
     {
         SkipIfNotEnabled();
@@ -241,7 +240,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         AssertUsageAgainstActivities(response, activities);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task FunctionInvocation_AutomaticallyInvokeFunction_WithParameters_NonStreaming()
     {
         SkipIfNotEnabled();
@@ -256,7 +255,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Contains("3528", response.Text);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task FunctionInvocation_AutomaticallyInvokeFunction_WithParameters_Streaming()
     {
         SkipIfNotEnabled();
@@ -277,7 +276,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Contains("3528", sb.ToString());
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task FunctionInvocation_OptionalParameter()
     {
         SkipIfNotEnabled();
@@ -309,7 +308,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         AssertUsageAgainstActivities(response, activities);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task FunctionInvocation_NestedParameters()
     {
         SkipIfNotEnabled();
@@ -341,7 +340,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         AssertUsageAgainstActivities(response, activities);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task FunctionInvocation_ArrayParameter()
     {
         SkipIfNotEnabled();
@@ -391,11 +390,11 @@ public abstract class ChatClientIntegrationTests : IDisposable
 
     public record PersonRecord(string Name, int Age = 42);
 
-    [ConditionalFact]
+    [Fact]
     public virtual Task AvailableTools_SchemasAreAccepted_Strict() =>
         AvailableTools_SchemasAreAccepted(strict: true);
 
-    [ConditionalFact]
+    [Fact]
     public virtual Task AvailableTools_SchemasAreAccepted_NonStrict() =>
         AvailableTools_SchemasAreAccepted(strict: false);
 
@@ -497,6 +496,10 @@ public abstract class ChatClientIntegrationTests : IDisposable
                 createWithSchema("""
                     {"properties":{"commit_message":{"description":"Extra detail for merge commit","type":"string"},"commit_title":{"description":"Title for merge commit","type":"string"},"merge_method":{"description":"Merge method","enum":["merge","squash","rebase"],"type":"string"},"owner":{"description":"Repository owner","type":"string"},"pullNumber":{"description":"Pull request number","type":"number"},"repo":{"description":"Repository name","type":"string"}},"required":["owner","repo","pullNumber"],"type":"object"}
                     """),
+
+                createWithSchema("""
+                    {"type":"object","properties":{"labels":{"type":"object"}},"additionalProperties":{"type":"string"}}
+                    """),
             ],
         };
 
@@ -558,14 +561,11 @@ public abstract class ChatClientIntegrationTests : IDisposable
 
     protected virtual bool SupportsParallelFunctionCalling => true;
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task FunctionInvocation_SupportsMultipleParallelRequests()
     {
         SkipIfNotEnabled();
-        if (!SupportsParallelFunctionCalling)
-        {
-            throw new SkipTestException("Parallel function calling is not supported by this chat client");
-        }
+        Assert.SkipUnless(SupportsParallelFunctionCalling, "Parallel function calling is not supported by this chat client");
 
         using var chatClient = new FunctionInvokingChatClient(ChatClient);
 
@@ -588,7 +588,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
             $"Doesn't contain three: {response.Text}");
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task FunctionInvocation_RequireAny()
     {
         SkipIfNotEnabled();
@@ -611,7 +611,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.True(callCount >= 1);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task FunctionInvocation_RequireSpecific()
     {
         SkipIfNotEnabled();
@@ -632,7 +632,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.True(shieldsUp);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task Caching_OutputVariesWithoutCaching()
     {
         SkipIfNotEnabled();
@@ -644,7 +644,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.NotEqual(firstResponse.Text, secondResponse.Text);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task Caching_SamePromptResultsInCacheHit_NonStreaming()
     {
         SkipIfNotEnabled();
@@ -669,7 +669,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.NotEqual(firstResponse.Messages, thirdResponse.Messages);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task Caching_SamePromptResultsInCacheHit_Streaming()
     {
         SkipIfNotEnabled();
@@ -708,7 +708,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.NotEqual(orig.ToString(), third.ToString());
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task Caching_BeforeFunctionInvocation_AvoidsExtraCalls()
     {
         SkipIfNotEnabled();
@@ -744,7 +744,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Equal(2, llmCallCount!.CallCount);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task Caching_AfterFunctionInvocation_FunctionOutputUnchangedAsync()
     {
         SkipIfNotEnabled();
@@ -786,7 +786,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
 
     public virtual bool FunctionInvokingChatClientSetsConversationId => false;
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task Caching_AfterFunctionInvocation_FunctionOutputChangedAsync()
     {
         SkipIfNotEnabled();
@@ -827,7 +827,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Equal(3, llmCallCount!.CallCount);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task Logging_LogsCalls_NonStreaming()
     {
         SkipIfNotEnabled();
@@ -846,7 +846,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
             entry => Assert.Contains("whale", entry.Message));
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task Logging_LogsCalls_Streaming()
     {
         SkipIfNotEnabled();
@@ -868,7 +868,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Contains(logs, e => e.Message.Contains("whale"));
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task Logging_LogsFunctionCalls_NonStreaming()
     {
         SkipIfNotEnabled();
@@ -894,7 +894,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
             entry => Assert.Contains(secretNumber.ToString(), entry.Message));
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task Logging_LogsFunctionCalls_Streaming()
     {
         SkipIfNotEnabled();
@@ -922,7 +922,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Contains(logs, e => e.Message.Contains($"\"result\": {secretNumber}"));
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task OpenTelemetry_CanEmitTracesAndMetrics()
     {
         SkipIfNotEnabled();
@@ -952,7 +952,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.True(activity.Duration.TotalMilliseconds > 0);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_StructuredOutput()
     {
         SkipIfNotEnabled();
@@ -968,7 +968,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Equal(JobType.Programmer, response.Result.Job);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_StructuredOutputArray()
     {
         SkipIfNotEnabled();
@@ -984,7 +984,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Contains(response.Result, x => x.FullName == "Josh Simpson");
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_StructuredOutputInteger()
     {
         SkipIfNotEnabled();
@@ -997,7 +997,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Equal(15, response.Result);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_StructuredOutputString()
     {
         SkipIfNotEnabled();
@@ -1010,7 +1010,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Equal("Jimbo Smith", response.Result);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_StructuredOutputBool_True()
     {
         SkipIfNotEnabled();
@@ -1023,7 +1023,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.True(response.Result);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_StructuredOutputBool_False()
     {
         SkipIfNotEnabled();
@@ -1036,7 +1036,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.False(response.Result);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_StructuredOutputEnum()
     {
         SkipIfNotEnabled();
@@ -1048,7 +1048,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Equal(JobType.PopStar, response.Result);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_StructuredOutput_WithFunctions()
     {
         SkipIfNotEnabled();
@@ -1079,7 +1079,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Assert.Equal(expectedPerson.Job, response.Result.Job);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GetResponseAsync_StructuredOutput_NonNative()
     {
         SkipIfNotEnabled();
@@ -1125,7 +1125,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
         Unknown,
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task SummarizingChatReducer_PreservesConversationContext()
     {
         SkipIfNotEnabled();
@@ -1167,7 +1167,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
             $"Expected 'hiking' or 'hike' in response: {response.Text}");
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task SummarizingChatReducer_PreservesSystemMessage()
     {
         SkipIfNotEnabled();
@@ -1211,7 +1211,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
             $"Expected pirate speak in response: {response.Text}");
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task SummarizingChatReducer_WithFunctionCalls()
     {
         SkipIfNotEnabled();
@@ -1262,7 +1262,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
             $"Expected weather comparison in response: {response.Text}");
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task SummarizingChatReducer_Streaming()
     {
         SkipIfNotEnabled();
@@ -1307,7 +1307,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
             $"Expected 'software' or 'engineer' in response: {responseText}");
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task SummarizingChatReducer_CustomPrompt()
     {
         SkipIfNotEnabled();
@@ -1401,10 +1401,7 @@ public abstract class ChatClientIntegrationTests : IDisposable
     {
         string? skipIntegration = TestRunnerConfiguration.Instance["SkipIntegrationTests"];
 
-        if (skipIntegration is not null || ChatClient is null)
-        {
-            throw new SkipTestException("Client is not enabled.");
-        }
+        Assert.SkipUnless(skipIntegration is null && ChatClient is not null, "Client is not enabled.");
     }
 
 }

@@ -7,7 +7,7 @@
   <PropertyGroup>
     <NoWarn>$(NoWarn);CA1716;S104</NoWarn>
     <TargetFrameworks>$(TestNetCoreTargetFrameworks)</TargetFrameworks>
-    <TargetFrameworks Condition=" '$(IsWindowsBuild)' == 'true' ">$(TestNetCoreTargetFrameworks)$(ConditionalNet462)</TargetFrameworks>
+    <TargetFrameworks Condition=" '$(IsWindowsBuild)' == 'true' ">$(TestNetCoreTargetFrameworks)$(ConditionalNet472)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

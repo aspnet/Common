@@ -98,7 +98,11 @@ internal sealed class HttpRequestLatencyListener : EventListener
 
     protected override void OnEventWritten(EventWrittenEventArgs eventData)
     {
-        OnEventWritten(eventData.EventSource.Name, eventData.EventName);
+        // .NET 8 can deliver events before Enable is called, even during construction.
+        if (Enabled)
+        {
+            OnEventWritten(eventData.EventSource.Name, eventData.EventName);
+        }
     }
 
     private void EnableEventSource(EventSource eventSource)

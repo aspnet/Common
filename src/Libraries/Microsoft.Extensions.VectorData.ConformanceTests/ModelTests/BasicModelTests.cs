@@ -546,11 +546,14 @@ public abstract class BasicModelTests<TKey>(BasicModelTests<TKey>.Fixture fixtur
             => $"Key: {Key}, Text: {Text}";
     }
 
-    public Task InitializeAsync()
-        => fixture.ReseedAsync();
+    public ValueTask InitializeAsync()
+        => new(fixture.ReseedAsync());
 
-    public Task DisposeAsync()
-        => Task.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return default;
+    }
 
     public static readonly TheoryData<bool> IncludeVectorsData = [false, true];
 }

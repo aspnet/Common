@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using Microsoft.Shared.DiagnosticIds;
 
 namespace Microsoft.Extensions.AI;
 
@@ -15,7 +13,6 @@ namespace Microsoft.Extensions.AI;
 /// The results contain a list of <see cref="AIContent"/> items describing the web pages
 /// found during the search, typically as <see cref="UriContent"/> instances.
 /// </remarks>
-[Experimental(DiagnosticIds.Experiments.AIWebSearch, UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class WebSearchToolResultContent : ToolResultContent
 {
     /// <summary>
@@ -28,12 +25,12 @@ public sealed class WebSearchToolResultContent : ToolResultContent
     }
 
     /// <summary>
-    /// Gets or sets the web search results.
+    /// Gets or sets the web search outputs.
     /// </summary>
     /// <remarks>
-    /// Each item represents a web page found during the search, typically as a <see cref="UriContent"/> instance.
+    /// Each output represents a web page result found during the search, typically as a <see cref="UriContent"/> instance.
     /// If a title is available for a result, it may be stored in the item's <see cref="AIContent.AdditionalProperties"/>
     /// under the key <c>"title"</c>.
     /// </remarks>
-    public IList<AIContent>? Results { get; set; }
+    public IList<AIContent>? Outputs { get; set; }
 }

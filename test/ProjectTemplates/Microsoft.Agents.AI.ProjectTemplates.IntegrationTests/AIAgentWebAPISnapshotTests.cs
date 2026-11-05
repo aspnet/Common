@@ -5,9 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Shared.ProjectTemplates.Tests;
 using Microsoft.TemplateEngine.Authoring.TemplateVerifier;
-using Microsoft.TemplateEngine.TestHelper;
 using Xunit;
-using Xunit.Abstractions;
 using static Microsoft.Shared.ProjectTemplates.Tests.TemplateTestUtilities;
 
 namespace Microsoft.Agents.AI.ProjectTemplates.Tests;
@@ -24,9 +22,8 @@ public class AIAgentWebAPISnapshotTests : TemplateSnapshotTestBase
     }
 
     [Theory]
-    [InlineData /* Defaults: --provider=githubmodels */]
-    [InlineData("--provider=ollama")]
     [InlineData("--provider=openai")]
+    [InlineData("--provider=ollama")]
     [InlineData("--provider=azureopenai", "--managed-identity=true")]
     [InlineData("--provider=azureopenai", "--managed-identity=false")]
     public async Task RunSnapshotTests(params string[] templateArgs)

@@ -8,11 +8,6 @@
     <InjectSharedNumericExtensions>true</InjectSharedNumericExtensions>
   </PropertyGroup>
 
-  <PropertyGroup Condition=" '$(TargetFramework)' == 'net462' ">
-    <!-- See https://github.com/dotnet/extensions/issues/4531 -->
-    <SkipTests>true</SkipTests>
-  </PropertyGroup>
-
   <ItemGroup>
     <None Update="configs\appsettings.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="configs\optionsOnChangeTestOriginal.json" CopyToOutputDirectory="PreserveNewest" />
@@ -30,6 +25,6 @@
     <PackageReference Include="Microsoft.Extensions.Configuration" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net11.0'))" />
   </ItemGroup>
 </Project>

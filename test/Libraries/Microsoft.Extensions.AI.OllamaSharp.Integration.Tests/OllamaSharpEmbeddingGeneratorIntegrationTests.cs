@@ -1,9 +1,8 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.Threading.Tasks;
-using Microsoft.TestUtilities;
 using OllamaSharp;
 using Xunit;
 
@@ -16,7 +15,7 @@ public class OllamaSharpEmbeddingGeneratorIntegrationTests : EmbeddingGeneratorI
             new OllamaApiClient(endpoint, "all-minilm") :
             null;
 
-    [ConditionalFact]
+    [Fact]
     public async Task InvalidModelParameter_ThrowsInvalidOperationException()
     {
         SkipIfNotEnabled();

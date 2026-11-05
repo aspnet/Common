@@ -7,7 +7,7 @@ using Microsoft.Extensions.Caching.Hybrid.Internal;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Xunit.Abstractions;
+using Xunit;
 using static Microsoft.Extensions.Caching.Hybrid.Tests.DistributedCacheTests;
 using static Microsoft.Extensions.Caching.Hybrid.Tests.L2Tests;
 
@@ -54,11 +54,11 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         Assert.Equal(expectedLength, actualLength);
 
         clock.Add(TimeSpan.FromSeconds(10));
-        var result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, tags, cache, out var payload, out var remaining, out var flags, out var entropy, out var pendingTags, out _, out _);
-        log.WriteLine($"Entropy: {entropy}; Flags: {flags}");
+        var result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, tags, cache, out var parsed, out _);
+        log.WriteLine($"Entropy: {parsed.Entropy}; Flags: {parsed.Flags}");
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.Success, result);
-        Assert.True(payload.SequenceEqual(bytes));
-        Assert.True(pendingTags.IsEmpty);
+        Assert.True(parsed.Payload.SequenceEqual(bytes));
+        Assert.True(parsed.PendingTags.IsEmpty);
     }
 
     [Theory]
@@ -81,13 +81,13 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         int actualLength = HybridCachePayload.Write(oversized, key, cache.CurrentTimestamp(), TimeSpan.FromMinutes(1), 0, tags, new(bytes), localCacheSize: localCacheSize);
 
         var result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, tags, cache,
-            out var payload, out _, out var flags, out _, out var pendingTags, out long? parsedSize, out _);
+            out var parsed, out _);
 
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.Success, result);
-        Assert.True(payload.SequenceEqual(bytes));
-        Assert.True(pendingTags.IsEmpty);
-        Assert.Equal(localCacheSize, parsedSize);
-        Assert.Equal(localCacheSize is not null, (flags & HybridCachePayload.PayloadFlags.HasLocalSize) != 0);
+        Assert.True(parsed.Payload.SequenceEqual(bytes));
+        Assert.True(parsed.PendingTags.IsEmpty);
+        Assert.Equal(localCacheSize, parsed.LocalCacheSize);
+        Assert.Equal(localCacheSize is not null, (parsed.Flags & HybridCachePayload.PayloadFlags.HasLocalSize) != 0);
 
         ArrayPool<byte>.Shared.Return(oversized);
     }
@@ -109,15 +109,14 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
 
         var result = HybridCachePayload.TryParse(
             new(frozen), "frozen-key", TagSet.Empty, cache,
-            out var payload, out var remaining, out var flags, out _, out var pendingTags,
-            out long? parsedSize, out _);
+            out var parsed, out _);
 
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.Success, result);
-        Assert.True(payload.AsSpan().SequenceEqual<byte>([ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 ]));
-        Assert.True(pendingTags.IsEmpty);
-        Assert.Null(parsedSize);
-        Assert.Equal(HybridCachePayload.PayloadFlags.None, flags & HybridCachePayload.PayloadFlags.HasLocalSize);
-        Assert.True(remaining > TimeSpan.Zero, "v1 frozen entry should not be expired (100-year duration).");
+        Assert.True(parsed.Payload.AsSpan().SequenceEqual<byte>([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]));
+        Assert.True(parsed.PendingTags.IsEmpty);
+        Assert.Null(parsed.LocalCacheSize);
+        Assert.Equal(HybridCachePayload.PayloadFlags.None, parsed.Flags & HybridCachePayload.PayloadFlags.HasLocalSize);
+        Assert.True(parsed.RemainingTime > TimeSpan.Zero, "v1 frozen entry should not be expired (100-year duration).");
     }
 
     [Fact]
@@ -142,17 +141,16 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         Assert.Equal(1063, actualLength);
 
         clock.Add(TimeSpan.FromSeconds(58));
-        var result = HybridCachePayload.TryParse(
-            new(oversized, 0, actualLength), key, tags, cache, out var payload, out var remaining, out var flags, out var entropy, out var pendingTags, out _, out _);
+        var result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, tags, cache, out var parsed, out _);
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.Success, result);
-        Assert.True(payload.SequenceEqual(bytes));
-        Assert.True(pendingTags.IsEmpty);
+        Assert.True(parsed.Payload.SequenceEqual(bytes));
+        Assert.True(parsed.PendingTags.IsEmpty);
 
         clock.Add(TimeSpan.FromSeconds(4));
-        result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, tags, cache, out payload, out remaining, out flags, out entropy, out pendingTags, out _, out _);
+        result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, tags, cache, out parsed, out _);
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.ExpiredByEntry, result);
-        Assert.Equal(0, payload.Count);
-        Assert.True(pendingTags.IsEmpty);
+        Assert.Equal(0, parsed.Payload.Count);
+        Assert.True(parsed.PendingTags.IsEmpty);
     }
 
     [Fact]
@@ -179,11 +177,10 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         clock.Add(TimeSpan.FromSeconds(2));
         await cache.RemoveByTagAsync("*");
 
-        var result = HybridCachePayload.TryParse(
-            new(oversized, 0, actualLength), key, tags, cache, out var payload, out var remaining, out var flags, out var entropy, out var pendingTags, out _, out _);
+        var result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, tags, cache, out var parsed, out _);
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.ExpiredByWildcard, result);
-        Assert.Equal(0, payload.Count);
-        Assert.True(pendingTags.IsEmpty);
+        Assert.Equal(0, parsed.Payload.Count);
+        Assert.True(parsed.PendingTags.IsEmpty);
     }
 
     [Fact]
@@ -210,17 +207,16 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         clock.Add(TimeSpan.FromSeconds(2));
         await cache.RemoveByTagAsync("other_tag");
 
-        var result = HybridCachePayload.TryParse(
-            new(oversized, 0, actualLength), key, tags, cache, out var payload, out var remaining, out var flags, out var entropy, out var pendingTags, out _, out _);
+        var result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, tags, cache, out var parsed, out _);
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.Success, result);
-        Assert.True(payload.SequenceEqual(bytes));
-        Assert.True(pendingTags.IsEmpty);
+        Assert.True(parsed.Payload.SequenceEqual(bytes));
+        Assert.True(parsed.PendingTags.IsEmpty);
 
         await cache.RemoveByTagAsync("some_tag");
-        result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, tags, cache, out payload, out remaining, out flags, out entropy, out pendingTags, out _, out _);
+        result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, tags, cache, out parsed, out _);
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.ExpiredByTag, result);
-        Assert.Equal(0, payload.Count);
-        Assert.True(pendingTags.IsEmpty);
+        Assert.Equal(0, parsed.Payload.Count);
+        Assert.True(parsed.PendingTags.IsEmpty);
     }
 
     [Fact]
@@ -249,15 +245,15 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
 
         var tcs = new TaskCompletionSource<long>();
         cache.DebugInvalidateTag("some_tag", tcs.Task);
-        var result = HybridCachePayload.TryParse(
-            new(oversized, 0, actualLength), key, tags, cache, out var payload, out var remaining, out var flags, out var entropy, out var pendingTags, out _, out _);
+        var result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, tags, cache, out var parsed, out _);
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.Success, result);
-        Assert.True(payload.SequenceEqual(bytes));
-        Assert.Equal(1, pendingTags.Count);
-        Assert.Equal("some_tag", pendingTags[0]);
+        Assert.True(parsed.Payload.SequenceEqual(bytes));
+        Assert.Equal(1, parsed.PendingTags.Count);
+        Assert.Equal("some_tag", parsed.PendingTags[0]);
+        Assert.Equal(creation, parsed.CreationTime);
 
         tcs.SetResult(cache.CurrentTimestamp());
-        Assert.True(await cache.IsAnyTagExpiredAsync(pendingTags, creation));
+        Assert.True(await cache.IsAnyTagExpiredAsync(parsed.PendingTags, creation));
     }
 
     [Fact]
@@ -272,10 +268,10 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         byte[] bytes = new byte[1024];
         new Random().NextBytes(bytes);
 
-        var result = HybridCachePayload.TryParse(new(bytes), "whatever", TagSet.Empty, cache, out var payload, out var remaining, out var flags, out var entropy, out var pendingTags, out _, out _);
+        var result = HybridCachePayload.TryParse(new(bytes), "whatever", TagSet.Empty, cache, out var parsed, out _);
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.FormatNotRecognized, result);
-        Assert.Equal(0, payload.Count);
-        Assert.True(pendingTags.IsEmpty);
+        Assert.Equal(0, parsed.Payload.Count);
+        Assert.True(parsed.PendingTags.IsEmpty);
     }
 
     [Fact]
@@ -306,12 +302,12 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         {
             var result = HybridCachePayload.TryParse(
                 new(oversized, 0, truncatedLength), key, tags, cache,
-                out var payload, out _, out _, out _, out var pendingTags, out _, out var fault);
+                out var parsed, out var fault);
 
             Assert.Null(fault);
             Assert.NotEqual(HybridCachePayload.HybridCachePayloadParseResult.Success, result);
-            Assert.Equal(0, payload.Count);
-            Assert.True(pendingTags.IsEmpty);
+            Assert.Equal(0, parsed.Payload.Count);
+            Assert.True(parsed.PendingTags.IsEmpty);
         }
 
         ArrayPool<byte>.Shared.Return(oversized);
@@ -338,11 +334,10 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         log.WriteLine($"bytes written: {actualLength}");
         Assert.Equal(1063, actualLength);
 
-        var result = HybridCachePayload.TryParse(
-            new(oversized, 0, actualLength + 1), key, tags, cache, out var payload, out var remaining, out var flags, out var entropy, out var pendingTags, out _, out _);
+        var result = HybridCachePayload.TryParse(new(oversized, 0, actualLength + 1), key, tags, cache, out var parsed, out _);
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.InvalidData, result);
-        Assert.Equal(0, payload.Count);
-        Assert.True(pendingTags.IsEmpty);
+        Assert.Equal(0, parsed.Payload.Count);
+        Assert.True(parsed.PendingTags.IsEmpty);
     }
 
     [Fact]
@@ -510,10 +505,9 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         }
 
         // Parse with empty knownTags to force all tags into pendingTags via the rented buffer path
-        var result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, TagSet.Empty, cache,
-            out var payload, out var remaining, out var flags, out var entropy, out var pendingTags, out _, out _);
+        var result = HybridCachePayload.TryParse(new(oversized, 0, actualLength), key, TagSet.Empty, cache, out var parsed, out _);
         Assert.Equal(HybridCachePayload.HybridCachePayloadParseResult.Success, result);
-        Assert.True(payload.SequenceEqual(bytes));
-        Assert.Equal(tagCount, pendingTags.Count);
+        Assert.True(parsed.Payload.SequenceEqual(bytes));
+        Assert.Equal(tagCount, parsed.PendingTags.Count);
     }
 }

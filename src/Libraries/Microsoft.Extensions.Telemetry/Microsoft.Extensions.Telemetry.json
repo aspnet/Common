@@ -124,6 +124,10 @@
           "Stage": "Stable"
         },
         {
+          "Member": "bool Microsoft.Extensions.Diagnostics.Buffering.GlobalLogBufferingOptions.IncludeScopes { get; set; }",
+          "Stage": "Experimental"
+        },
+        {
           "Member": "int Microsoft.Extensions.Diagnostics.Buffering.GlobalLogBufferingOptions.MaxBufferSizeInBytes { get; set; }",
           "Stage": "Stable"
         },

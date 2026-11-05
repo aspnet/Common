@@ -18,6 +18,8 @@
     <Compile Include="..\Microsoft.Extensions.AI.Evaluation.Reporting\CSharp\JsonSerialization\CamelCaseEnumConverter.cs" Link="JsonSerialization\CamelCaseEnumConverter.cs" />
     <Compile Include="..\Microsoft.Extensions.AI.Evaluation.Reporting\CSharp\JsonSerialization\EvaluationContextConverter.cs" Link="JsonSerialization\EvaluationContextConverter.cs" />
     <Compile Include="..\Microsoft.Extensions.AI.Evaluation.Reporting\CSharp\JsonSerialization\TimeSpanConverter.cs" Link="JsonSerialization\TimeSpanConverter.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Evaluation.Reporting\CSharp\Utilities\IterationNameComparer.cs" Link="Utilities\IterationNameComparer.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Evaluation.Reporting\CSharp\Utilities\PathValidation.cs" Link="Utilities\PathValidation.cs" />
   </ItemGroup>
 
   <ItemGroup>

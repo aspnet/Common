@@ -24,12 +24,12 @@ parameters:
   enablePublishBuildArtifacts: false
   enablePublishBuildAssets: false
   enablePublishTestResults: false
+  enablePublishing: false
   enableBuildRetry: false
   mergeTestResults: false
   testRunTitle: ''
   testResultsFormat: ''
   name: ''
-  componentGovernanceSteps: []
   preSteps: []
   artifactPublishSteps: []
   runAsPublic: false
@@ -109,7 +109,8 @@ jobs:
         - name: ${{ pair.key }}
           value: ${{ pair.value }}
 
-  # DotNet-HelixApi-Access provides 'HelixApiAccessToken' for internal builds
+  # DotNet-HelixApi-Access provides 'HelixApiAccessToken' for internal builds.
+  # Entra-enabled Helix templates do not forward this value to their processes.
   - ${{ if and(eq(parameters.enableTelemetry, 'true'), eq(parameters.runAsPublic, 'false'), ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:
     - group: DotNet-HelixApi-Access
 
@@ -144,9 +145,6 @@ jobs:
         itemPattern: ${{ coalesce(parameters.artifacts.download.pattern, '**') }}
 
   - ${{ each step in parameters.steps }}:
-    - ${{ step }}
-
-  - ${{ each step in parameters.componentGovernanceSteps }}:
     - ${{ step }}
 
   - ${{ if and(eq(parameters.runAsPublic, 'false'), ne(variables['System.TeamProject'], 'public'), notin(variables['Build.Reason'], 'PullRequest')) }}:

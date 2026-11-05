@@ -21,10 +21,12 @@ public class KeyPropertyModel(string modelName, Type type) : PropertyModel(model
 
     /// <summary>
     /// Gets or sets the name that the JSON serializer will produce for this key property.
-    /// This is needed for providers that use an external JSON serializer combined with a reserved key storage name
-    /// (e.g. CosmosDB NoSQL uses "id"): the serializer produces a JSON object with the policy-transformed name, and
-    /// the provider needs to find and replace it with the reserved storage name.
     /// </summary>
+    /// <remarks>
+    /// This is needed for providers that use an external JSON serializer combined with a reserved key storage name
+    /// (for example, CosmosDB NoSQL uses <c>"id"</c>): the serializer produces a JSON object with the
+    /// policy-transformed name, and the provider needs to find and replace it with the reserved storage name.
+    /// </remarks>
     public string? SerializedKeyName { get; set; }
 
     /// <inheritdoc/>

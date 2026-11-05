@@ -29,8 +29,10 @@ public sealed class CollectionModelBuildingOptions
     public bool UsesExternalSerializer { get; init; }
 
     /// <summary>
-    /// Gets the special, reserved name for the key property of the database.
-    /// When set, the model builder manages the key storage name, and users cannot customize it.
+    /// Gets or initializes the special, reserved name for the key property of the database.
     /// </summary>
+    /// <remarks>
+    /// When set, the model builder manages the key storage name, and users cannot customize it.
+    /// </remarks>
     public string? ReservedKeyStorageName { get; init; }
 }

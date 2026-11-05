@@ -49,8 +49,11 @@ public class ChatToolMode
 
     /// <summary>
     /// Gets a predefined <see cref="ChatToolMode"/> indicating that tool usage is required,
-    /// but that any tool can be selected. At least one tool must be provided in <see cref="ChatOptions.Tools"/>.
+    /// but that any tool can be selected.
     /// </summary>
+    /// <remarks>
+    /// At least one tool must be provided in <see cref="ChatOptions.Tools"/>.
+    /// </remarks>
     public static RequiredChatToolMode RequireAny { get; } = new(requiredFunctionName: null);
 
     /// <summary>

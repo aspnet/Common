@@ -3,12 +3,9 @@
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { App } from '../../components/App.tsx'
-import { FluentProvider, webLightTheme } from '@fluentui/react-components';
-import { createScoreSummary } from '../../components/Summary.ts';
-import { ReportContextProvider } from '../../components/ReportContext.tsx';
+import { App, createScoreSummary, ReportContextProvider } from '../../components';
 
-let dataset: Dataset = { scenarioRunResults: [] };
+let dataset: Dataset = { scenarioRunResults: [], createdAt: '' };
 
 const rootElement = document.getElementById('root')!;
 
@@ -22,18 +19,20 @@ if (!import.meta.env.PROD) {
   // This pattern avoids XSS vulnerabilities that can occur when embedding JSON in script blocks.
   const datasetJson = rootElement.getAttribute('data-dataset');
   if (datasetJson) {
-    dataset = JSON.parse(datasetJson) as Dataset;
+    try {
+      dataset = JSON.parse(datasetJson) as Dataset;
+    } catch {
+      // Keep the empty fallback dataset when the embedded payload is malformed.
+    }
   }
 }
 
 const scoreSummary = createScoreSummary(dataset);
 
 createRoot(rootElement).render(
-  <FluentProvider theme={webLightTheme}>
-    <StrictMode>
-      <ReportContextProvider dataset={dataset} scoreSummary={scoreSummary}>
-        <App />
-      </ReportContextProvider>
-    </StrictMode>
-  </FluentProvider>,
+  <StrictMode>
+    <ReportContextProvider dataset={dataset} scoreSummary={scoreSummary}>
+      <App heightStrategy="fill-viewport" themeSource="toggle" />
+    </ReportContextProvider>
+  </StrictMode>,
 )

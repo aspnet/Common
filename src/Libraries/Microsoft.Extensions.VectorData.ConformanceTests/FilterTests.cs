@@ -571,7 +571,7 @@ public abstract class FilterTests<TKey>(FilterTests<TKey>.Fixture fixture)
 
         public virtual bool TestDynamic => true;
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
 

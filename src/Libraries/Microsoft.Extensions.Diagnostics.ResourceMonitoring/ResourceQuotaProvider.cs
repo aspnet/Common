@@ -1,9 +1,6 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System.Diagnostics.CodeAnalysis;
-using Microsoft.Shared.DiagnosticIds;
-
 namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring;
 
 /// <summary>
@@ -15,7 +12,6 @@ namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring;
 /// resource management systems, or other runtime constraints.
 /// </remarks>
 #pragma warning disable S1694 // An abstract class should have both abstract and concrete methods. It's for better .NET Framework support, to have more flexible API if we add more methods here.
-[Experimental(diagnosticId: DiagnosticIds.Experiments.ResourceMonitoring, UrlFormat = DiagnosticIds.UrlFormat)]
 public abstract class ResourceQuotaProvider
 #pragma warning restore S1694 // An abstract class should have both abstract and concrete methods
 {

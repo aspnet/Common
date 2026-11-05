@@ -3,7 +3,7 @@
 
 using System.Net;
 using System.Net.Sockets;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Microsoft.Extensions.ServiceDiscovery.Dns.Resolver.Tests;
 

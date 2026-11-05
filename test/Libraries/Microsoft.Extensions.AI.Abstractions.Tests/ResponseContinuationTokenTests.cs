@@ -20,19 +20,30 @@ public class ResponseContinuationTokenTests
         Assert.Equal(testBytes, token.ToBytes().ToArray());
     }
 
-    [Fact]
-    public void JsonSerialization_Roundtrips()
+    [Theory]
+    [InlineData(new byte[0], "\"\"")]
+    [InlineData(new byte[] { 1, 2, 3, 4, 5 }, "\"AQIDBAU=\"")]
+    public void JsonSerialization_Roundtrips(byte[] testBytes, string expectedJson)
     {
-        ResponseContinuationToken originalToken = ResponseContinuationToken.FromBytes(new byte[] { 1, 2, 3, 4, 5 });
+        ResponseContinuationToken originalToken = ResponseContinuationToken.FromBytes(testBytes);
 
         // Act
-        string json = JsonSerializer.Serialize(originalToken, TestJsonSerializerContext.Default.ResponseContinuationToken);
+        string json = JsonSerializer.Serialize(originalToken, AIJsonUtilities.DefaultOptions);
 
-        ResponseContinuationToken? deserializedToken = JsonSerializer.Deserialize(json, TestJsonSerializerContext.Default.ResponseContinuationToken);
+        ResponseContinuationToken? deserializedToken = JsonSerializer.Deserialize<ResponseContinuationToken>(json, AIJsonUtilities.DefaultOptions);
 
         // Assert
+        Assert.Equal(expectedJson, json);
         Assert.NotNull(deserializedToken);
         Assert.Equal(originalToken.ToBytes().ToArray(), deserializedToken.ToBytes().ToArray());
         Assert.NotSame(originalToken, deserializedToken);
+    }
+
+    [Fact]
+    public void DefaultOptions_ContainsMetadataForResponseContinuationToken()
+    {
+        Assert.True(AIJsonUtilities.DefaultOptions.TryGetTypeInfo(typeof(ResponseContinuationToken), out var info));
+        Assert.NotNull(info);
+        Assert.Equal(typeof(ResponseContinuationToken), info.Type);
     }
 }

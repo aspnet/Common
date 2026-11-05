@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.ServiceDiscovery.Dns.Tests;
 using Microsoft.Extensions.Time.Testing;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Microsoft.Extensions.ServiceDiscovery.Dns.Resolver.Tests;
 

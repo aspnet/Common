@@ -74,11 +74,13 @@ public class MyService
 Per-request buffering is especially useful for capturing all logs related to a specific HTTP request and making decisions about them collectively based on request outcomes.
 Per-request buffering is tightly coupled with [Global Buffering](https://github.com/dotnet/extensions/blob/main/src/Libraries/Microsoft.Extensions.Telemetry/README.md#log-buffering). If a log entry is supposed to be buffered to a per-request buffer, but there is no active HTTP context, it will be buffered to the global buffer instead. If buffer flush is triggered, the per-request buffer will be flushed first, followed by the global buffer.
 
+To preserve logging scopes in buffered log records, set the experimental `IncludeScopes` option, which adds the scopes' name/value pairs to the records' attributes.
+
 ### Tracking HTTP Request Latency
 
 These components enable tracking and reporting the latency of HTTP request processing.
 
-The services can be registered using the following methods:
+The services can be registered using the following methods. They also register the latency context services (see `AddLatencyContext()`) unless those are already registered:
 
 ```csharp
 public static IServiceCollection AddRequestCheckpoint(this IServiceCollection services)
@@ -100,11 +102,40 @@ For example:
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRequestLatencyTelemetry();
-builder.Services.AddRequestCheckpoint(options => { });
+builder.Services.AddRequestCheckpoint();
 
 var app = builder.Build();
 
 app.UseRequestCheckpoint();
+app.UseRequestLatencyTelemetry();
+```
+
+#### Enriching HTTP Request Logs with Latency Data
+
+This enricher appends the latency data collected for an incoming request (checkpoints, tags, measures, and total duration) to that request's HTTP log. It reads the per-request latency context populated by `AddRequestLatencyTelemetry`, so register the latency telemetry services and middleware as shown above.
+
+This API is only available for ASP.NET Core 8+.
+
+The enricher can be registered using the following method:
+
+```csharp
+public static IServiceCollection AddHttpServerLatencyTelemetry(this IServiceCollection services)
+```
+
+For example:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddRequestLatencyTelemetry();
+builder.Services.AddRequestCheckpoint();
+builder.Services.AddHttpLogging();
+builder.Services.AddHttpServerLatencyTelemetry();
+
+var app = builder.Build();
+
+app.UseRequestCheckpoint();
+app.UseHttpLogging();
 app.UseRequestLatencyTelemetry();
 ```
 
@@ -113,6 +144,8 @@ app.UseRequestLatencyTelemetry();
 These components enable enriching and redacting ASP.NET Core's [HTTP request logs](https://learn.microsoft.com/aspnet/core/fundamentals/http-logging/).
 
 These APIs are only available for ASP.NET Core 8+.
+
+`AddHttpLoggingRedaction()` registers a default redactor provider by calling `AddRedaction()` from the `Microsoft.Extensions.Compliance.Redaction` package. `AddHttpLogEnricher<T>()` and `AddHttpServerLatencyTelemetry()` call `AddHttpLoggingRedaction()`, so they register it too. The default redactor provider erases any data that has a data classification other than `DataClassification.None`. To use specific redactors for your data classifications, call `builder.Services.AddRedaction(...)` and configure them; this can be done before or after calling any of these methods. If you use `AddFakeRedaction()` or a custom `IRedactorProvider` implementation, it must be registered before calling any of these methods.
 
 The services can be registered using the following methods:
 

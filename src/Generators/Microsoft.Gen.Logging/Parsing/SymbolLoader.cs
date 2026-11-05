@@ -34,6 +34,7 @@ internal static class SymbolLoader
         "System.DateOnly",
         "System.Version",
         "System.Uri",
+        "System.Type",
         "System.Net.IPAddress",
         "System.Net.EndPoint",
         "System.Net.IPEndPoint",

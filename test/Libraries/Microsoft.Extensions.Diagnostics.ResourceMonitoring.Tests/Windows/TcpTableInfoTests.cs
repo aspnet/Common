@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -6,15 +6,18 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.Extensions.Diagnostics.ResourceMonitoring.Windows.Network;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring.Windows.Test;
 
 [Collection("Tcp Connection Tests")]
-[OSSkipCondition(OperatingSystems.Linux | OperatingSystems.MacOSX, SkipReason = "Windows specific.")]
 public sealed class TcpTableInfoTests
 {
+    public TcpTableInfoTests()
+    {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Windows), "Skipped on Linux/macOS");
+    }
+
     public static readonly TimeSpan DefaultTimeSpan = TimeSpan.FromSeconds(5);
     public static DateTimeOffset StartTimestamp = DateTimeOffset.UtcNow;
     public static DateTimeOffset NextTimestamp = StartTimestamp.Add(DefaultTimeSpan);
@@ -169,7 +172,7 @@ public sealed class TcpTableInfoTests
         return (uint)NTSTATUS.Success;
     }
 
-    [ConditionalFact]
+    [Fact]
     public void Test_TcpTableInfo_Get_UnsuccessfulStatus_All_The_Time()
     {
         var options = new ResourceMonitoringOptions
@@ -185,7 +188,7 @@ public sealed class TcpTableInfoTests
         });
     }
 
-    [ConditionalFact]
+    [Fact]
     public void Test_TcpTableInfo_Get_InsufficientBuffer_Then_Get_InvalidParameter()
     {
         var options = new ResourceMonitoringOptions
@@ -201,7 +204,7 @@ public sealed class TcpTableInfoTests
         });
     }
 
-    [ConditionalFact]
+    [Fact]
     public void Test_TcpTableInfo_Get_Correct_Information()
     {
         StartTimestamp = DateTimeOffset.UtcNow;
@@ -262,7 +265,7 @@ public sealed class TcpTableInfoTests
         Assert.Equal(2, tcpStateInfo.DeleteTcbCount);
     }
 
-    [ConditionalFact]
+    [Fact]
     public void Test_TcpTableInfo_CalculateCount_default_branch()
     {
         TcpStateInfo tcpStateInfo = new();

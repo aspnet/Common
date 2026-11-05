@@ -22,7 +22,7 @@ namespace Microsoft.Extensions.AI;
 
 /// <summary>Represents a delegating speech-to-text client that implements the OpenTelemetry Semantic Conventions for Generative AI systems.</summary>
 /// <remarks>
-/// This class provides an implementation of the Semantic Conventions for Generative AI systems v1.40, defined at <see href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />.
+/// This class provides an implementation of the Semantic Conventions for Generative AI systems v1.41, defined at <see href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />.
 /// The specification is still experimental and subject to change; as such, the telemetry output by this client is also subject to change.
 /// </remarks>
 [Experimental(DiagnosticIds.Experiments.AISpeechToText, UrlFormat = DiagnosticIds.UrlFormat)]
@@ -64,19 +64,8 @@ public sealed class OpenTelemetrySpeechToTextClient : DelegatingSpeechToTextClie
         _activitySource = new(name);
         _meter = new(name);
 
-        _tokenUsageHistogram = _meter.CreateHistogram<int>(
-            OpenTelemetryConsts.GenAI.Client.TokenUsage.Name,
-            OpenTelemetryConsts.TokensUnit,
-            OpenTelemetryConsts.GenAI.Client.TokenUsage.Description,
-            advice: new() { HistogramBucketBoundaries = OpenTelemetryConsts.GenAI.Client.TokenUsage.ExplicitBucketBoundaries }
-            );
-
-        _operationDurationHistogram = _meter.CreateHistogram<double>(
-            OpenTelemetryConsts.GenAI.Client.OperationDuration.Name,
-            OpenTelemetryConsts.SecondsUnit,
-            OpenTelemetryConsts.GenAI.Client.OperationDuration.Description,
-            advice: new() { HistogramBucketBoundaries = OpenTelemetryConsts.GenAI.Client.OperationDuration.ExplicitBucketBoundaries }
-            );
+        _tokenUsageHistogram = OtelMetricHelpers.CreateGenAITokenUsageHistogram(_meter);
+        _operationDurationHistogram = OtelMetricHelpers.CreateGenAIOperationDurationHistogram(_meter);
     }
 
     /// <inheritdoc/>
@@ -288,17 +277,7 @@ public sealed class OpenTelemetrySpeechToTextClient : DelegatingSpeechToTextClie
             }
         }
 
-        if (error is not null)
-        {
-            _ = activity?
-                .AddTag(OpenTelemetryConsts.Error.Type, error.GetType().FullName)
-                .SetStatus(ActivityStatusCode.Error, error.Message);
-
-            if (_logger is not null)
-            {
-                OpenTelemetryLog.OperationException(_logger, error);
-            }
-        }
+        OpenTelemetryLog.RecordOperationError(activity, _logger, error);
 
         if (response is not null)
         {
@@ -368,7 +347,7 @@ public sealed class OpenTelemetrySpeechToTextClient : DelegatingSpeechToTextClie
         {
             _ = activity.AddTag(
                 OpenTelemetryConsts.GenAI.Output.Messages,
-                OpenTelemetryChatClient.SerializeChatMessages([new(ChatRole.Assistant, response.Contents)]));
+                OtelMessageSerializer.SerializeChatMessages([new(ChatRole.Assistant, response.Contents)]));
         }
     }
 }

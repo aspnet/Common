@@ -21,5 +21,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["components", "html-report", "azure-devops-report"]
+  "include": ["components", "html-report", "azure-devops-report", "test"]
 }

@@ -16,13 +16,13 @@ public abstract class TestStore
     private VectorStore? _defaultVectorStore;
 
     /// <summary>
-    /// Some databases modify vectors on upsert, e.g. normalizing them, so vectors
-    /// returned cannot be compared with the original ones.
+    /// Gets a value indicating whether vectors returned from the database can be
+    /// compared with the original vectors.
     /// </summary>
     public virtual bool VectorsComparable => true;
 
     /// <summary>
-    /// Whether the database supports filtering by score threshold in vector search.
+    /// Gets a value indicating whether the database supports filtering by score threshold in vector search.
     /// </summary>
     public virtual bool SupportsScoreThreshold => true;
 
@@ -95,8 +95,10 @@ public abstract class TestStore
 
     /// <summary>
     /// Creates a collection for the given name and definition.
-    /// Override this to provide provider-specific collection options (e.g., partition key configuration).
     /// </summary>
+    /// <remarks>
+    /// Override this to provide provider-specific collection options, such as partition key configuration.
+    /// </remarks>
     public virtual VectorStoreCollection<TKey, TRecord> CreateCollection<TKey, TRecord>(
         string name,
         VectorStoreCollectionDefinition definition)
@@ -106,8 +108,10 @@ public abstract class TestStore
 
     /// <summary>
     /// Creates a dynamic collection for the given name and definition.
-    /// Override this to provide provider-specific collection options (e.g., partition key configuration).
     /// </summary>
+    /// <remarks>
+    /// Override this to provide provider-specific collection options, such as partition key configuration.
+    /// </remarks>
     public virtual VectorStoreCollection<object, Dictionary<string, object?>> CreateDynamicCollection(
         string name,
         VectorStoreCollectionDefinition definition)

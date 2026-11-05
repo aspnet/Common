@@ -15,7 +15,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net462'" >
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)' != '.NETCoreApp'" >
     <!-- Direct dependencies as Microsoft.AspNetCore.Mvc.Testing references vulnerable versions. -->
     <PackageReference Include="Microsoft.AspNetCore.Http" />
     <PackageReference Include="Newtonsoft.Json" />

@@ -67,8 +67,10 @@ internal sealed class HttpResponseBodyReader
 
         // TimeSpan.Zero cannot be set from user's code as
         // validation prevents values less than one millisecond
-        // However, this is useful during unit tests
-        if (readTimeout <= TimeSpan.Zero)
+        // However, this is useful during unit tests.
+        // Note: the comparison has to be an exact match; when a debugger is attached,
+        // the timeout is Timeout.InfiniteTimeSpan (-1 ms), which means "never time out".
+        if (readTimeout == TimeSpan.Zero)
         {
             // cancel immediately, async cancel not required in tests
 #pragma warning disable CA1849 // Call async methods when in an async method

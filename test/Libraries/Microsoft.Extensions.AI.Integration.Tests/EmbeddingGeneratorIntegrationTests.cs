@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -16,7 +16,6 @@ using System.Numerics.Tensors;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.TestUtilities;
 using OpenTelemetry.Trace;
 using Xunit;
 
@@ -42,7 +41,7 @@ public abstract class EmbeddingGeneratorIntegrationTests : IDisposable
 
     protected abstract IEmbeddingGenerator<string, Embedding<float>>? CreateEmbeddingGenerator();
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GenerateEmbedding_CreatesEmbeddingSuccessfully()
     {
         SkipIfNotEnabled();
@@ -57,7 +56,7 @@ public abstract class EmbeddingGeneratorIntegrationTests : IDisposable
         Assert.NotEmpty(embeddings[0].Vector.ToArray());
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GenerateEmbeddings_CreatesEmbeddingsSuccessfully()
     {
         SkipIfNotEnabled();
@@ -79,7 +78,7 @@ public abstract class EmbeddingGeneratorIntegrationTests : IDisposable
         });
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task Caching_SameOutputsForSameInput()
     {
         SkipIfNotEnabled();
@@ -102,7 +101,7 @@ public abstract class EmbeddingGeneratorIntegrationTests : IDisposable
         Assert.Equal(2, callCounter.CallCount);
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task OpenTelemetry_CanEmitTracesAndMetrics()
     {
         SkipIfNotEnabled();
@@ -134,7 +133,7 @@ public abstract class EmbeddingGeneratorIntegrationTests : IDisposable
     }
 
 #if NET
-    [ConditionalFact]
+    [Fact]
     public async Task Quantization_Binary_EmbeddingsCompareSuccessfully()
     {
         SkipIfNotEnabled();
@@ -178,7 +177,7 @@ public abstract class EmbeddingGeneratorIntegrationTests : IDisposable
         Assert.True(distances[2, 3] < distances[1, 3]);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Quantization_Half_EmbeddingsCompareSuccessfully()
     {
         SkipIfNotEnabled();
@@ -219,9 +218,6 @@ public abstract class EmbeddingGeneratorIntegrationTests : IDisposable
     [MemberNotNull(nameof(_embeddingGenerator))]
     protected void SkipIfNotEnabled()
     {
-        if (_embeddingGenerator is null)
-        {
-            throw new SkipTestException("Generator is not enabled.");
-        }
+        Assert.SkipUnless(_embeddingGenerator is not null, "Generator is not enabled.");
     }
 }

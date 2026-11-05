@@ -319,8 +319,8 @@ public sealed class ImageGeneratingChatClient : DelegatingChatClient
         {
             List<AIContent>? newContents = null;
 
-            // Replace FunctionResultContent instances with generated image content
-            for (int i = contents.Count - 1; i >= 0; i--)
+            // Replace image-generation FunctionCallContent with ImageGenerationToolCallContent, and FunctionResultContent with generated image content
+            for (int i = 0; i < contents.Count; i++)
             {
                 var content = contents[i];
 
@@ -328,7 +328,7 @@ public sealed class ImageGeneratingChatClient : DelegatingChatClient
                 if (content is FunctionCallContent functionCall &&
                     _toolNames.Contains(functionCall.Name))
                 {
-                    // create a new list and omit the FunctionCallContent
+                    // create a new list copying all items before this one, and omit the FunctionCallContent
                     newContents ??= CopyList(contents, i);
 
                     if (functionCall.Name != nameof(GetImagesForEdit))
@@ -339,6 +339,7 @@ public sealed class ImageGeneratingChatClient : DelegatingChatClient
                 else if (content is FunctionResultContent functionResult &&
                     _imageContentByCallId.TryGetValue(functionResult.CallId, out var imageContents))
                 {
+                    // create a new list copying all items before this one
                     newContents ??= CopyList(contents, i);
 
                     if (imageContents.Any())

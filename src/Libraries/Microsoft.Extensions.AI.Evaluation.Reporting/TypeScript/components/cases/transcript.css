@@ -1,0 +1,82 @@
+/*
+Licensed to the .NET Foundation under one or more agreements.
+The .NET Foundation licenses this file to you under the MIT license.
+*/
+
+.eval-md > :first-child { margin-top: 0; }
+.eval-md > :last-child { margin-bottom: 0; }
+.eval-md p,
+.eval-md ul,
+.eval-md ol,
+.eval-md blockquote,
+.eval-md pre,
+.eval-md table {
+  margin: var(--spacing-xs) 0;
+}
+.eval-md ul,
+.eval-md ol { padding-left: var(--spacing-xl); }
+.eval-md li { margin: var(--spacing-xxs) 0; }
+.eval-md li > ul,
+.eval-md li > ol { margin: var(--spacing-xxs) 0; }
+.eval-md .md-h1,
+.eval-md .md-h2,
+.eval-md .md-h3,
+.eval-md .md-h4 {
+  margin: var(--spacing-s) 0 var(--spacing-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-400);
+}
+.eval-md .md-h1 { font-size: var(--font-size-500); }
+.eval-md .md-h2 { font-size: var(--font-size-400); }
+.eval-md .md-h3 { font-size: var(--font-size-300); }
+.eval-md .md-h4 { font-size: var(--font-size-200); }
+.eval-md a {
+  color: var(--brand-foreground-1);
+  text-decoration: underline;
+}
+.eval-md blockquote {
+  padding: var(--spacing-xxs) var(--spacing-m);
+  border-left: 3px solid var(--neutral-stroke-1);
+  color: var(--neutral-foreground-2);
+}
+.eval-md code {
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-200);
+  background: var(--neutral-background-3);
+  padding: 1px var(--spacing-xxs);
+  border-radius: var(--radius-small);
+}
+.eval-md pre {
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-200);
+  line-height: var(--line-height-200);
+  background: var(--neutral-background-3);
+  padding: var(--spacing-s) var(--spacing-m);
+  border-radius: var(--radius-medium);
+  overflow-x: auto;
+}
+.eval-md pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+.eval-md table {
+  border-collapse: collapse;
+  font-size: var(--font-size-200);
+}
+.eval-md th,
+.eval-md td {
+  border: 1px solid var(--neutral-stroke-2);
+  padding: var(--spacing-xxs) var(--spacing-s);
+  text-align: left;
+}
+.eval-md th {
+  background: var(--neutral-background-3);
+  font-weight: var(--font-weight-semibold);
+}
+.eval-md hr {
+  border: none;
+  border-top: 1px solid var(--neutral-stroke-2);
+  margin: var(--spacing-s) 0;
+}

@@ -76,7 +76,7 @@ public static class HttpClientLoggingHttpClientBuilderExtensions
         _ = Throw.IfNull(builder);
         _ = Throw.IfNull(section);
 
-        return AddExtendedHttpClientLoggingInternal(builder, options => options.Bind(section), wrapHandlersPipeline: true);
+        return AddExtendedHttpClientLoggingInternal(builder, options => options.BindConfigurationSection(section), wrapHandlersPipeline: true);
     }
 
     /// <summary>
@@ -100,7 +100,7 @@ public static class HttpClientLoggingHttpClientBuilderExtensions
         _ = Throw.IfNull(builder);
         _ = Throw.IfNull(section);
 
-        return AddExtendedHttpClientLoggingInternal(builder, options => options.Bind(section), wrapHandlersPipeline);
+        return AddExtendedHttpClientLoggingInternal(builder, options => options.BindConfigurationSection(section), wrapHandlersPipeline);
     }
 
     /// <summary>
@@ -157,6 +157,7 @@ public static class HttpClientLoggingHttpClientBuilderExtensions
         configureOptionsBuilder?.Invoke(optionsBuilder);
 
         _ = builder.Services
+            .AddRedaction()
             .AddHttpRouteProcessor()
             .AddHttpHeadersRedactor()
             .AddOutgoingRequestContext();

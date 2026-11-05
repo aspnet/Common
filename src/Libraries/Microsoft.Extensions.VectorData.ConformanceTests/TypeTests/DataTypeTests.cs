@@ -440,9 +440,11 @@ public abstract class DataTypeTests<TKey, TRecord>(DataTypeTests<TKey, TRecord>.
         private readonly IList<VectorStoreDataProperty> _defaultDataProperties;
 
         /// <summary>
-        /// Whether the recreate the collection while testing, as opposed to deleting the records.
-        /// Necessary for InMemory, where the .NET mapped on the collection cannot be changed.
+        /// Gets a value indicating whether the collection is recreated while testing instead of deleting the records.
         /// </summary>
+        /// <remarks>
+        /// This is necessary for InMemory, where the .NET type mapped on the collection cannot be changed.
+        /// </remarks>
         public virtual bool RecreateCollection => false;
 
 #pragma warning disable CA2214 // Do not call overridable methods in constructors
@@ -452,7 +454,7 @@ public abstract class DataTypeTests<TKey, TRecord>(DataTypeTests<TKey, TRecord>.
         }
 #pragma warning restore CA2214
 
-        public override async Task InitializeAsync()
+        public override async ValueTask InitializeAsync()
         {
             await base.InitializeAsync();
 

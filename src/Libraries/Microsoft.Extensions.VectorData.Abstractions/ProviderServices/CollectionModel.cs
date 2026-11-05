@@ -84,8 +84,10 @@ public sealed class CollectionModel
 
     /// <summary>
     /// Gets the single vector property in the model, and throws if there are multiple vector properties.
-    /// Suitable for providers where validation is in place for single vectors only (<see cref="CollectionModelBuildingOptions.SupportsMultipleVectors"/>).
     /// </summary>
+    /// <remarks>
+    /// This is suitable for providers where validation is in place for single vectors only (<see cref="CollectionModelBuildingOptions.SupportsMultipleVectors"/>).
+    /// </remarks>
     public VectorPropertyModel VectorProperty => _singleVectorProperty ??= VectorProperties.Single();
 
     // TODO: the pattern of first instantiating via parameterless constructor and then populating the properties isn't compatible

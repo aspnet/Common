@@ -3,6 +3,6 @@
   Message: We tried to convert total memory usage value from '/proc/meminfo' to bytes, but we've got a unit that we don't recognize: '  '.,
   StackTrace:
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetHostAvailableMemory()
-at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass11_0.<Throws_When_MemInfo_Does_Not_Contain_TotalMemory>b__0()
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass12_0.<Throws_When_MemInfo_Does_Not_Contain_TotalMemory>b__0()
 at Xunit.Record.Exception(Func`1 testCode)
 }

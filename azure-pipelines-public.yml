@@ -131,7 +131,6 @@ stages:
               repoTestResultsPath: $(Build.Arcade.TestResultsPath)
               skipQualityGates: ${{ eq(variables['SkipQualityGates'], 'true') }}
               isWindows: true
-              warnAsError: 0
               runAsPublic: true
 
       # ----------------------------------------------------------------
@@ -163,7 +162,6 @@ stages:
               repoTestResultsPath: $(Build.Arcade.TestResultsPath)
               skipQualityGates: ${{ eq(variables['SkipQualityGates'], 'true') }}
               isWindows: false
-              warnAsError: 0
               runAsPublic: true
 
 
@@ -209,50 +207,3 @@ stages:
           displayName: Init toolset
 
         - template: /eng/pipelines/templates/VerifyCoverageReport.yml
-
-
-# ----------------------------------------------------------------
-# This stage only performs a build treating warnings as errors
-# to detect any kind of code style violations
-# ----------------------------------------------------------------
-- stage: correctness
-  displayName: Correctness
-  dependsOn: []
-  variables:
-  - template: /eng/common/templates/variables/pool-providers.yml
-  jobs:
-  - template: /eng/common/templates/jobs/jobs.yml
-    parameters:
-      enableMicrobuild: true
-      enableTelemetry: true
-      runAsPublic: true
-      workspace:
-        clean: all
-
-      jobs:
-      - job: WarningsCheck
-        timeoutInMinutes: 180
-
-        pool:
-          name: $(DncEngPublicBuildPool)
-          demands: ImageOverride -equals windows.vs2022.amd64.open
-
-        variables:
-          - _buildScript: $(Build.SourcesDirectory)/build.cmd -ci -NativeToolsOnMachine
-
-        preSteps:
-          - checkout: self
-            clean: true
-            persistCredentials: true
-            fetchDepth: 1
-
-        steps:
-          - template: /eng/pipelines/templates/BuildAndTest.yml
-            parameters:
-              buildScript: $(_buildScript)
-              buildConfig: $(_BuildConfig)
-              repoLogPath: $(Build.Arcade.LogsPath)
-              repoTestResultsPath: $(Build.Arcade.TestResultsPath)
-              skipTests: true
-              skipQualityGates: true
-              isWindows: true

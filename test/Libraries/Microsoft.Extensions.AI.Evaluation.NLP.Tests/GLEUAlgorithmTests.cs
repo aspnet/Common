@@ -31,6 +31,46 @@ public class GLEUAlgorithmTests
     }
 
     [Fact]
+    public void TestSentenceGLEUUsesTheBestMatchingReference()
+    {
+        string[][] references = [
+            "the cat sat on the mat".Split(' '),
+            "completely different text here now".Split(' '),
+        ];
+        string[] hypothesis = "the cat sat on the mat".Split(' ');
+
+        double score = SentenceGLEU(references, hypothesis);
+        Assert.Equal(1.0, score, 4);
+    }
+
+    [Fact]
+    public void TestSentenceGLEUFindsTheBestReferenceInAnyPosition()
+    {
+        string[][] references = [
+            "completely different text here now".Split(' '),
+            "nothing in common with the response".Split(' '),
+            "the cat sat on the mat".Split(' '),
+        ];
+        string[] hypothesis = "the cat sat on the mat".Split(' ');
+
+        double score = SentenceGLEU(references, hypothesis);
+        Assert.Equal(1.0, score, 4);
+    }
+
+    [Fact]
+    public void TestSentenceGLEUIgnoresAdditionalWorseReferences()
+    {
+        string[][] references = [
+            "It is a guide to action that ensures that the military will forever heed Party commands".Split(' '),
+            "It is the guiding principle which guarantees the military forces always being under the command of the Party".Split(' '),
+        ];
+        string[] hypothesis = "It is a guide to action which ensures that the military always obeys the commands of the party".Split(' ');
+
+        double score = SentenceGLEU(references, hypothesis);
+        Assert.Equal(0.43939, score, 4);
+    }
+
+    [Fact]
     public void TestSentenceGLEUExampleA()
     {
         string[][] references = [
@@ -41,7 +81,7 @@ public class GLEUAlgorithmTests
         string[] hypothesis = "It is a guide to action which ensures that the military always obeys the commands of the party".Split(' ');
 
         double score = SentenceGLEU(references, hypothesis);
-        Assert.Equal(0.2778, score, 4);
+        Assert.Equal(0.43939, score, 4);
     }
 
     [Fact]
@@ -91,7 +131,7 @@ public class GLEUAlgorithmTests
         string[] hypothesis = SimpleWordTokenizer.WordTokenize("It is a guide to action which ensures that the military always obeys the commands of the party").ToArray();
 
         double score = SentenceGLEU(references, hypothesis);
-        Assert.Equal(0.2980, score, 4);
+        Assert.Equal(0.45454, score, 4);
 
     }
 

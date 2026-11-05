@@ -8,6 +8,8 @@ using System.Net.Http;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Latency;
+using Microsoft.Extensions.Diagnostics.Latency.Internal;
 using Microsoft.Extensions.Http.Latency.Internal;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -105,6 +107,31 @@ public class HttpClientLatencyTelemetryExtensionsTest
         Assert.Equal(expectedOptions.EnableDetailedLatencyBreakdown, options.EnableDetailedLatencyBreakdown);
     }
 
+    [Fact]
+    public void HttpClientLatencyTelemtry_LatencyContextNotRegistered_RegistersLatencyContext()
+    {
+        using var sp = new ServiceCollection()
+            .AddHttpClient()
+            .AddHttpClientLatencyTelemetry()
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        Assert.IsType<LatencyContextTokenIssuer>(sp.GetRequiredService<ILatencyContextTokenIssuer>());
+        Assert.IsType<LatencyContextProvider>(sp.GetRequiredService<ILatencyContextProvider>());
+    }
+
+    [Fact]
+    public void HttpClientLatencyTelemtry_CustomLatencyContextRegisteredFirst_KeepsCustomLatencyContext()
+    {
+        using var sp = new ServiceCollection()
+            .AddSingleton<ILatencyContextTokenIssuer, TestLatencyContextTokenIssuer>()
+            .AddSingleton<ILatencyContextProvider, TestLatencyContextProvider>()
+            .AddHttpClientLatencyTelemetry()
+            .BuildServiceProvider();
+
+        Assert.IsType<TestLatencyContextTokenIssuer>(sp.GetRequiredService<ILatencyContextTokenIssuer>());
+        Assert.IsType<TestLatencyContextProvider>(sp.GetRequiredService<ILatencyContextProvider>());
+    }
+
     private static IConfigurationSection GetConfigSection(HttpClientLatencyTelemetryOptions options)
     {
         return new ConfigurationBuilder()
@@ -114,5 +141,17 @@ public class HttpClientLatencyTelemetryExtensionsTest
             })
             .Build()
             .GetSection($"{nameof(HttpClientLatencyTelemetryOptions)}");
+    }
+
+    private sealed class TestLatencyContextTokenIssuer : ILatencyContextTokenIssuer
+    {
+        public TagToken GetTagToken(string name) => throw new NotSupportedException();
+        public CheckpointToken GetCheckpointToken(string name) => throw new NotSupportedException();
+        public MeasureToken GetMeasureToken(string name) => throw new NotSupportedException();
+    }
+
+    private sealed class TestLatencyContextProvider : ILatencyContextProvider
+    {
+        public ILatencyContext CreateContext() => throw new NotSupportedException();
     }
 }

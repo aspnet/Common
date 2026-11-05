@@ -162,16 +162,16 @@ internal partial class Parser
                     var current = type;
                     while (current != null)
                     {
-                        classification.UnionWith(GetDataClassificationAttributes(current, symbols).Select(x => x.ToDisplayString()));
+                        classification.UnionWith(GetDataClassificationAttributes(current, symbols).Select(x => x.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
                         current = current.BaseType;
                     }
 
-                    classification.UnionWith(GetDataClassificationAttributes(property, symbols).Select(x => x.ToDisplayString()));
+                    classification.UnionWith(GetDataClassificationAttributes(property, symbols).Select(x => x.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
 
                     // A property might be a sensitive parameter of a constructor:
                     if (sensitivePropsFromCtor.TryGetValue(property.Name, out var dataClassesFromCtor))
                     {
-                        classification.UnionWith(dataClassesFromCtor.Select(x => x.ToDisplayString()));
+                        classification.UnionWith(dataClassesFromCtor.Select(x => x.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
                     }
 
                     if (classification.Count > 0)
@@ -275,14 +275,24 @@ internal partial class Parser
 
                         if (CanLogProperties(property, property.Type, symbols, silent: logPropertiesAttribute == null))
                         {
-                            _ = typesChain.Add(namedType);
-                            var props = GetTypePropertiesToLog(extractedType, typesChain, symbols, transitive, ref foundDataClassificationAttributes);
-                            _ = typesChain.Remove(namedType);
-
-                            if (props != null)
+                            if (typesChain.Count >= MaxTypeTraversalDepth)
                             {
-                                lp.Properties.AddRange(props);
+                                Diag(DiagDescriptors.LogPropertiesCycleDetected, paramSymbol.GetLocation(), paramName, namedType.ToDisplayString(), property.Type.ToDisplayString(), lm.Name);
+                                return null;
                             }
+
+                            var propertyTransitive = transitive || (logPropertiesAttribute != null && AttributeProcessors.ExtractLogPropertiesAttributeValues(logPropertiesAttribute).transitive);
+
+                            _ = typesChain.Add(extractedType);
+                            var props = GetTypePropertiesToLog(extractedType, typesChain, symbols, propertyTransitive, ref foundDataClassificationAttributes);
+                            _ = typesChain.Remove(extractedType);
+
+                            if (props == null)
+                            {
+                                return null;
+                            }
+
+                            lp.Properties.AddRange(props);
                         }
                     }
 
@@ -300,7 +310,7 @@ internal partial class Parser
                         }
                     }
 
-                    if (tagProviderAttribute == null && logPropertiesAttribute == null && !transitive)
+                    if (tagProviderAttribute == null && logPropertiesAttribute == null)
                     {
                         if ((property.DeclaredAccessibility != Accessibility.Public || property.IsStatic)
                             || (property.GetMethod == null || property.GetMethod.DeclaredAccessibility != Accessibility.Public)

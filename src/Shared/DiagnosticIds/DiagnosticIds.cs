@@ -45,6 +45,7 @@ internal static class DiagnosticIds
         internal const string DocumentDb = "EXTEXP0011";
         internal const string AutoActivation = "EXTEXP0012";
         internal const string HttpLogging = "EXTEXP0013";
+        internal const string Documents = "EXTEXP0019";
 
         // All AI experiments share a diagnostic ID but have different
         // constants to manage which experiment each API belongs to.
@@ -53,19 +54,20 @@ internal static class DiagnosticIds
         internal const string AITextToSpeech = AIExperiments;
         internal const string AIMcpServers = AIExperiments;
         internal const string AIFunctionApprovals = AIExperiments;
+        internal const string AIApprovalsInvocationRequired = AIExperiments;
+        internal const string AIFunctionAndParameterName = AIExperiments;
 
         internal const string AIChatReduction = AIExperiments;
-        internal const string AIResponseContinuations = AIExperiments;
-        internal const string AICodeInterpreter = AIExperiments;
-        internal const string AIWebSearch = AIExperiments;
+        internal const string AIToolSearch = AIExperiments;
         internal const string AIRealTime = AIExperiments;
         internal const string AIFiles = AIExperiments;
+        internal const string AIOpenAIRequestPolicies = AIExperiments;
+        internal const string AIRoutingChat = AIExperiments;
 
         // These diagnostic IDs are defined by the OpenAI package for its experimental APIs.
         // We use the same IDs so consumers do not need to suppress additional diagnostics
         // when using the experimental OpenAI APIs.
         internal const string AIOpenAIResponses = "OPENAI001";
-        internal const string AIOpenAIAssistants = "OPENAI001";
         internal const string AIOpenAIImageClient = "OPENAI001";
         internal const string AIOpenAIAudio = "OPENAI001";
         internal const string AIOpenAIReasoning = "OPENAI001";
@@ -76,8 +78,13 @@ internal static class DiagnosticIds
         // constants to manage which experiment each API belongs to.
         internal const string VectorDataProviderServices = VectorDataExperiments;
 
+        // All Document Extraction experiments share a diagnostic ID but have different
+        // constants to manage which experiment each API belongs to.
+        internal const string DocumentExtraction = DocumentExtractionExperiments;
+
         private const string AIExperiments = "MEAI001";
         private const string VectorDataExperiments = "MEVD9001";
+        private const string DocumentExtractionExperiments = "MEDE0001";
     }
 
     internal static class LoggerMessage
@@ -158,10 +165,13 @@ internal static class DiagnosticIds
     {
         internal const string NonObservableResourceMonitoringApiDiagId = "EXTOBS0001";
         internal const string ObsoleteTelemetryApiDiagId = "EXTOBS0002";
+        internal const string HybridCacheDisableCompressionDiagId = "EXTOBS0003";
         internal const string NonObservableResourceMonitoringApiMessage =
             "This API is obsolete and will be removed in a future version. Consider using Resource Monitoring observable instruments.";
         internal const string ObsoleteTelemetryApiMessage =
             "This API is obsolete and will be removed in a future version. Instead of the AddServiceLogEnricher() methods, consider using the respective AddApplicationLogEnricher() methods.";
+        internal const string HybridCacheDisableCompressionMessage =
+            "HybridCache does not provide built-in compression, so this option doesn't do anything.";
     }
 }
 

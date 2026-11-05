@@ -26,7 +26,7 @@
     <NoWarn>$(NoWarn);AD0001</NoWarn>
 
     <!-- Experimental warnings are for customers, not for this repo -->
-    <NoWarn>$(NoWarn);EXTEXP0001;EXTEXP0002;EXTEXP0003;EXTEXP0004;EXTEXP0005;EXTEXP0006;EXTEXP0007;EXTEXP0008;EXTEXP0009;EXTEXP0010;EXTEXP0011;EXTEXP0012;EXTEXP0013;EXTEXP0014;EXTEXP0015;EXTEXP0016;EXTEXP0017;EXTEXP0018;MEVD9001</NoWarn>
+    <NoWarn>$(NoWarn);EXTEXP0001;EXTEXP0002;EXTEXP0003;EXTEXP0004;EXTEXP0005;EXTEXP0006;EXTEXP0007;EXTEXP0008;EXTEXP0009;EXTEXP0010;EXTEXP0011;EXTEXP0012;EXTEXP0013;EXTEXP0014;EXTEXP0015;EXTEXP0016;EXTEXP0017;EXTEXP0018;EXTEXP0019;MEVD9001;MEDE0001</NoWarn>
 
     <!-- Obsoletion warnings are for customers, not for this repo -->
     <NoWarn>$(NoWarn);EXTOBS0001;</NoWarn>
@@ -92,8 +92,8 @@
 
   <Target Name="_ConfigureTestRunnerAdditionalArguments" BeforeTargets="_InnerGetTestsToRun">
     <PropertyGroup>
-      <!-- See https://learn.microsoft.com/dotnet/core/tools/dotnet-test -->
-      <_BlameArgs>--blame --blame-crash --blame-crash-dump-type full --blame-hang --blame-hang-dump-type full --blame-hang-timeout 6m</_BlameArgs>
+      <!-- The blame options are only supported by VSTest, not by Microsoft.Testing.Platform (used by xUnit v3) -->
+      <_BlameArgs Condition="'$(UseMicrosoftTestingPlatformRunner)' != 'true'">--blame --blame-crash --blame-crash-dump-type full --blame-hang --blame-hang-dump-type full --blame-hang-timeout 6m</_BlameArgs>
 
       <!-- This property is used by the Arcade SDK while bootstrapping the VS Test runner -->
       <TestRunnerAdditionalArguments>$(TestRunnerAdditionalArguments) $(_BlameArgs)</TestRunnerAdditionalArguments>
@@ -106,7 +106,7 @@
           AfterTargets="ResolveReferences">
     <ItemGroup>
       <_Microsoft_Extensions_Logging_AbstractionsAnalyzer Include="@(Analyzer)" Condition="'%(Analyzer.NuGetPackageId)' == 'Microsoft.Extensions.Logging.Abstractions' Or
-                                                                                           ('%(Analyzer.AssemblyName)' == 'Microsoft.Extensions.Logging.Generators' and '%(Analyzer.NuGetPackageId)' == 'Microsoft.AspNetCore.App.Ref')" />
+                                                                                           '%(Analyzer.AssemblyName)' == 'Microsoft.Extensions.Logging.Generators'" />
     </ItemGroup>
 
     <!-- Remove Microsoft.Extensions.Logging.Abstractions Analyzer -->

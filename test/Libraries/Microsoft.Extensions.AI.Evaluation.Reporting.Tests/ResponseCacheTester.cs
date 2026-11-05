@@ -1,11 +1,10 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.AI.Evaluation.Reporting.Tests;
@@ -23,13 +22,10 @@ public abstract class ResponseCacheTester
 
     private void SkipIfNotConfigured()
     {
-        if (!IsConfigured)
-        {
-            throw new SkipTestException("Test not configured");
-        }
+        Assert.SkipUnless(IsConfigured, "Test not configured");
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task AddUncachedEntry()
     {
         SkipIfNotConfigured();
@@ -52,7 +48,7 @@ public abstract class ResponseCacheTester
         Assert.True(_responseB.SequenceEqual(cached));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task RemoveCachedEntry()
     {
         SkipIfNotConfigured();
@@ -78,7 +74,7 @@ public abstract class ResponseCacheTester
         Assert.Null(cache.Get(_keyB));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task CacheEntryExpiration()
     {
         SkipIfNotConfigured();
@@ -106,7 +102,7 @@ public abstract class ResponseCacheTester
         Assert.Null(cache.Get(_keyB));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task MultipleCacheInstances()
     {
         SkipIfNotConfigured();
@@ -128,7 +124,7 @@ public abstract class ResponseCacheTester
         Assert.True(_responseB.SequenceEqual(cache.Get(_keyB) ?? []));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task DeleteExpiredEntries()
     {
         SkipIfNotConfigured();
@@ -163,7 +159,7 @@ public abstract class ResponseCacheTester
         Assert.Null(cache.Get(_keyB));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task ResetCache()
     {
         SkipIfNotConfigured();

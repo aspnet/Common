@@ -2,10 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text.Json;
-using Microsoft.Shared.DiagnosticIds;
 using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.AI;
@@ -15,7 +13,6 @@ namespace Microsoft.Extensions.AI;
 /// The token is used for resuming streamed background responses and continuing
 /// non-streamed background responses until completion.
 /// </remarks>
-[Experimental(DiagnosticIds.Experiments.AIResponseContinuations)]
 internal sealed class ResponsesClientContinuationToken : ResponseContinuationToken
 {
     /// <summary>Initializes a new instance of the <see cref="ResponsesClientContinuationToken"/> class.</summary>
@@ -67,7 +64,7 @@ internal sealed class ResponsesClientContinuationToken : ResponseContinuationTok
 
         if (data.Length == 0)
         {
-            Throw.ArgumentException(nameof(token), "Failed to create OpenAIResponsesResumptionToken from provided token because it does not contain any data.");
+            Throw.ArgumentException(nameof(token), "Failed to create OpenAI continuation token from provided token because it does not contain any data.");
         }
 
         Utf8JsonReader reader = new(data.Span);
@@ -104,7 +101,7 @@ internal sealed class ResponsesClientContinuationToken : ResponseContinuationTok
 
         if (responseId is null)
         {
-            Throw.ArgumentException(nameof(token), "Failed to create MessagesPageToken from provided pageToken because it does not contain a responseId.");
+            Throw.ArgumentException(nameof(token), "Failed to create OpenAI continuation token from provided token because it does not contain a responseId.");
         }
 
         return new(responseId)

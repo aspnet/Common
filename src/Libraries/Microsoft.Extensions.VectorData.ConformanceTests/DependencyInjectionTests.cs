@@ -31,7 +31,7 @@ public abstract class DependencyInjectionTests<TVectorStore, TCollection, TKey, 
     public abstract IEnumerable<Func<IServiceCollection, object?, string, ServiceLifetime, IServiceCollection>> CollectionDelegates { get; }
 
     [Fact]
-    public void ServiceCollectionCantBeNull()
+    public virtual void ServiceCollectionCantBeNull()
     {
         foreach (var registrationDelegate in StoreDelegates)
         {
@@ -47,7 +47,7 @@ public abstract class DependencyInjectionTests<TVectorStore, TCollection, TKey, 
     }
 
     [Fact]
-    public void CollectionNameCantBeNullOrEmpty()
+    public virtual void CollectionNameCantBeNullOrEmpty()
     {
         const string EmptyCollectionName = "";
 
@@ -84,7 +84,7 @@ public abstract class DependencyInjectionTests<TVectorStore, TCollection, TKey, 
 
     [Theory]
     [MemberData(nameof(LifetimesAndServiceKeys))]
-    public void CanRegisterCollections(ServiceLifetime lifetime, object? serviceKey)
+    public virtual void CanRegisterCollections(ServiceLifetime lifetime, object? serviceKey)
     {
         foreach (var registrationDelegate in CollectionDelegates)
         {
@@ -136,7 +136,7 @@ public abstract class DependencyInjectionTests<TVectorStore, TCollection, TKey, 
 
     [Theory]
     [MemberData(nameof(LifetimesAndServiceKeys))]
-    public void CanRegisterConcreteTypeCollectionsAfterSomeAbstractionHasBeenRegistered(ServiceLifetime lifetime, object? serviceKey)
+    public virtual void CanRegisterConcreteTypeCollectionsAfterSomeAbstractionHasBeenRegistered(ServiceLifetime lifetime, object? serviceKey)
     {
         foreach (var registrationDelegate in CollectionDelegates)
         {
@@ -156,7 +156,7 @@ public abstract class DependencyInjectionTests<TVectorStore, TCollection, TKey, 
 
     [Theory]
     [MemberData(nameof(LifetimesAndServiceKeys))]
-    public void EmbeddingGeneratorIsResolved(ServiceLifetime lifetime, object? serviceKey)
+    public virtual void EmbeddingGeneratorIsResolved(ServiceLifetime lifetime, object? serviceKey)
     {
         foreach (var registrationDelegate in CollectionDelegates)
         {

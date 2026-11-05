@@ -11,8 +11,11 @@ namespace Microsoft.Extensions.DataIngestion;
 public sealed class VectorStoreWriterOptions
 {
     /// <summary>
-    /// Gets or sets the name of the collection. When not provided, "chunks" will be used.
+    /// Gets or sets the name of the collection.
     /// </summary>
+    /// <value>
+    /// When not provided, <c>"chunks"</c> is used.
+    /// </value>
     public string CollectionName
     {
         get => field ?? "chunks";

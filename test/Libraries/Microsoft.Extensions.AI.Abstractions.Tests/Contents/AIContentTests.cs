@@ -55,9 +55,13 @@ public class AIContentTests
         Assert.Single(deserialized.AdditionalProperties);
     }
 
-    [Fact]
-    public void Serialization_DerivedTypes_Roundtrips()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Serialization_DerivedTypes_Roundtrips(bool useBuiltInJsonContext)
     {
+        JsonSerializerOptions options = useBuiltInJsonContext ? AIJsonUtilities.DefaultOptions : TestJsonSerializerContext.Default.Options;
+
         ChatMessage message = new(ChatRole.User,
         [
             new TextContent("a"),
@@ -77,20 +81,24 @@ public class AIContentTests
             new ToolApprovalRequestContent("request123", new McpServerToolCallContent("call123", "myTool", "myServer")),
             new ToolApprovalResponseContent("request123", approved: true, new McpServerToolCallContent("call456", "myTool2", "myServer2")),
             new ImageGenerationToolCallContent("img123"),
-            new ImageGenerationToolResultContent("img456") { Outputs = [new DataContent(new byte[] { 4, 5, 6 }, "image/png")] }
+            new ImageGenerationToolResultContent("img456") { Outputs = [new DataContent(new byte[] { 4, 5, 6 }, "image/png")] },
+            new CodeInterpreterToolCallContent("ci123"),
+            new CodeInterpreterToolResultContent("ci456"),
+            new WebSearchToolCallContent("ws123"),
+            new WebSearchToolResultContent("ws456"),
         ]);
 
         // Verify each element roundtrips individually
         foreach (AIContent content in message.Contents)
         {
-            var serializedElement = JsonSerializer.Serialize(content, AIJsonUtilities.DefaultOptions);
-            var deserializedElement = JsonSerializer.Deserialize<AIContent>(serializedElement, AIJsonUtilities.DefaultOptions);
+            var serializedElement = JsonSerializer.Serialize(content, options);
+            var deserializedElement = JsonSerializer.Deserialize<AIContent>(serializedElement, options);
             Assert.NotNull(deserializedElement);
             Assert.Equal(content.GetType(), deserializedElement.GetType());
         }
 
-        var serialized = JsonSerializer.Serialize(message, AIJsonUtilities.DefaultOptions);
-        ChatMessage? deserialized = JsonSerializer.Deserialize<ChatMessage>(serialized, AIJsonUtilities.DefaultOptions);
+        var serialized = JsonSerializer.Serialize(message, options);
+        ChatMessage? deserialized = JsonSerializer.Deserialize<ChatMessage>(serialized, options);
         Assert.NotNull(deserialized);
 
         Assert.Equal(message.Role, deserialized.Role);

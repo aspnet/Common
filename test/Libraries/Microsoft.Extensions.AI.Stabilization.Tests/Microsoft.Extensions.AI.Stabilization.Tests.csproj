@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Microsoft.Extensions.AI</RootNamespace>
+    <Description>Stabilization tests (no MEAI001 suppression).</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- No MEAI001 suppression: verifies stabilized types don't expose experimental APIs to consumers -->
+    <NoWarn>$(NoWarn);CA1063;CA1861;CA2201;VSTHRD003;S104</NoWarn>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <InjectIsExternalInitOnLegacy>true</InjectIsExternalInitOnLegacy>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\ResponseContinuationTokenTests.cs" Link="ResponseContinuationTokenTests.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\Contents\CodeInterpreterToolCallContentTests.cs" Link="Contents\CodeInterpreterToolCallContentTests.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\Contents\CodeInterpreterToolResultContentTests.cs" Link="Contents\CodeInterpreterToolResultContentTests.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\Contents\HostedFileContentTests.cs" Link="Contents\HostedFileContentTests.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\Contents\ImageGenerationToolCallContentTests.cs" Link="Contents\ImageGenerationToolCallContentTests.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\Contents\ImageGenerationToolResultContentTests.cs" Link="Contents\ImageGenerationToolResultContentTests.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\Contents\WebSearchToolCallContentTests.cs" Link="Contents\WebSearchToolCallContentTests.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\Contents\WebSearchToolResultContentTests.cs" Link="Contents\WebSearchToolResultContentTests.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\Tools\HostedCodeInterpreterToolTests.cs" Link="Tools\HostedCodeInterpreterToolTests.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\Tools\HostedImageGenerationToolTests.cs" Link="Tools\HostedImageGenerationToolTests.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\Tools\HostedWebSearchToolTests.cs" Link="Tools\HostedWebSearchToolTests.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\Image\ImageGenerationOptionsTests.cs" Link="Image\ImageGenerationOptionsTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.AI.Abstractions\Microsoft.Extensions.AI.Abstractions.csproj" ProjectUnderTest="true" />
+    <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.AI\Microsoft.Extensions.AI.csproj" ProjectUnderTest="true" Condition="'$(TargetFramework)' != 'net11.0'" />
+  </ItemGroup>
+</Project>

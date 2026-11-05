@@ -27,9 +27,13 @@ public class InputResponseContentTests
         Assert.Equal(id, content.RequestId);
     }
 
-    [Fact]
-    public void Serialization_DerivedTypes_Roundtrips()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Serialization_DerivedTypes_Roundtrips(bool useBuiltInJsonContext)
     {
+        JsonSerializerOptions options = useBuiltInJsonContext ? AIJsonUtilities.DefaultOptions : TestJsonSerializerContext.Default.Options;
+
         InputResponseContent[] contents =
         [
             new ToolApprovalResponseContent("request123", true, new FunctionCallContent("call123", "functionName")),
@@ -39,8 +43,8 @@ public class InputResponseContentTests
         // Verify each element roundtrips individually
         foreach (var content in contents)
         {
-            var serialized = JsonSerializer.Serialize(content, AIJsonUtilities.DefaultOptions);
-            var deserialized = JsonSerializer.Deserialize<InputResponseContent>(serialized, AIJsonUtilities.DefaultOptions);
+            var serialized = JsonSerializer.Serialize(content, options);
+            var deserialized = JsonSerializer.Deserialize<InputResponseContent>(serialized, options);
             Assert.NotNull(deserialized);
             Assert.Equal(content.GetType(), deserialized.GetType());
         }

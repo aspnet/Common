@@ -130,4 +130,28 @@ public class ToolApprovalRequestContentTests
         Assert.NotNull(approvalRequest.AdditionalProperties);
         Assert.Equal("val", approvalRequest.AdditionalProperties["key"]?.ToString());
     }
+
+    [Fact]
+    public void RequiresConfirmation_DefaultsToTrue()
+    {
+        var content = new ToolApprovalRequestContent("req-1", new FunctionCallContent("call1", "Func"));
+        Assert.True(content.RequiresConfirmation);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RequiresConfirmation_RoundtripsThroughJson(bool value)
+    {
+        var content = new ToolApprovalRequestContent("req-1", new FunctionCallContent("call1", "Func"))
+        {
+            RequiresConfirmation = value,
+        };
+
+        string json = JsonSerializer.Serialize(content, AIJsonUtilities.DefaultOptions);
+        var deserialized = JsonSerializer.Deserialize<ToolApprovalRequestContent>(json, AIJsonUtilities.DefaultOptions);
+
+        Assert.NotNull(deserialized);
+        Assert.Equal(value, deserialized!.RequiresConfirmation);
+    }
 }

@@ -14,8 +14,10 @@ public class RealtimeClientMessage
 {
     /// <summary>
     /// Gets or sets the optional message ID associated with the message.
-    /// This can be used for tracking and correlation purposes.
     /// </summary>
+    /// <remarks>
+    /// This can be used for tracking and correlation purposes.
+    /// </remarks>
     public string? MessageId { get; set; }
 
     /// <summary>

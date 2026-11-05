@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.AI.Evaluation.NLP;
 using Microsoft.Extensions.AI.Evaluation.Reporting;
 using Microsoft.Extensions.AI.Evaluation.Reporting.Storage;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.AI.Evaluation.Integration.Tests;
@@ -41,7 +40,7 @@ public class NLPEvaluatorTests
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task ExactMatch()
     {
         SkipIfNotConfigured();
@@ -67,7 +66,7 @@ public class NLPEvaluatorTests
         Assert.True(result.TryGet(F1Evaluator.F1MetricName, out NumericMetric? _));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task PartialMatch()
     {
         SkipIfNotConfigured();
@@ -94,7 +93,7 @@ public class NLPEvaluatorTests
         Assert.True(result.TryGet(F1Evaluator.F1MetricName, out NumericMetric? _));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Unmatched()
     {
         SkipIfNotConfigured();
@@ -120,7 +119,7 @@ public class NLPEvaluatorTests
         Assert.True(result.TryGet(F1Evaluator.F1MetricName, out NumericMetric? _));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task AdditionalContextIsNotPassed()
     {
         SkipIfNotConfigured();
@@ -149,10 +148,7 @@ public class NLPEvaluatorTests
     [MemberNotNull(nameof(_nlpReportingConfiguration))]
     private static void SkipIfNotConfigured()
     {
-        if (!Settings.Current.Configured)
-        {
-            throw new SkipTestException("Test is not configured");
-        }
+        Assert.SkipUnless(Settings.Current.Configured, "Test is not configured");
 
         Assert.NotNull(_nlpReportingConfiguration);
     }

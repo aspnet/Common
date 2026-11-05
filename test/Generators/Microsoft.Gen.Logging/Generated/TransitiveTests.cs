@@ -64,4 +64,50 @@ public class TransitiveTests
 
         logger.Collector.LatestRecord.StructuredState.Should().NotBeNull().And.Equal(expectedState);
     }
+
+    [Fact]
+    public void SystemTypeIsLoggedAsSingleValue()
+    {
+        var logger = new FakeLogger();
+
+        TransitiveTestExtensions.M4(logger, new());
+
+        var expectedState = new Dictionary<string, string?>
+        {
+            ["p0.Kind"] = typeof(TransitiveTestExtensions.C4).ToString(),
+        };
+
+        logger.Collector.LatestRecord.StructuredState.Should().NotBeNull().And.Equal(expectedState);
+    }
+
+    [Fact]
+    public void IgnoredAndDelegatePropertiesAreNotLogged()
+    {
+        var logger = new FakeLogger();
+
+        TransitiveTestExtensions.M5(logger, new());
+
+        var expectedState = new Dictionary<string, string?>
+        {
+            ["p0.P5"] = "V5",
+        };
+
+        logger.Collector.LatestRecord.StructuredState.Should().NotBeNull().And.Equal(expectedState);
+    }
+
+    [Fact]
+    public void TransitiveOnPropertyIsHonored()
+    {
+        var logger = new FakeLogger();
+
+        TransitiveTestExtensions.M6(logger, new());
+
+        var expectedState = new Dictionary<string, string?>
+        {
+            ["p0.P8.P1"] = "V1",
+            ["p0.P8.P0.P2"] = "V2",
+        };
+
+        logger.Collector.LatestRecord.StructuredState.Should().NotBeNull().And.Equal(expectedState);
+    }
 }

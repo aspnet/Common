@@ -3,20 +3,26 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AutoFixture;
 using FluentAssertions;
 using Microsoft.Extensions.Compliance.Classification;
+using Microsoft.Extensions.Compliance.Redaction;
 using Microsoft.Extensions.Compliance.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Hosting.Testing;
 using Microsoft.Extensions.Http.Diagnostics;
+using Microsoft.Extensions.Http.Logging.Internal;
 using Microsoft.Extensions.Http.Logging.Test.Internal;
+using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
@@ -240,6 +246,218 @@ public class HttpClientLoggingExtensionsTest
     }
 
     [Fact]
+    public void AddHttpClientLogging_GivenConfigurationSection_BindsDataClasses()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.LogRequestStart)}"] = "true",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestQueryParametersDataClasses)}:search:{nameof(DataClassification.TaxonomyName)}"] = "MyTaxonomy",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestQueryParametersDataClasses)}:search:{nameof(DataClassification.Value)}"] = "PrivateData",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.LogBody)}"] = "true",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.BodySizeLimit)}"] = "1024",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.BodyReadTimeout)}"] = "00:00:02",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestBodyContentTypes)}:0"] = "application/json",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestBodyContentTypes)}:1"] = null,
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.ResponseBodyContentTypes)}:0"] = "text/plain",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestHeadersDataClasses)}:User-Agent"] = "None",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.ResponseHeadersDataClasses)}:Content-Type"] = "Unknown",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestPathLoggingMode)}"] = "Structured",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestPathParameterRedactionMode)}"] = "None",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RouteParameterDataClasses)}:userId"] = "MyTaxonomy:EUII",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.LogContentHeaders)}"] = "true",
+            })
+            .Build();
+        var configurationSection = configuration.GetSection(nameof(LoggingOptions));
+
+        using var provider = new ServiceCollection()
+            .AddHttpClient("test")
+            .AddExtendedHttpClientLogging(configurationSection)
+            .Services
+            .BuildServiceProvider();
+
+        var options = provider.GetRequiredService<IOptionsMonitor<LoggingOptions>>().Get("test");
+
+        configurationSection.GetChildren().Select(child => child.Key).Should().BeEquivalentTo(
+            typeof(LoggingOptions).GetProperties()
+                .Where(property => property.SetMethod?.IsPublic is true)
+                .Select(property => property.Name));
+        options.LogRequestStart.Should().BeTrue();
+        options.RequestQueryParametersDataClasses.Should().Contain("search", new DataClassification("MyTaxonomy", "PrivateData"));
+        options.LogBody.Should().BeTrue();
+        options.BodySizeLimit.Should().Be(1024);
+        options.BodyReadTimeout.Should().Be(TimeSpan.FromSeconds(2));
+        options.RequestBodyContentTypes.Should().Equal("application/json");
+        options.ResponseBodyContentTypes.Should().Equal("text/plain");
+        options.RequestHeadersDataClasses.Should().Contain("User-Agent", DataClassification.None);
+        options.ResponseHeadersDataClasses.Should().Contain("Content-Type", DataClassification.Unknown);
+        options.RequestPathLoggingMode.Should().Be(OutgoingPathLoggingMode.Structured);
+        options.RequestPathParameterRedactionMode.Should().Be(HttpRouteParameterRedactionMode.None);
+        options.RouteParameterDataClasses.Should().Contain("userId", new DataClassification("MyTaxonomy", "EUII"));
+        options.LogContentHeaders.Should().BeTrue();
+    }
+
+    [Fact]
+    public void LoggingOptionsConfigureOptions_HandlesOptionNamesAndMissingSections()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.BodySizeLimit)}"] = "1024",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.LogBody)}"] = "false",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.LogContentHeaders)}"] = "false",
+            })
+            .Build();
+        var section = configuration.GetSection(nameof(LoggingOptions));
+        int defaultBodySizeLimit = new LoggingOptions().BodySizeLimit;
+
+        var defaultOptions = new LoggingOptions
+        {
+            LogBody = true,
+            LogContentHeaders = true,
+        };
+        var defaultConfigurator = new LoggingOptionsConfigureOptions(Microsoft.Extensions.Options.Options.DefaultName, section);
+        ((IConfigureOptions<LoggingOptions>)defaultConfigurator).Configure(defaultOptions);
+
+        defaultOptions.BodySizeLimit.Should().Be(1024);
+        defaultOptions.LogBody.Should().BeFalse();
+        defaultOptions.LogContentHeaders.Should().BeFalse();
+
+        var mismatchedOptions = new LoggingOptions();
+        new LoggingOptionsConfigureOptions("test", section).Configure("other", mismatchedOptions);
+
+        mismatchedOptions.BodySizeLimit.Should().Be(defaultBodySizeLimit);
+
+        var missingSectionOptions = new LoggingOptions();
+        new LoggingOptionsConfigureOptions("test", configuration.GetSection("Missing")).Configure("test", missingSectionOptions);
+
+        missingSectionOptions.BodySizeLimit.Should().Be(defaultBodySizeLimit);
+    }
+
+    [Fact]
+    public void AddHttpClientLogging_GivenDocumentedConfigurationSample_CreatesClient()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("""
+        {
+          "HttpClientLogging": {
+            "LogRequestStart": false,
+            "LogBody": false,
+            "BodySizeLimit": 32768,
+            "BodyReadTimeout": "00:00:01",
+            "RequestHeadersDataClasses": {
+              "User-Agent": "None",
+              "Content-Type": "None"
+            },
+            "ResponseHeadersDataClasses": {
+              "Content-Type": "None"
+            },
+            "RequestPathLoggingMode": "Formatted",
+            "RequestPathParameterRedactionMode": "Strict"
+          }
+        }
+        """));
+
+        var configuration = new ConfigurationBuilder()
+            .AddJsonStream(stream)
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddRedaction();
+        services.AddHttpClient("test")
+            .AddExtendedHttpClientLogging(configuration.GetSection("HttpClientLogging"));
+
+        using var provider = services.BuildServiceProvider();
+
+        using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("test");
+        client.Should().NotBeNull();
+
+        var options = provider.GetRequiredService<IOptionsMonitor<LoggingOptions>>().Get("test");
+        options.LogRequestStart.Should().BeFalse();
+        options.LogBody.Should().BeFalse();
+        options.BodySizeLimit.Should().Be(32768);
+        options.BodyReadTimeout.Should().Be(TimeSpan.FromSeconds(1));
+        options.RequestHeadersDataClasses.Should().Contain("User-Agent", DataClassification.None);
+        options.RequestHeadersDataClasses.Should().Contain("Content-Type", DataClassification.None);
+        options.ResponseHeadersDataClasses.Should().Contain("Content-Type", DataClassification.None);
+        options.RequestPathLoggingMode.Should().Be(OutgoingPathLoggingMode.Formatted);
+        options.RequestPathParameterRedactionMode.Should().Be(HttpRouteParameterRedactionMode.Strict);
+    }
+
+    [Fact]
+    public void AddHttpClientLogging_GivenInvalidDataClassification_Throws()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestHeadersDataClasses)}:User-Agent"] = "invalid",
+            })
+            .Build();
+
+        using var provider = new ServiceCollection()
+            .AddHttpClient("test")
+            .AddExtendedHttpClientLogging(configuration.GetSection(nameof(LoggingOptions)))
+            .Services
+            .BuildServiceProvider();
+
+        var act = () => provider.GetRequiredService<IOptionsMonitor<LoggingOptions>>().Get("test");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*LoggingOptions:RequestHeadersDataClasses:User-Agent*");
+    }
+
+    [Fact]
+    public void AddHttpClientLogging_GivenInvalidScalarValue_Throws()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestPathLoggingMode)}"] = "invalid",
+            })
+            .Build();
+
+        using var provider = new ServiceCollection()
+            .AddHttpClient("test")
+            .AddExtendedHttpClientLogging(configuration.GetSection(nameof(LoggingOptions)))
+            .Services
+            .BuildServiceProvider();
+
+        var act = () => provider.GetRequiredService<IOptionsMonitor<LoggingOptions>>().Get("test");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*LoggingOptions:RequestPathLoggingMode*");
+    }
+
+    [Fact]
+    public void AddHttpClientLogging_GivenConfigurationReload_UpdatesOptions()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.BodySizeLimit)}"] = "1024",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestHeadersDataClasses)}:User-Agent"] = "None",
+            })
+            .Build();
+
+        using var provider = new ServiceCollection()
+            .AddHttpClient("test")
+            .AddExtendedHttpClientLogging(configuration.GetSection(nameof(LoggingOptions)))
+            .Services
+            .BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptionsMonitor<LoggingOptions>>();
+
+        options.Get("test").BodySizeLimit.Should().Be(1024);
+        options.Get("test").RequestHeadersDataClasses.Should().Contain("User-Agent", DataClassification.None);
+
+        configuration[$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.BodySizeLimit)}"] = "2048";
+        configuration[$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestHeadersDataClasses)}:User-Agent"] = "Unknown";
+        configuration.Reload();
+
+        options.Get("test").BodySizeLimit.Should().Be(2048);
+        options.Get("test").RequestHeadersDataClasses.Should().Contain("User-Agent", DataClassification.Unknown);
+    }
+
+    [Fact]
     public void AddHttpClientLogEnricher_RegistersEnricherInDI()
     {
         using var provider = new ServiceCollection()
@@ -393,6 +611,32 @@ public class HttpClientLoggingExtensionsTest
     }
 
     [Fact]
+    public void AddHttpClientLogging_ServiceCollection_GivenConfigurationSection_BindsDataClasses()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestQueryParametersDataClasses)}:search"] = "MyTaxonomy:PrivateData",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RequestHeadersDataClasses)}:User-Agent"] = "None",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.ResponseHeadersDataClasses)}:Content-Type"] = "Unknown",
+                [$"{nameof(LoggingOptions)}:{nameof(LoggingOptions.RouteParameterDataClasses)}:userId"] = "MyTaxonomy:EUII",
+            })
+            .Build();
+
+        using var provider = new ServiceCollection()
+            .AddHttpClient()
+            .AddExtendedHttpClientLogging(configuration.GetSection(nameof(LoggingOptions)))
+            .BuildServiceProvider();
+
+        var options = provider.GetRequiredService<IOptions<LoggingOptions>>().Value;
+
+        options.RequestQueryParametersDataClasses.Should().Contain("search", new DataClassification("MyTaxonomy", "PrivateData"));
+        options.RequestHeadersDataClasses.Should().Contain("User-Agent", DataClassification.None);
+        options.ResponseHeadersDataClasses.Should().Contain("Content-Type", DataClassification.Unknown);
+        options.RouteParameterDataClasses.Should().Contain("userId", new DataClassification("MyTaxonomy", "EUII"));
+    }
+
+    [Fact]
     public void AddHttpClientLogging_ServiceCollection_CreatesClientSuccessfully()
     {
         using var sp = new ServiceCollection()
@@ -492,6 +736,112 @@ public class HttpClientLoggingExtensionsTest
         var innerLogs = collector.GetSnapshot();
         Assert.Equal(6, innerLogs.Count); // 3 attempts × (1 start + 1 stop/failed)
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AddExtendedHttpClientLogging_WithoutRedactionRegistration_LogsRequest(bool useHttpClientBuilder)
+    {
+        await using var sp = BuildServiceProviderWithoutRedactionRegistration(useHttpClientBuilder);
+
+        using var client = sp.GetRequiredService<IHttpClientFactory>().CreateClient("test");
+        using var response = await client.GetAsync("http://localhost/api");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("200", GetHttpClientLoggerRecord(sp).GetStructuredStateValue(HttpClientLoggingTagNames.StatusCode));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AddExtendedHttpClientLogging_WithoutRedactionRegistration_ErasesClassifiedData(bool useHttpClientBuilder)
+    {
+        await using var sp = BuildServiceProviderWithoutRedactionRegistration(useHttpClientBuilder, options =>
+        {
+            options.RequestHeadersDataClasses.Add("X-Private", FakeTaxonomy.PrivateData);
+            options.RequestHeadersDataClasses.Add("X-Public", DataClassification.None);
+        });
+
+        using var client = sp.GetRequiredService<IHttpClientFactory>().CreateClient("test");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/api");
+        request.Headers.Add("X-Private", "private-value");
+        request.Headers.Add("X-Public", "public-value");
+        using var response = await client.SendAsync(request);
+
+        var record = GetHttpClientLoggerRecord(sp);
+        Assert.Equal(string.Empty, record.GetStructuredStateValue($"{HttpClientLoggingTagNames.RequestHeaderPrefix}x-private"));
+        Assert.Equal("public-value", record.GetStructuredStateValue($"{HttpClientLoggingTagNames.RequestHeaderPrefix}x-public"));
+    }
+
+    [Fact]
+    public async Task AddExtendedHttpClientLogging_RedactionConfiguredAfterLogging_UsesConfiguredRedactor()
+    {
+        await using var sp = new ServiceCollection()
+            .AddFakeLogging()
+            .AddHttpClient("test")
+            .ConfigurePrimaryHttpMessageHandler(() => new TestMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)))
+            .AddExtendedHttpClientLogging(options => options.RequestHeadersDataClasses.Add("X-Test", FakeTaxonomy.PrivateData))
+            .Services
+            .AddRedaction(redaction => redaction.SetFakeRedactor(options => options.RedactionFormat = "REDACTED:{0}", FakeTaxonomy.PrivateData))
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        using var client = sp.GetRequiredService<IHttpClientFactory>().CreateClient("test");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/api");
+        request.Headers.Add("X-Test", "header-value");
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal("REDACTED:header-value", GetHttpClientLoggerRecord(sp).GetStructuredStateValue($"{HttpClientLoggingTagNames.RequestHeaderPrefix}x-test"));
+    }
+
+    [Fact]
+    public async Task LatencyInfo_IsPopulated_WithoutLatencyContextAndRedactionRegistration()
+    {
+        await using var sp = new ServiceCollection()
+            .AddHttpClientLatencyTelemetry()
+            .AddHttpClient("test")
+            .ConfigurePrimaryHttpMessageHandler(() => new TestMessageHandler(_ =>
+            {
+                var response = new HttpResponseMessage(HttpStatusCode.OK);
+                response.Headers.TryAddWithoutValidation(TelemetryConstants.ServerApplicationNameHeader, "TestServer");
+                return response;
+            }))
+            .AddExtendedHttpClientLogging(wrapHandlersPipeline: true)
+            .Services
+            .AddFakeLogging()
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        var client = sp.GetRequiredService<IHttpClientFactory>().CreateClient("test");
+
+        using var response = await client.GetAsync("http://localhost/api");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var latencyInfo = GetHttpClientLoggerRecord(sp).GetStructuredStateValue("LatencyInfo");
+        Assert.False(string.IsNullOrEmpty(latencyInfo));
+        Assert.StartsWith("v1.0,", latencyInfo);
+        Assert.Contains("TestServer", latencyInfo);
+    }
+
+    private static ServiceProvider BuildServiceProviderWithoutRedactionRegistration(bool useHttpClientBuilder, Action<LoggingOptions>? configure = null)
+    {
+        var services = new ServiceCollection().AddFakeLogging();
+        var builder = services
+            .AddHttpClient("test")
+            .ConfigurePrimaryHttpMessageHandler(() => new TestMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        if (useHttpClientBuilder)
+        {
+            _ = configure is null ? builder.AddExtendedHttpClientLogging() : builder.AddExtendedHttpClientLogging(configure);
+        }
+        else
+        {
+            _ = configure is null ? services.AddExtendedHttpClientLogging() : services.AddExtendedHttpClientLogging(configure);
+        }
+
+        return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+    }
+
+    private static FakeLogRecord GetHttpClientLoggerRecord(IServiceProvider serviceProvider)
+        => serviceProvider.GetFakeLogCollector().GetSnapshot().Single(r => r.Category == typeof(HttpClientLogger).FullName);
 
     private sealed class TestMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
         : HttpMessageHandler

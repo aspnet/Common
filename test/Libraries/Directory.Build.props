@@ -3,6 +3,6 @@
 
   <PropertyGroup>
     <TargetFrameworks>$(TestNetCoreTargetFrameworks)</TargetFrameworks>
-    <TargetFrameworks Condition=" '$(IsWindowsBuild)' == 'true' ">$(TestNetCoreTargetFrameworks)$(ConditionalNet462)</TargetFrameworks>
+    <TargetFrameworks Condition=" '$(IsWindowsBuild)' == 'true' ">$(TestNetCoreTargetFrameworks)$(ConditionalNet472)</TargetFrameworks>
   </PropertyGroup>
 </Project>

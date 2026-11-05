@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.TestUtilities;
 using Xunit;
 
 #pragma warning disable MEAI001
@@ -24,7 +23,7 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
         _client?.Dispose();
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Upload_Download_Delete_Roundtrip()
     {
         SkipIfNotEnabled();
@@ -81,7 +80,7 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Upload_ListFiles_VerifyPresent()
     {
         SkipIfNotEnabled();
@@ -112,7 +111,7 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task GetFileInfo_ReturnsMetadata()
     {
         SkipIfNotEnabled();
@@ -147,7 +146,7 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Delete_NonExistent_ReturnsFalse()
     {
         SkipIfNotEnabled();
@@ -156,7 +155,7 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
         Assert.False(deleted);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task GetFileInfo_NonExistent_ReturnsNull()
     {
         SkipIfNotEnabled();
@@ -165,7 +164,7 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
         Assert.Null(fileInfo);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Upload_DataContent_Extension()
     {
         SkipIfNotEnabled();
@@ -193,7 +192,7 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Download_AsDataContent_Extension()
     {
         SkipIfNotEnabled();
@@ -222,7 +221,7 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Upload_DownloadTo_Extension()
     {
         SkipIfNotEnabled();
@@ -262,7 +261,7 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task Container_Upload_Download_Delete_Roundtrip()
     {
         SkipIfNotEnabled();
@@ -332,7 +331,7 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
         Assert.True(deleted);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task CodeInterpreter_ProducesDownloadableOutputs()
     {
         SkipIfNotEnabled();
@@ -382,7 +381,7 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
         Assert.True(ms.Length > 0);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task CodeInterpreter_Upload_ProcessedByCodeInterpreter()
     {
         SkipIfNotEnabled();
@@ -458,9 +457,6 @@ public sealed class OpenAIHostedFileClientIntegrationTests : IDisposable
     {
         string? skipIntegration = TestRunnerConfiguration.Instance["SkipIntegrationTests"];
 
-        if (skipIntegration is not null || _client is null)
-        {
-            throw new SkipTestException("Client is not enabled.");
-        }
+        Assert.SkipUnless(skipIntegration is null && _client is not null, "Client is not enabled.");
     }
 }

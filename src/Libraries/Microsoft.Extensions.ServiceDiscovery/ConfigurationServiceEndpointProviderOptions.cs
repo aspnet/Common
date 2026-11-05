@@ -11,12 +11,18 @@ namespace Microsoft.Extensions.ServiceDiscovery;
 public sealed class ConfigurationServiceEndpointProviderOptions
 {
     /// <summary>
-    /// The name of the configuration section which contains service endpoints. Defaults to <c>"Services"</c>.
+    /// Gets or sets the name of the configuration section that contains service endpoints.
     /// </summary>
+    /// <value>
+    /// The default value is <c>"Services"</c>.
+    /// </value>
     public string SectionName { get; set; } = "Services";
 
     /// <summary>
-    /// Gets or sets a delegate used to determine whether to apply host name metadata to each resolved endpoint. Defaults to a delegate which returns <c>false</c>.
+    /// Gets or sets a delegate used to determine whether to apply host name metadata to each resolved endpoint.
     /// </summary>
+    /// <value>
+    /// The default delegate returns <see langword="false"/>.
+    /// </value>
     public Func<ServiceEndpoint, bool> ShouldApplyHostNameMetadata { get; set; } = _ => false;
 }

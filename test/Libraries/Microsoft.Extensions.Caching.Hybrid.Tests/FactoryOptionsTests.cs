@@ -8,7 +8,7 @@ using Microsoft.Extensions.Caching.Hybrid.Internal;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Internal;
-using Xunit.Abstractions;
+using Xunit;
 using static Microsoft.Extensions.Caching.Hybrid.Tests.DistributedCacheTests;
 using static Microsoft.Extensions.Caching.Hybrid.Tests.L2Tests;
 

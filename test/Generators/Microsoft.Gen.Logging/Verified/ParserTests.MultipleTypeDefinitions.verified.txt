@@ -18,21 +18,26 @@ namespace Test
             }
 
             var state = global::Microsoft.Extensions.Logging.LoggerMessageHelper.ThreadLocalState;
+            try
+            {
 
-            _ = state.ReserveTagSpace(1);
-            state.TagArray[0] = new("{OriginalFormat}", "M1");
+                _ = state.ReserveTagSpace(1);
+                state.TagArray[0] = new("{OriginalFormat}", "M1");
 
-            logger.Log(
-                global::Microsoft.Extensions.Logging.LogLevel.Debug,
-                new(1, nameof(M1)),
-                state,
-                null,
-                [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Gen.Logging", "VERSION")] static string (s, _) =>
-                {
-                    return "M1";
-                });
-
-            state.Clear();
+                logger.Log(
+                    global::Microsoft.Extensions.Logging.LogLevel.Debug,
+                    new(1, nameof(M1)),
+                    state,
+                    null,
+                    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.Gen.Logging", "VERSION")] static string (s, _) =>
+                    {
+                        return "M1";
+                    });
+            }
+            finally
+            {
+                state.Clear();
+            }
         }
     }
 }

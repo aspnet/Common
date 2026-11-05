@@ -10,7 +10,7 @@
 
     <!-- Set the version info to align with Microsoft.Agents.AI packages -->
     <MajorVersion>1</MajorVersion>
-    <MinorVersion>0</MinorVersion>
+    <MinorVersion>13</MinorVersion>
     <PatchVersion>0</PatchVersion>
     <PreReleaseVersionLabel>preview</PreReleaseVersionLabel>
 

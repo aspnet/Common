@@ -16,19 +16,24 @@ public abstract class VectorStoreFixture : IAsyncLifetime
     public virtual string DefaultDistanceFunction => TestStore.DefaultDistanceFunction;
     public virtual string DefaultIndexKind => TestStore.DefaultIndexKind;
 
-    public virtual Task InitializeAsync()
-        => TestStore.ReferenceCountingStartAsync();
+    public virtual ValueTask InitializeAsync()
+        => new(TestStore.ReferenceCountingStartAsync());
 
-    public virtual Task DisposeAsync()
-        => TestStore.ReferenceCountingStopAsync();
+    public virtual ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return new(TestStore.ReferenceCountingStopAsync());
+    }
 
     public virtual TKey GenerateNextKey<TKey>()
         => TestStore.GenerateKey<TKey>(Interlocked.Increment(ref _nextKeyValue));
 
     /// <summary>
     /// Creates a collection for the given name and definition.
-    /// Delegates to <see cref="TestStore.CreateCollection{TKey, TRecord}"/> which can be overridden for provider-specific options.
     /// </summary>
+    /// <remarks>
+    /// This delegates to <see cref="TestStore.CreateCollection{TKey, TRecord}"/>, which can be overridden for provider-specific options.
+    /// </remarks>
     public virtual VectorStoreCollection<TKey, TRecord> CreateCollection<TKey, TRecord>(string name, VectorStoreCollectionDefinition definition)
         where TKey : notnull
         where TRecord : class
@@ -36,8 +41,10 @@ public abstract class VectorStoreFixture : IAsyncLifetime
 
     /// <summary>
     /// Creates a dynamic collection for the given name and definition.
-    /// Delegates to <see cref="TestStore.CreateDynamicCollection"/> which can be overridden for provider-specific options.
     /// </summary>
+    /// <remarks>
+    /// This delegates to <see cref="TestStore.CreateDynamicCollection"/>, which can be overridden for provider-specific options.
+    /// </remarks>
     public virtual VectorStoreCollection<object, Dictionary<string, object?>> CreateDynamicCollection(string name, VectorStoreCollectionDefinition definition)
         => TestStore.CreateDynamicCollection(name, definition);
 }

@@ -259,7 +259,7 @@ public sealed class MetricCollector<T> : IDisposable
     }
 
     /// <summary>
-    /// Scan all registered observable instruments.
+    /// Records all registered observable instruments.
     /// </summary>
     public void RecordObservableInstruments()
     {

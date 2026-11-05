@@ -1,18 +1,22 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Linq;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.ResourceMonitoring.Test.Publishers;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring.Test;
 
-[OSSkipCondition(OperatingSystems.MacOSX, SkipReason = "Not supported on MacOs.")]
 public sealed class ResourceMonitoringBuilderTests
 {
-    [ConditionalFact(Skip = "Not supported on MacOs.")]
+    public ResourceMonitoringBuilderTests()
+    {
+        Assert.SkipUnless(!RuntimeInformation.IsOSPlatform(OSPlatform.OSX), "Skipped on macOS");
+    }
+
+    [Fact]
     public void AddPublisher_CalledOnce_AddsSinglePublisherToServiceCollection()
     {
         using var provider = new ServiceCollection()
@@ -33,7 +37,7 @@ public sealed class ResourceMonitoringBuilderTests
         Assert.IsAssignableFrom<EmptyPublisher>(publishersArray.First());
     }
 
-    [ConditionalFact]
+    [Fact]
     public void AddPublisher_CalledMultipleTimes_AddsMultiplePublishersToServiceCollection()
     {
         using var provider = new ServiceCollection()

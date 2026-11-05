@@ -25,7 +25,7 @@ public abstract class VectorStoreCollectionFixtureBase<TKey, TRecord> : VectorSt
     protected abstract string CollectionNameBase { get; }
 
     /// <summary>
-    /// The actual name of the test collection, after any provider-specific collection naming rules have been applied.
+    /// Gets the actual name of the test collection after any provider-specific collection naming rules have been applied.
     /// </summary>
     public virtual string CollectionName => TestStore.AdjustCollectionName(CollectionNameBase);
 
@@ -35,7 +35,7 @@ public abstract class VectorStoreCollectionFixtureBase<TKey, TRecord> : VectorSt
     protected virtual VectorStoreCollection<TKey, TRecord> GetCollection()
         => TestStore.CreateCollection<TKey, TRecord>(CollectionName, CreateRecordDefinition());
 
-    public override async Task InitializeAsync()
+    public override async ValueTask InitializeAsync()
     {
         await base.InitializeAsync();
 

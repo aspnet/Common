@@ -9,7 +9,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using OpenAI.Assistants;
 using OpenAI.Chat;
 using OpenAI.Realtime;
 using OpenAI.Responses;
@@ -107,6 +106,35 @@ public class OpenAIConversionTests
     }
 
     [Fact]
+    public void AsOpenAIChatTool_ExplicitSchema_PreservesObjectAdditionalProperties()
+    {
+        var schema = JsonDocument.Parse("""
+            {
+                "type": "object",
+                "properties": {
+                    "labels": { "type": "object" }
+                },
+                "additionalProperties": { "type": "string" }
+            }
+            """).RootElement;
+
+        var function = AIFunctionFactory.CreateDeclaration(
+            "set_labels",
+            "Stores labels and arbitrary string metadata.",
+            schema);
+
+        var tool = function.AsOpenAIChatTool();
+        Assert.NotNull(tool);
+        Assert.Equal("set_labels", tool.FunctionName);
+
+        using var parsedParams = JsonDocument.Parse(tool.FunctionParameters);
+        var root = parsedParams.RootElement;
+        Assert.True(root.TryGetProperty("additionalProperties", out var ap), "additionalProperties should be preserved");
+        Assert.Equal(JsonValueKind.Object, ap.ValueKind);
+        Assert.Equal("string", ap.GetProperty("type").GetString());
+    }
+
+    [Fact]
     public void AsOpenAIChatTool_PreservesExtraTopLevelPropertiesLikeDefs()
     {
         // Create a JSON schema with $defs (used for reference types)
@@ -166,6 +194,36 @@ public class OpenAIConversionTests
         var functionTool = Assert.IsType<FunctionTool>(tool);
         Assert.Equal("test_function", functionTool.FunctionName);
         Assert.Equal("A test function for conversion", functionTool.FunctionDescription);
+    }
+
+    [Fact]
+    public void AsOpenAIResponseTool_ExplicitSchema_PreservesObjectAdditionalProperties()
+    {
+        var schema = JsonDocument.Parse("""
+            {
+                "type": "object",
+                "properties": {
+                    "labels": { "type": "object" }
+                },
+                "additionalProperties": { "type": "string" }
+            }
+            """).RootElement;
+
+        var function = AIFunctionFactory.CreateDeclaration(
+            "set_labels",
+            "Stores labels and arbitrary string metadata.",
+            schema);
+
+        var tool = function.AsOpenAIResponseTool();
+        Assert.NotNull(tool);
+        var functionTool = Assert.IsType<FunctionTool>(tool);
+        Assert.Equal("set_labels", functionTool.FunctionName);
+
+        using var parsedParams = JsonDocument.Parse(functionTool.FunctionParameters);
+        var root = parsedParams.RootElement;
+        Assert.True(root.TryGetProperty("additionalProperties", out var ap), "additionalProperties should be preserved");
+        Assert.Equal(JsonValueKind.Object, ap.ValueKind);
+        Assert.Equal("string", ap.GetProperty("type").GetString());
     }
 
     [Fact]
@@ -318,6 +376,18 @@ public class OpenAIConversionTests
         Assert.NotNull(result);
         var tool = Assert.IsType<ImageGenerationTool>(result);
         Assert.NotNull(tool);
+    }
+
+    [Fact]
+    public void AsOpenAIResponseTool_WithHostedImageGenerationToolWithoutMediaType_PreservesUnspecifiedOutputFileFormat()
+    {
+        var imageGenTool = new HostedImageGenerationTool();
+
+        var result = imageGenTool.AsOpenAIResponseTool();
+
+        Assert.NotNull(result);
+        var tool = Assert.IsType<ImageGenerationTool>(result);
+        Assert.Null(tool.OutputFileFormat);
     }
 
     [Fact]
@@ -513,8 +583,8 @@ public class OpenAIConversionTests
         Assert.NotNull(result);
         var tool = Assert.IsType<McpTool>(result);
         Assert.NotNull(tool.ToolCallApprovalPolicy);
-        Assert.NotNull(tool.ToolCallApprovalPolicy.GlobalPolicy);
-        Assert.Equal(GlobalMcpToolCallApprovalPolicy.AlwaysRequireApproval, tool.ToolCallApprovalPolicy.GlobalPolicy);
+        Assert.NotNull(tool.ToolCallApprovalPolicy.DefaultPolicy);
+        Assert.Equal(DefaultMcpToolCallApprovalPolicy.AlwaysRequireApproval, tool.ToolCallApprovalPolicy.DefaultPolicy);
     }
 
     [Fact]
@@ -530,8 +600,8 @@ public class OpenAIConversionTests
         Assert.NotNull(result);
         var tool = Assert.IsType<McpTool>(result);
         Assert.NotNull(tool.ToolCallApprovalPolicy);
-        Assert.NotNull(tool.ToolCallApprovalPolicy.GlobalPolicy);
-        Assert.Equal(GlobalMcpToolCallApprovalPolicy.NeverRequireApproval, tool.ToolCallApprovalPolicy.GlobalPolicy);
+        Assert.NotNull(tool.ToolCallApprovalPolicy.DefaultPolicy);
+        Assert.Equal(DefaultMcpToolCallApprovalPolicy.NeverRequireApproval, tool.ToolCallApprovalPolicy.DefaultPolicy);
     }
 
     [Fact]
@@ -589,6 +659,30 @@ public class OpenAIConversionTests
     }
 
     [Fact]
+    public void AsOpenAIResponseTool_WithHostedToolSearchTool_ProducesValidToolSearchTool()
+    {
+        var toolSearchTool = new HostedToolSearchTool();
+
+        var result = toolSearchTool.AsOpenAIResponseTool();
+
+        Assert.NotNull(result);
+        var json = ModelReaderWriter.Write(result, ModelReaderWriterOptions.Json).ToString();
+        Assert.Contains("\"type\"", json);
+        Assert.Contains("tool_search", json);
+    }
+
+    [Fact]
+    public void AsOpenAIResponseTool_WithHostedToolSearchTool_ProducesNewInstanceEachTime()
+    {
+        var result1 = new HostedToolSearchTool().AsOpenAIResponseTool();
+        var result2 = new HostedToolSearchTool().AsOpenAIResponseTool();
+
+        Assert.NotNull(result1);
+        Assert.NotNull(result2);
+        Assert.NotSame(result1, result2);
+    }
+
+    [Fact]
     public void AsOpenAIResponseTool_WithNullTool_ThrowsArgumentNullException()
     {
         Assert.Throws<ArgumentNullException>("tool", () => ((AITool)null!).AsOpenAIResponseTool());
@@ -603,17 +697,6 @@ public class OpenAIConversionTests
         Assert.Equal("test_function", tool.FunctionName);
         Assert.Equal("A test function for conversion", tool.FunctionDescription);
         ValidateSchemaParameters(tool.FunctionParameters);
-    }
-
-    [Fact]
-    public void AsOpenAIAssistantsFunctionToolDefinition_ProducesValidInstance()
-    {
-        var tool = _testFunction.AsOpenAIAssistantsFunctionToolDefinition();
-
-        Assert.NotNull(tool);
-        Assert.Equal("test_function", tool.FunctionName);
-        Assert.Equal("A test function for conversion", tool.Description);
-        ValidateSchemaParameters(tool.Parameters);
     }
 
     /// <summary>Helper method to validate function parameters match our schema.</summary>

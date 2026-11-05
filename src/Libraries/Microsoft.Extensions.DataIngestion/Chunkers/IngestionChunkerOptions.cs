@@ -32,8 +32,11 @@ public class IngestionChunkerOptions
     public Tokenizer Tokenizer { get; }
 
     /// <summary>
-    /// Gets or sets the maximum number of tokens allowed in each chunk. Default is 2000.
+    /// Gets or sets the maximum number of tokens allowed in each chunk.
     /// </summary>
+    /// <value>
+    /// The default is 2000.
+    /// </value>
     public int MaxTokensPerChunk
     {
         get => field == default ? DefaultTokensPerChunk : field;
@@ -51,8 +54,11 @@ public class IngestionChunkerOptions
     }
 
     /// <summary>
-    /// Gets or sets the number of overlapping tokens between consecutive chunks. Default is 500.
+    /// Gets or sets the number of overlapping tokens between consecutive chunks.
     /// </summary>
+    /// <value>
+    /// The default is 500.
+    /// </value>
     public int OverlapTokens
     {
         get

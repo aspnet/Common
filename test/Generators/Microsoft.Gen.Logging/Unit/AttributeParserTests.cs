@@ -1,10 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Compliance.Redaction;
 using Microsoft.Extensions.Compliance.Testing;
@@ -12,6 +15,7 @@ using Microsoft.Extensions.Diagnostics.Enrichment;
 using Microsoft.Extensions.Logging;
 using Microsoft.Gen.Logging.Parsing;
 using Microsoft.Gen.Shared;
+using VerifyXunit;
 using Xunit;
 
 namespace Microsoft.Gen.Logging.Test;
@@ -74,6 +78,86 @@ public class AttributeParserTests
             ");
 
         Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public Task DataClassificationAttributeNamespaceIsGloballyQualified()
+    {
+        const string Source = @"
+                using Microsoft.Extensions.Compliance.Classification;
+                using Microsoft.Extensions.Logging;
+
+                namespace Bar.Classifications
+                {
+                    public sealed class SecretAttribute : DataClassificationAttribute
+                    {
+                        public SecretAttribute()
+                            : base(new DataClassification(""Taxonomy"", ""Secret""))
+                        {
+                        }
+                    }
+                }
+
+                namespace Foo.Bar
+                {
+                    using global::Bar.Classifications;
+
+                    internal static partial class C
+                    {
+                        [LoggerMessage(0, LogLevel.Debug, ""M {p0}"")]
+                        static partial void M(ILogger logger, [Secret] string p0);
+                    }
+                }
+            ";
+
+        var generatedSource = RunGeneratorAndAssertNoErrors(Source);
+
+        return Verifier.Verify(generatedSource)
+            .AddScrubber(_ => _.Replace(GeneratorUtilities.CurrentVersion, "VERSION"))
+            .UseDirectory(Path.Combine("..", "Verified"));
+    }
+
+    [Fact]
+    public void DataClassificationAttributeNamespaceIsGloballyQualifiedForLogProperties()
+    {
+        const string Source = @"
+                using Microsoft.Extensions.Compliance.Classification;
+                using Microsoft.Extensions.Logging;
+
+                namespace Bar.Classifications
+                {
+                    public sealed class SecretAttribute : DataClassificationAttribute
+                    {
+                        public SecretAttribute()
+                            : base(new DataClassification(""Taxonomy"", ""Secret""))
+                        {
+                        }
+                    }
+                }
+
+                namespace Foo.Bar
+                {
+                    using global::Bar.Classifications;
+
+                    public class Payload
+                    {
+                        [Secret]
+                        public string? Value { get; set; }
+                    }
+
+                    public record class Record([property: Secret] string Value);
+
+                    internal static partial class C
+                    {
+                        [LoggerMessage(0, LogLevel.Debug, ""M"")]
+                        static partial void M(ILogger logger, [LogProperties] Payload p0, [LogProperties] Record p1);
+                    }
+                }
+            ";
+
+        var generatedSource = RunGeneratorAndAssertNoErrors(Source);
+
+        Assert.Contains("new global::Bar.Classifications.SecretAttribute().Classification", generatedSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -220,6 +304,22 @@ public class AttributeParserTests
         _ = Assert.Single(diagnostics);
 
         Assert.Equal(DiagDescriptors.CantUseDataClassificationWithLogPropertiesOrTagProvider.Id, diagnostics[0].Id);
+    }
+
+    // Runs the generator over a full compilation so that the emitted code is verified to actually compile.
+    private static string RunGeneratorAndAssertNoErrors(string source)
+    {
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(new LoggingGenerator());
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            CompilationHelper.CreateCompilation(source),
+            out var outputCompilation,
+            out var generatorDiagnostics);
+
+        Assert.Empty(generatorDiagnostics);
+        Assert.DoesNotContain(outputCompilation.GetDiagnostics(), static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var generatedSource = Assert.Single(driver.GetRunResult().Results[0].GeneratedSources);
+        return generatedSource.SourceText.ToString();
     }
 
     private static async Task<IReadOnlyList<Diagnostic>> RunGenerator(string code)

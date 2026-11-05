@@ -18,7 +18,7 @@ internal sealed class ServiceEndpointResolverResult(ServiceEndpointSource? endpo
     public Exception? Exception { get; } = exception;
 
     /// <summary>
-    /// Gets a value indicating whether resolution completed successfully.
+    /// Gets a value that indicates whether resolution completed successfully.
     /// </summary>
     [MemberNotNullWhen(true, nameof(EndpointSource))]
     public bool ResolvedSuccessfully => Exception is null;

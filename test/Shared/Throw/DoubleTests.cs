@@ -136,8 +136,10 @@ public class DoubleTests
         const double Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfGreaterThan(Zero, -1));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfGreaterThan(Zero, -1, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -147,8 +149,10 @@ public class DoubleTests
         const double Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfGreaterThanOrEqual(Zero, -1));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfGreaterThanOrEqual(Zero, -1, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -158,8 +162,10 @@ public class DoubleTests
         const double Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfLessThan(Zero, 1));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfLessThan(Zero, 1, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -169,8 +175,10 @@ public class DoubleTests
         const double Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfLessThanOrEqual(Zero, 1));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfLessThanOrEqual(Zero, 1, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -180,8 +188,10 @@ public class DoubleTests
         const double Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfZero(Zero));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfZero(Zero, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -191,8 +201,10 @@ public class DoubleTests
         const double Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfOutOfRange(Zero, 1, 2));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfOutOfRange(Zero, 1, 2, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 

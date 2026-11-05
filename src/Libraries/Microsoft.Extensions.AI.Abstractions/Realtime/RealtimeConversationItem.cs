@@ -55,7 +55,9 @@ public class RealtimeConversationItem
 
     /// <summary>
     /// Gets or sets the raw representation of the conversation item.
-    /// This can be used to hold the original data structure received from or sent to the provider.
     /// </summary>
+    /// <remarks>
+    /// This can be used to hold the original data structure received from or sent to the provider.
+    /// </remarks>
     public object? RawRepresentation { get; set; }
 }

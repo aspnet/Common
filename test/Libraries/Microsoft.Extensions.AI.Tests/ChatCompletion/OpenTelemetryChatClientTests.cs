@@ -48,6 +48,7 @@ public class OpenTelemetryChatClientTests
                         OutputTokenCount = 20,
                         TotalTokenCount = 42,
                         CachedInputTokenCount = 5,
+                        ReasoningTokenCount = 8,
                     },
                     AdditionalProperties = new()
                     {
@@ -89,6 +90,7 @@ public class OpenTelemetryChatClientTests
                     OutputTokenCount = 20,
                     TotalTokenCount = 42,
                     CachedInputTokenCount = 5,
+                    ReasoningTokenCount = 8,
                 })],
                 AdditionalProperties = new()
                 {
@@ -170,6 +172,7 @@ public class OpenTelemetryChatClientTests
         Assert.Equal("testservice", activity.GetTagItem("gen_ai.provider.name"));
 
         Assert.Equal("replacementmodel", activity.GetTagItem("gen_ai.request.model"));
+        Assert.Equal(streaming ? (object?)true : null, activity.GetTagItem("gen_ai.request.stream"));
         Assert.Equal(3.0f, activity.GetTagItem("gen_ai.request.frequency_penalty"));
         Assert.Equal(4.0f, activity.GetTagItem("gen_ai.request.top_p"));
         Assert.Equal(5.0f, activity.GetTagItem("gen_ai.request.presence_penalty"));
@@ -186,8 +189,19 @@ public class OpenTelemetryChatClientTests
         Assert.Equal(10, activity.GetTagItem("gen_ai.usage.input_tokens"));
         Assert.Equal(20, activity.GetTagItem("gen_ai.usage.output_tokens"));
         Assert.Equal(5, activity.GetTagItem("gen_ai.usage.cache_read.input_tokens"));
+        Assert.Equal(8, activity.GetTagItem("gen_ai.usage.reasoning.output_tokens"));
         Assert.Equal(enableSensitiveData ? "abcdefgh" : null, activity.GetTagItem("system_fingerprint"));
         Assert.Equal(enableSensitiveData ? "value2" : null, activity.GetTagItem("AndSomethingElse"));
+
+        if (streaming)
+        {
+            var timeToFirstChunk = Assert.IsType<double>(activity.GetTagItem("gen_ai.response.time_to_first_chunk"));
+            Assert.True(timeToFirstChunk >= 0);
+        }
+        else
+        {
+            Assert.Null(activity.GetTagItem("gen_ai.response.time_to_first_chunk"));
+        }
 
         Assert.True(activity.Duration.TotalMilliseconds > 0);
 
@@ -300,16 +314,20 @@ public class OpenTelemetryChatClientTests
                     }
                   },
                   {
-                    "type": "web_search"
+                    "type": "web_search",
+                    "name": "web_search"
                   },
                   {
-                    "type": "file_search"
+                    "type": "file_search",
+                    "name": "file_search"
                   },
                   {
-                    "type": "code_interpreter"
+                    "type": "code_interpreter",
+                    "name": "code_interpreter"
                   },
                   {
-                    "type": "mcp"
+                    "type": "mcp",
+                    "name": "mcp"
                   },
                   {
                     "type": "function",
@@ -339,47 +357,27 @@ public class OpenTelemetryChatClientTests
                 [
                   {
                     "type": "function",
-                    "name": "GetPersonAge",
-                    "description": "Gets the age of a person by name.",
-                    "parameters": {
-                      "type": "object",
-                      "properties": {
-                        "personName": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "personName"
-                      ]
-                    }
+                    "name": "GetPersonAge"
                   },
                   {
-                    "type": "web_search"
+                    "type": "web_search",
+                    "name": "web_search"
                   },
                   {
-                    "type": "file_search"
+                    "type": "file_search",
+                    "name": "file_search"
                   },
                   {
-                    "type": "code_interpreter"
+                    "type": "code_interpreter",
+                    "name": "code_interpreter"
                   },
                   {
-                    "type": "mcp"
+                    "type": "mcp",
+                    "name": "mcp"
                   },
                   {
                     "type": "function",
-                    "name": "GetCurrentWeather",
-                    "description": "Gets the current weather for a location.",
-                    "parameters": {
-                      "type": "object",
-                      "properties": {
-                        "location": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "location"
-                      ]
-                    }
+                    "name": "GetCurrentWeather"
                   }
                 ]
                 """), ReplaceWhitespace(tags["gen_ai.tool.definitions"]));

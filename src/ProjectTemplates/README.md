@@ -140,23 +140,19 @@ Finally, create a project from the template and run it:
 
 ```pwsh
     dotnet new aiagent-webapi `
-        [--provider <azureopenai | githubmodels | ollama | openai>] `
+        --provider <azureopenai | ollama | openai> `
         [--managed-identity]
 
 # or
 
     dotnet new aichatweb `
-        [--provider <azureopenai | githubmodels | ollama | openai>] `
+        --provider <azureopenai | ollama | openai> `
         [--vector-store <azureaisearch | local | qdrant>] `
         [--aspire] `
         [--managed-identity]
 
     # If using `--aspire`, cd into the *AppHost directory
     # Follow the instructions in the generated README for setting the necessary user-secrets
-
-# or
-
-    dotnet new mcpserver [--aot] [--self-contained]
 
 dotnet run
 ```

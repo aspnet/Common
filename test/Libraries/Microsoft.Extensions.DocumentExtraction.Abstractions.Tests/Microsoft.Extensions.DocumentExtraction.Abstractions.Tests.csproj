@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Unit tests for Microsoft.Extensions.DocumentExtraction.Abstractions.</Description>
+    <NoWarn>$(NoWarn);CA1063</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.DocumentExtraction.Abstractions\Microsoft.Extensions.DocumentExtraction.Abstractions.csproj" ProjectUnderTest="true" />
+  </ItemGroup>
+</Project>

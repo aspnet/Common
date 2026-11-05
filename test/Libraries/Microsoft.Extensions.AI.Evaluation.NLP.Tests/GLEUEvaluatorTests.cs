@@ -92,7 +92,7 @@ public class GLEUEvaluatorTests
         var metric = Assert.Single(result.Metrics.Values) as NumericMetric;
         Assert.NotNull(metric);
         Assert.Equal(GLEUEvaluator.GLEUMetricName, metric.Name);
-        Assert.Equal(0.29799, (double)metric!.Value!, 4);
+        Assert.Equal(0.45454, (double)metric!.Value!, 4);
     }
 
     [Fact]

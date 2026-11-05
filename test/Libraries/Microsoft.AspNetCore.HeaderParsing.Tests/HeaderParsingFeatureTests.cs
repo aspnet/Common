@@ -209,6 +209,34 @@ public sealed class HeaderParsingFeatureTests
         latest.Tags["aspnetcore.header_parsing.cache_access.type"].Should().Be("Hit");
     }
 
+    [Fact]
+    public void Metrics_HaveDescriptions()
+    {
+        using var meter = new Meter(nameof(Metrics_HaveDescriptions));
+        _ = GetMockedMetrics(meter);
+        using var parseErrorsMetricCollector = new MetricCollector<long>(meter, "aspnetcore.header_parsing.parse_errors");
+        using var cacheAccessesMetricCollector = new MetricCollector<long>(meter, "aspnetcore.header_parsing.cache_accesses");
+
+        Assert.Equal(
+            "Number of errors that occurred when parsing HTTP request headers.",
+            parseErrorsMetricCollector.Instrument?.Description);
+        Assert.Equal(
+            "Number of times a cache storing parsed header values was accessed.",
+            cacheAccessesMetricCollector.Instrument?.Description);
+    }
+
+    [Fact]
+    public void Counters_have_units()
+    {
+        using var meter = new Meter(nameof(Counters_have_units));
+        _ = GetMockedMetrics(meter);
+        using var parseErrorsCollector = new MetricCollector<long>(meter, "aspnetcore.header_parsing.parse_errors");
+        using var cacheAccessesCollector = new MetricCollector<long>(meter, "aspnetcore.header_parsing.cache_accesses");
+
+        Assert.Equal("{parse_error}", parseErrorsCollector.Instrument?.Unit);
+        Assert.Equal("{cache_access}", cacheAccessesCollector.Instrument?.Unit);
+    }
+
     private static HeaderParsingMetrics GetMockedMetrics(Meter meter)
     {
         var meterFactoryMock = new Mock<IMeterFactory>();

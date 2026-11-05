@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -6,9 +6,10 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.IO;
-#if !NET10_0
+#if !NET10_0_OR_GREATER
 using System.Linq;
 #endif
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -19,17 +20,17 @@ using Microsoft.Extensions.Hosting.Testing;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.Shared.Instruments;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test;
 
 public sealed class AcceptanceTest
 {
-    [ConditionalFact]
-    [OSSkipCondition(OperatingSystems.Windows | OperatingSystems.MacOSX, SkipReason = "Linux specific tests")]
+    [Fact]
     public void Adding_Linux_Resource_Utilization_Allows_To_Query_Snapshot_Provider()
     {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Linux), "Linux specific tests");
+
         using var services = new ServiceCollection()
             .AddResourceMonitoring()
             .BuildServiceProvider();
@@ -40,11 +41,12 @@ public sealed class AcceptanceTest
         Assert.NotEqual(default, provider.GetSnapshot());
     }
 
-    [ConditionalFact]
-    [OSSkipCondition(OperatingSystems.Windows | OperatingSystems.MacOSX, SkipReason = "Linux specific tests")]
+    [Fact]
     [SuppressMessage("Minor Code Smell", "S3257:Declarations and initializations should be as concise as possible", Justification = "Broken analyzer.")]
     public void Adding_Linux_Resource_Utilization_Can_Be_Configured_With_Section()
     {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Linux), "Linux specific tests");
+
         var cpuRefresh = TimeSpan.FromMinutes(13);
         var memoryRefresh = TimeSpan.FromMinutes(14);
 
@@ -70,10 +72,11 @@ public sealed class AcceptanceTest
         Assert.Equal(memoryRefresh, options.Value.MemoryConsumptionRefreshInterval);
     }
 
-    [ConditionalFact]
-    [OSSkipCondition(OperatingSystems.Windows | OperatingSystems.MacOSX, SkipReason = "Linux specific tests")]
+    [Fact]
     public void Adding_Linux_Resource_Utilization_Can_Be_Configured_With_Action()
     {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Linux), "Linux specific tests");
+
         var cpuRefresh = TimeSpan.FromMinutes(13);
         var memoryRefresh = TimeSpan.FromMinutes(14);
 
@@ -92,11 +95,12 @@ public sealed class AcceptanceTest
         Assert.Equal(memoryRefresh, options.Value.MemoryConsumptionRefreshInterval);
     }
 
-    [ConditionalFact]
-    [OSSkipCondition(OperatingSystems.Windows | OperatingSystems.MacOSX, SkipReason = "Linux specific tests")]
+    [Fact]
     [SuppressMessage("Minor Code Smell", "S3257:Declarations and initializations should be as concise as possible", Justification = "Broken analyzer.")]
     public void Adding_Linux_Resource_Utilization_With_Section_Registers_SnapshotProvider_Cgroupv1()
     {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Linux), "Linux specific tests");
+
         var cpuRefresh = TimeSpan.FromMinutes(13);
         var memoryRefresh = TimeSpan.FromMinutes(14);
 
@@ -141,11 +145,12 @@ public sealed class AcceptanceTest
         Assert.Equal(100_000UL, provider.Resources.MaximumMemoryInBytes);
     }
 
-    [ConditionalFact]
-    [OSSkipCondition(OperatingSystems.Windows | OperatingSystems.MacOSX, SkipReason = "Linux specific tests")]
+    [Fact]
     [SuppressMessage("Minor Code Smell", "S3257:Declarations and initializations should be as concise as possible", Justification = "Broken analyzer.")]
     public void Adding_Linux_Resource_Utilization_With_Section_Registers_SnapshotProvider_Cgroupv2()
     {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Linux), "Linux specific tests");
+
         var cpuRefresh = TimeSpan.FromMinutes(13);
         var memoryRefresh = TimeSpan.FromMinutes(14);
 
@@ -190,11 +195,11 @@ public sealed class AcceptanceTest
         Assert.Equal(100_000UL, provider.Resources.MaximumMemoryInBytes);
     }
 
-    [ConditionalFact]
-    [CombinatorialData]
-    [OSSkipCondition(OperatingSystems.Windows | OperatingSystems.MacOSX, SkipReason = "Linux specific tests")]
+    [Fact]
     public Task ResourceUtilizationTracker_And_Metrics_Report_Same_Values_With_Cgroupsv1()
     {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Linux), "Linux specific tests");
+
         var cpuRefresh = TimeSpan.FromMinutes(13);
         var memoryRefresh = TimeSpan.FromMinutes(14);
         var fileSystem = new HardcodedValueFileSystem(new Dictionary<FileInfo, string>
@@ -289,11 +294,11 @@ public sealed class AcceptanceTest
         return Task.CompletedTask;
     }
 
-    [ConditionalFact]
-    [CombinatorialData]
-    [OSSkipCondition(OperatingSystems.Windows | OperatingSystems.MacOSX, SkipReason = "Linux specific tests")]
+    [Fact]
     public Task ResourceUtilizationTracker_And_Metrics_Report_Same_Values_With_Cgroupsv2()
     {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Linux), "Linux specific tests");
+
         var cpuRefresh = TimeSpan.FromMinutes(13);
         var memoryRefresh = TimeSpan.FromMinutes(14);
         var fileSystem = new HardcodedValueFileSystem(new Dictionary<FileInfo, string>
@@ -398,11 +403,11 @@ public sealed class AcceptanceTest
         return Task.CompletedTask;
     }
 
-    [ConditionalFact]
-    [CombinatorialData]
-    [OSSkipCondition(OperatingSystems.Windows | OperatingSystems.MacOSX, SkipReason = "Linux specific tests")]
+    [Fact]
     public Task ResourceUtilizationTracker_And_Metrics_Report_Same_Values_With_Cgroupsv2_Using_LinuxCalculationV2()
     {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Linux), "Linux specific tests");
+
         var fileSystem = new HardcodedValueFileSystem(new Dictionary<FileInfo, string>
         {
             { new FileInfo("/proc/self/cgroup"), "0::/fakeslice"},

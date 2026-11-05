@@ -3,21 +3,15 @@
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { App } from '../../components/App.tsx';
+import { App, createScoreSummary, ReportContextProvider } from '../../components';
 import './index.css'
 import { init, ready, getAccessToken, getConfiguration } from "azure-devops-extension-sdk";
 import { getClient } from "./azure-devops-extension-api";
 import { Build, Attachment, BuildRestClient } from "./azure-devops-extension-api/Build";
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
-import { createScoreSummary as createScoreSummary } from '../../components/Summary.ts';
-import { ReportContextProvider } from '../../components/ReportContext.tsx';
 
 const ErrorHtml = ({ message }: { message: string }) =>
-  <html>
-    <body>
-      <div className="error">{message}</div>
-    </body>
-  </html>;
+  <div className="error">{message}</div>;
 
 const ATTACHMENT_NAME = 'ai-eval-report';
 const ATTACHMENT_TYPE = 'ai-eval-report-json';
@@ -53,10 +47,11 @@ const getReportData = async (client: BuildRestClient, project: string, buildId: 
 
 const run = async () => {
 
-  await init();
+  await init({ applyTheme: true });
   await ready();
 
   const config = getConfiguration();
+  const root = createRoot(document.getElementById('root')!);
   config.onBuildChanged(async (build: Build) => {
 
     try {
@@ -68,29 +63,24 @@ const run = async () => {
 
       const scoreSummary = createScoreSummary(dataset);
 
-      createRoot(document.getElementById('root')!).render(
-        <FluentProvider theme={webLightTheme}>
-          <StrictMode>
-            <ReportContextProvider dataset={dataset} scoreSummary={scoreSummary}>
-              <App />
-            </ReportContextProvider>
-          </StrictMode>
-        </FluentProvider>
+      root.render(
+        <StrictMode>
+          <ReportContextProvider dataset={dataset} scoreSummary={scoreSummary} persistKey={String(build.id)}>
+            <App heightStrategy="auto-grow" themeSource="host" />
+          </ReportContextProvider>
+        </StrictMode>
       );
 
     } catch (e) {
 
-      if (e instanceof Error) {
-        const err = e as Error;
-        createRoot(document.getElementById('root')!).render(
-          <FluentProvider theme={webLightTheme}>
-            <StrictMode>
-              <ErrorHtml message={err.message} />
-            </StrictMode>
-          </FluentProvider>
-        );
-        return;
-      }
+      const message = e instanceof Error ? e.message : 'An unknown error occurred while loading the report.';
+      root.render(
+        <FluentProvider theme={webLightTheme}>
+          <StrictMode>
+            <ErrorHtml message={message} />
+          </StrictMode>
+        </FluentProvider>
+      );
     }
   });
 };

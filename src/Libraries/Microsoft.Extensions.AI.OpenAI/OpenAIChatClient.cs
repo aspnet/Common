@@ -22,6 +22,7 @@ using OpenAI.Chat;
 #pragma warning disable CA1308 // Normalize strings to uppercase
 #pragma warning disable S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
 #pragma warning disable SA1204 // Static elements should appear before instance elements
+#pragma warning disable MEAI001 // OpenAIRequestPolicies is experimental
 
 namespace Microsoft.Extensions.AI;
 
@@ -55,6 +56,9 @@ internal sealed partial class OpenAIChatClient : IChatClient
     /// <summary>The underlying <see cref="ChatClient" />.</summary>
     private readonly ChatClient _chatClient;
 
+    /// <summary>Caller-registered policies applied to every <see cref="RequestOptions"/>.</summary>
+    private readonly OpenAIRequestPolicies _requestPolicies = new();
+
     /// <summary>Initializes a new instance of the <see cref="OpenAIChatClient"/> class for the specified <see cref="ChatClient"/>.</summary>
     /// <param name="chatClient">The underlying client.</param>
     /// <exception cref="ArgumentNullException"><paramref name="chatClient"/> is <see langword="null"/>.</exception>
@@ -76,6 +80,7 @@ internal sealed partial class OpenAIChatClient : IChatClient
             serviceKey is not null ? null :
             serviceType == typeof(ChatClientMetadata) ? _metadata :
             serviceType == typeof(ChatClient) ? _chatClient :
+            serviceType == typeof(OpenAIRequestPolicies) ? _requestPolicies :
             serviceType.IsInstanceOfType(this) ? this :
             null;
     }
@@ -94,7 +99,7 @@ internal sealed partial class OpenAIChatClient : IChatClient
 
         // Make the call to OpenAI.
         var task = _completeChatAsync is not null ?
-            _completeChatAsync(_chatClient, openAIChatMessages, openAIOptions, cancellationToken.ToRequestOptions(streaming: false)) :
+            _completeChatAsync(_chatClient, openAIChatMessages, openAIOptions, cancellationToken.ToRequestOptions(streaming: false, _requestPolicies)) :
             _chatClient.CompleteChatAsync(openAIChatMessages, openAIOptions, cancellationToken);
         var response = await task.ConfigureAwait(false);
 
@@ -115,7 +120,7 @@ internal sealed partial class OpenAIChatClient : IChatClient
 
         // Make the call to OpenAI.
         var chatCompletionUpdates = _completeChatStreamingAsync is not null ?
-            _completeChatStreamingAsync(_chatClient, openAIChatMessages, openAIOptions, cancellationToken.ToRequestOptions(streaming: true)) :
+            _completeChatStreamingAsync(_chatClient, openAIChatMessages, openAIOptions, cancellationToken.ToRequestOptions(streaming: true, _requestPolicies)) :
             _chatClient.CompleteChatStreamingAsync(openAIChatMessages, openAIOptions, cancellationToken);
 
         return FromOpenAIStreamingChatCompletionAsync(chatCompletionUpdates, openAIOptions, cancellationToken);
@@ -329,7 +334,10 @@ internal sealed partial class OpenAIChatClient : IChatClient
             {
                 string detailString => new ChatImageDetailLevel(detailString),
                 ChatImageDetailLevel detail => detail,
-                _ => null
+
+                // The SDK defines nullable and non-nullable op_Implicit conversions from string. Force a nullable result so
+                // null does not bind to the non-nullable conversion, which throws ArgumentNullException.
+                _ => (ChatImageDetailLevel?)null
             };
         }
 
@@ -349,6 +357,8 @@ internal sealed partial class OpenAIChatClient : IChatClient
         string? responseId = null;
         DateTimeOffset? createdAt = null;
         string? modelId = null;
+        string? serviceTier = null;
+        string? systemFingerprint = null;
 
         // Process each update as it arrives
         await foreach (StreamingChatCompletionUpdate update in updates.WithCancellation(cancellationToken).ConfigureAwait(false))
@@ -358,7 +368,12 @@ internal sealed partial class OpenAIChatClient : IChatClient
             finishReason ??= update.FinishReason is OpenAI.Chat.ChatFinishReason reason ? FromOpenAIFinishReason(reason) : null;
             responseId ??= update.CompletionId;
             createdAt ??= update.CreatedAt;
-            modelId ??= update.Model;
+            modelId ??= string.IsNullOrEmpty(update.Model) ? null : update.Model;
+
+            // Record the service tier and system fingerprint each once if not yet recorded.
+            OpenAIClientExtensions.AddOpenAIResponseAttributes(
+                update.ServiceTier?.ToString(), update.SystemFingerprint,
+                ref serviceTier, ref systemFingerprint);
 
             // Create the response content object.
             ChatResponseUpdate responseUpdate = new()
@@ -571,6 +586,8 @@ internal sealed partial class OpenAIChatClient : IChatClient
             RawRepresentation = openAICompletion,
             ResponseId = openAICompletion.Id,
         };
+
+        OpenAIClientExtensions.AddOpenAIResponseAttributes(openAICompletion.ServiceTier?.ToString(), openAICompletion.SystemFingerprint);
 
         if (openAICompletion.Usage is ChatTokenUsage tokenUsage)
         {

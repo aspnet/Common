@@ -25,7 +25,15 @@ public sealed class AIFunctionFactoryOptions
 
     /// <summary>Gets or sets the <see cref="JsonSerializerOptions"/> used to marshal .NET values being passed to the underlying delegate.</summary>
     /// <remarks>
+    /// <para>
     /// If no value has been specified, the <see cref="AIJsonUtilities.DefaultOptions"/> instance will be used.
+    /// </para>
+    /// <para>
+    /// The <see cref="JsonSerializerOptions.UnmappedMemberHandling"/> setting is honored by the function parameter
+    /// binder: when set to <see cref="System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow"/>, invoking
+    /// the produced <see cref="AIFunction"/> throws if the supplied <see cref="AIFunctionArguments"/> contains keys
+    /// that do not correspond to a bindable parameter of the underlying method.
+    /// </para>
     /// </remarks>
     public JsonSerializerOptions? SerializerOptions { get; set; }
 
@@ -42,7 +50,7 @@ public sealed class AIFunctionFactoryOptions
 
     /// <summary>Gets or sets the name to use for the function.</summary>
     /// <value>
-    /// The name to use for the function. The default value is a name derived from the passed <see cref="Delegate"/> or <see cref="MethodInfo"/> (for example, via a <see cref="DisplayNameAttribute"/> on the method).
+    /// The name to use for the function. The default value is a name derived from the passed <see cref="Delegate"/> or <see cref="MethodInfo"/> (for example, via an <see cref="AIFunctionNameAttribute"/> or <see cref="DisplayNameAttribute"/> on the method).
     /// </value>
     public string? Name { get; set; }
 

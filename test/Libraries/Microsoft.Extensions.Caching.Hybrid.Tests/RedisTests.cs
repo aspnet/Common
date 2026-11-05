@@ -5,7 +5,7 @@ using Microsoft.Extensions.Caching.Hybrid.Internal;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Microsoft.Extensions.Caching.Hybrid.Tests;
 
@@ -81,9 +81,17 @@ public class RedisTests : DistributedCacheTests, IClassFixture<RedisFixture>
 
         Assert.Equal(1, count);
 
-        await Task.Delay(500); // the L2 write continues in the background; give it a chance
+        // the L2 write continues in the background; poll up to 50 times (5 seconds total) until the key surfaces a TTL
+        TimeSpan? ttl = null;
+        for (var i = 0; i < 50 && ttl is null; i++)
+        {
+            ttl = await redis.GetDatabase().KeyTimeToLiveAsync(key);
+            if (ttl is null)
+            {
+                await Task.Delay(100);
+            }
+        }
 
-        var ttl = await redis.GetDatabase().KeyTimeToLiveAsync(key);
         Log.WriteLine($"ttl: {ttl}");
         Assert.NotNull(ttl);
     }

@@ -98,45 +98,53 @@ internal sealed class LinuxUtilizationProvider : ISnapshotProvider
             _ = meter.CreateObservableGauge(
                 name: ResourceUtilizationInstruments.ContainerCpuLimitUtilization,
                 observeValues: () => GetMeasurementWithRetry(() => CpuUtilizationLimit(_cpuLimit)),
-                unit: "1");
+                unit: "1",
+                description: "The CPU consumption of the running containerized application relative to resource limit.");
 
             _ = meter.CreateObservableGauge(
                 name: ResourceUtilizationInstruments.ContainerCpuRequestUtilization,
                 observeValues: () => GetMeasurementWithRetry(() => CpuUtilizationRequest(_cpuRequest)),
-                unit: "1");
+                unit: "1",
+                description: "The CPU consumption of the running containerized application relative to resource request.");
 
             _ = meter.CreateObservableGauge(
                 name: ResourceUtilizationInstruments.ContainerCpuTime,
                 observeValues: GetCpuTime,
-                unit: "1");
+                unit: "1",
+                description: "CPU time used by the container.");
         }
         else
         {
             _ = meter.CreateObservableGauge(
                 name: ResourceUtilizationInstruments.ContainerCpuLimitUtilization,
                 observeValues: () => GetMeasurementWithRetry(() => CpuUtilization() * scaleRelativeToCpuLimit),
-                unit: "1");
+                unit: "1",
+                description: "The CPU consumption of the running containerized application relative to resource limit.");
 
             _ = meter.CreateObservableGauge(
                 name: ResourceUtilizationInstruments.ContainerCpuRequestUtilization,
                 observeValues: () => GetMeasurementWithRetry(() => CpuUtilization() * scaleRelativeToCpuRequest),
-                unit: "1");
+                unit: "1",
+                description: "The CPU consumption of the running containerized application relative to resource request.");
 
             _ = meter.CreateObservableGauge(
                 name: ResourceUtilizationInstruments.ProcessCpuUtilization,
                 observeValues: () => GetMeasurementWithRetry(() => CpuUtilization() * scaleRelativeToCpuRequest),
-                unit: "1");
+                unit: "1",
+                description: "The CPU consumption of the running application.");
         }
 
         _ = meter.CreateObservableGauge(
             name: ResourceUtilizationInstruments.ContainerMemoryLimitUtilization,
             observeValues: () => GetMeasurementWithRetry(() => MemoryPercentageLimit()),
-            unit: "1");
+            unit: "1",
+            description: "The memory consumption of the running containerized application relative to resource limit.");
 
         _ = meter.CreateObservableGauge(
             name: ResourceUtilizationInstruments.ContainerMemoryRequestUtilization,
             observeValues: () => GetMeasurementWithRetry(() => MemoryPercentageRequest()),
-            unit: "1");
+            unit: "1",
+            description: "The memory consumption of the running containerized application relative to resource request.");
 
         _ = meter.CreateObservableUpDownCounter(
             name: ResourceUtilizationInstruments.ContainerMemoryUsage,
@@ -147,7 +155,8 @@ internal sealed class LinuxUtilizationProvider : ISnapshotProvider
         _ = meter.CreateObservableGauge(
             name: ResourceUtilizationInstruments.ProcessMemoryUtilization,
             observeValues: () => GetMeasurementWithRetry(() => MemoryPercentageLimit()),
-            unit: "1");
+            unit: "1",
+            description: "The memory consumption of the running application.");
 
         Resources = new SystemResources(_cpuRequest, _cpuLimit, quota.BaselineMemoryInBytes, quota.MaxMemoryInBytes);
         _logger.SystemResourcesInfo(_cpuLimit, _cpuRequest, quota.MaxMemoryInBytes, quota.BaselineMemoryInBytes);

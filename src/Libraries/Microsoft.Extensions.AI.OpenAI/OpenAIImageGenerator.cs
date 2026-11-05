@@ -179,8 +179,6 @@ internal sealed class OpenAIImageGenerator : IImageGenerator
         {
             ImageGenerationResponseFormat.Uri => GeneratedImageFormat.Uri,
             ImageGenerationResponseFormat.Data => GeneratedImageFormat.Bytes,
-
-            // ImageGenerationResponseFormat.Hosted not supported by ImageGenerator, however other OpenAI API support file IDs.
             _ => (GeneratedImageFormat?)null
         };
 
@@ -214,8 +212,6 @@ internal sealed class OpenAIImageGenerator : IImageGenerator
         {
             ImageGenerationResponseFormat.Uri => GeneratedImageFormat.Uri,
             ImageGenerationResponseFormat.Data => GeneratedImageFormat.Bytes,
-
-            // ImageGenerationResponseFormat.Hosted not supported by ImageGenerator, however other OpenAI API support file IDs.
             _ => (GeneratedImageFormat?)null
         };
 

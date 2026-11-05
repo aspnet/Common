@@ -4,9 +4,7 @@ This is an AI Agent Web API application created from the `aiagent-webapi` templa
 
 ## Prerequisites
 
-<!--#if (IsGHModels) -->
-- A GitHub Models API token (free to get started)
-<!--#elif (IsOpenAI) -->
+<!--#if (IsOpenAI) -->
 - An OpenAI API key
 <!--#elif (IsAzureOpenAI) -->
 - An Azure OpenAI service deployment
@@ -18,40 +16,7 @@ This is an AI Agent Web API application created from the `aiagent-webapi` templa
 
 ### 1. Configure Your AI Service
 
-<!--#if (IsGHModels) -->
-#### GitHub Models Configuration
-
-This application uses GitHub Models (model: gpt-4o-mini) for AI functionality. You'll need to configure your GitHub Models API token:
-
-**Option A: Using User Secrets (Recommended for Development)**
-
-```bash
-dotnet user-secrets set "GITHUB_TOKEN" "your-github-models-token-here"
-```
-
-**Option B: Using Environment Variables**
-
-Set the `GITHUB_TOKEN` environment variable:
-
-- **Windows (PowerShell)**:
-  ```powershell
-  $env:GITHUB_TOKEN = "your-github-models-token-here"
-  ```
-
-- **Linux/macOS**:
-  ```bash
-  export GITHUB_TOKEN="your-github-models-token-here"
-  ```
-
-#### Get a GitHub Models Token
-
-1. Visit [GitHub Models](https://github.com/marketplace/models)
-2. Sign in with your GitHub account
-3. Select a model (e.g., gpt-4o-mini)
-4. Click "Get API Key" or follow the authentication instructions
-5. Copy your personal access token
-
-<!--#elif (IsOpenAI) -->
+<!--#if (IsOpenAI) -->
 #### OpenAI Configuration
 
 This application uses the OpenAI Platform (model: gpt-4o-mini). You'll need to configure your OpenAI API key:
@@ -198,20 +163,19 @@ dotnet new aiagent-webapi --provider ollama --chat-model llama3.1
 ### Available Parameters
 
 - **`--provider`**: Choose the AI service provider
-  - `githubmodels` (default) - GitHub Models
   - `azureopenai` - Azure OpenAI
   - `openai` - OpenAI Platform
   - `ollama` - Ollama (local development)
 
 - **`--chat-model`**: Specify the chat model/deployment name
-  - Default for OpenAI/Azure OpenAI/GitHub Models: `gpt-4o-mini`
+  - Default for OpenAI/Azure OpenAI: `gpt-4o-mini`
   - Default for Ollama: `llama3.2`
 
 - **`--managed-identity`**: Use managed identity for Azure services (default: `true`)
   - Only applicable when `--provider azureopenai`
 
-- **`--framework`**: Target framework (default: `net10.0`)
-  - Options: `net10.0`, `net9.0`, `net8.0`
+- **`--framework`**: Target framework (default: `net11.0`)
+  - Options: `net11.0`, `net10.0`, `net9.0`, `net8.0`
 
 ## Project Structure
 
@@ -223,9 +187,7 @@ dotnet new aiagent-webapi --provider ollama --chat-model llama3.1
 
 - [AI apps for .NET developers](https://learn.microsoft.com/dotnet/ai)
 - [Microsoft Agent Framework Documentation](https://aka.ms/dotnet/agent-framework/docs)
-<!--#if (IsGHModels) -->
-- [GitHub Models](https://github.com/marketplace/models)
-<!--#elif (IsOpenAI) -->
+<!--#if (IsOpenAI) -->
 - [OpenAI Platform](https://platform.openai.com)
 <!--#elif (IsAzureOpenAI) -->
 - [Azure OpenAI Service](https://azure.microsoft.com/products/ai-services/openai-service)
@@ -235,16 +197,7 @@ dotnet new aiagent-webapi --provider ollama --chat-model llama3.1
 
 ## Troubleshooting
 
-<!--#if (IsGHModels) -->
-**Problem**: Application fails with "Missing configuration: GITHUB_TOKEN"
-
-**Solution**: Make sure you've configured your GitHub Models API token using one of the methods described above.
-
-**Problem**: API requests fail with authentication errors
-
-**Solution**: Verify your GitHub Models token is valid and hasn't expired. You may need to regenerate it from the GitHub Models website.
-
-<!--#elif (IsOpenAI) -->
+<!--#if (IsOpenAI) -->
 **Problem**: Application fails with "Missing configuration: OPENAI_KEY"
 
 **Solution**: Make sure you've configured your OpenAI API key using one of the methods described above.

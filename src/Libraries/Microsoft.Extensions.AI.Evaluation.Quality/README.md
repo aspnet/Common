@@ -43,10 +43,13 @@ You can optionally add the `Microsoft.Extensions.AI.Evaluation.Reporting.Azure` 
 dotnet tool install Microsoft.Extensions.AI.Evaluation.Console --create-manifest-if-needed
 ```
 
-## Usage Examples
+## Usage examples
 
-For a comprehensive tour of all the functionality, concepts and APIs available in the `Microsoft.Extensions.AI.Evaluation` libraries, check out the [API Usage Examples](https://github.com/dotnet/ai-samples/blob/main/src/microsoft-extensions-ai-evaluation/api/) available in the [dotnet/ai-samples](https://github.com/dotnet/ai-samples) repo. These examples are structured as a collection of unit tests. Each unit test showcases a specific concept or API, and builds on the concepts and APIs showcased in previous unit tests.
+For `Microsoft.Extensions.AI.Evaluation` library usage examples, see the following tutorials:
 
+* [Quickstart: Evaluate response quality](https://learn.microsoft.com/dotnet/ai/evaluation/evaluate-ai-response)
+* [Tutorial: Evaluate response quality with caching and reporting](https://learn.microsoft.com/dotnet/ai/evaluation/evaluate-with-reporting)
+* [Tutorial: Evaluate response safety with caching and reporting](https://learn.microsoft.com/dotnet/ai/evaluation/evaluate-safety)
 
 ## Feedback & Contributing
 

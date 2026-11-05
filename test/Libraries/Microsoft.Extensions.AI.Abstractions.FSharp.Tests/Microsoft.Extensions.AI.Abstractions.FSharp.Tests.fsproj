@@ -7,11 +7,17 @@
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- Suppress F# nullability warnings when interoperating with nullable C# APIs -->
-    <NoWarn>$(NoWarn);FS3261</NoWarn>
+    <!-- FS0052: xUnit v3 auto-generated entry point copies struct values (ValueTask) which triggers this in F# -->
+    <NoWarn>$(NoWarn);FS3261;FS0052</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="FSharpOptionalParameterTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CPM disables implicit FSharp.Core reference; add explicitly so it deploys to output -->
+    <PackageReference Include="FSharp.Core" VersionOverride="$(FSCorePackageVersion)" />
   </ItemGroup>
 
   <ItemGroup>

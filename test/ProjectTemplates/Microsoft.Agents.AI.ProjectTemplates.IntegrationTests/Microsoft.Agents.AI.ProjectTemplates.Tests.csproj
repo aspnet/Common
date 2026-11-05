@@ -11,8 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.TemplateEngine.Authoring.TemplateVerifier" />
-    <PackageReference Include="Microsoft.TemplateEngine.TestHelper" />
+    <PackageReference Include="Microsoft.TemplateEngine.Authoring.TemplateVerifier.XunitV3" />
+    <!-- Lift CVE-impacted transitive dependency; remove once the direct dependency updates. -->
+    <PackageReference Include="NuGet.Packaging" />
+    <!-- Lift CVE-impacted transitive dependency; remove once the direct dependency updates. -->
+    <PackageReference Include="NuGet.Protocol" />
   </ItemGroup>
 
   <ItemGroup>

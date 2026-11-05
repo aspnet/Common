@@ -80,6 +80,8 @@ internal sealed partial class Emitter : EmitterBase
         var stateName = PickUniqueName("state", lm.Parameters.Select(p => p.ParameterName));
 
         OutLn($"var {stateName} = {LoggerMessageHelperType}.ThreadLocalState;");
+        OutLn("try");
+        OutOpenBrace();
         GenTagWrites(lm, stateName, out int numReservedUnclassifiedTags, out int numReservedClassifiedTags);
 
         OutLn();
@@ -140,8 +142,11 @@ internal sealed partial class Emitter : EmitterBase
         OutCloseBraceWithExtra(");");
         Unindent();
 
-        OutLn();
+        OutCloseBrace();
+        OutLn("finally");
+        OutOpenBrace();
         OutLn($"{stateName}.Clear();");
+        OutCloseBrace();
         OutCloseBrace();
 
         /// <summary>
@@ -392,7 +397,7 @@ internal sealed partial class Emitter : EmitterBase
                     if (NeedsASlot(p) && p.HasDataClassification)
                     {
                         var key = $"\"{p.TagName}\"";
-                        var classification = MakeClassificationValue(p.ClassificationAttributeTypes);
+                        var classification = _classificationMap[p.ClassificationAttributeTypes];
 
                         var value = ShouldStringifyParameter(p)
                             ? ConvertParameterToString(p, p.ParameterNameWithAtIfNeeded)
@@ -417,7 +422,7 @@ internal sealed partial class Emitter : EmitterBase
                                     ? ConvertPropertyToString(member, accessExpression)
                                     : accessExpression;
 
-                                var classification = MakeClassificationValue(member.ClassificationAttributeTypes);
+                                var classification = _classificationMap[member.ClassificationAttributeTypes];
 
                                 OutLn($"{stateName}.ClassifiedTagArray[{--count}] = new(\"{propName}\", {value}, {classification});");
                             }
@@ -441,7 +446,7 @@ internal sealed partial class Emitter : EmitterBase
                                 ? ConvertPropertyToString(member, accessExpression)
                                 : accessExpression;
 
-                            var classification = MakeClassificationValue(member.ClassificationAttributeTypes);
+                            var classification = _classificationMap[member.ClassificationAttributeTypes];
 
                             if (member.PotentiallyNull)
                             {
@@ -602,30 +607,6 @@ internal sealed partial class Emitter : EmitterBase
 
             return (logger, isNullable);
         }
-    }
-
-    private string MakeClassificationValue(HashSet<string> classificationTypes)
-    {
-        var sb = _sbPool.GetStringBuilder();
-
-        _ = sb.Append("new global::Microsoft.Extensions.Compliance.Classification.DataClassificationSet(");
-
-        int i = 0;
-
-        foreach (var ct in classificationTypes)
-        {
-            if (i > 0)
-            {
-                _ = sb.Append(", ");
-            }
-
-            _ = sb.Append(_classificationMap[ct]);
-            i++;
-        }
-
-        _ = sb.Append(')');
-
-        return sb.ToString();
     }
 
     private void GenParameters(LoggingMethod lm)

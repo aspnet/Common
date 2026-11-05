@@ -69,7 +69,7 @@ namespace System.Text
         }
 
         /// <summary>
-        /// Get a pinnable reference to the builder.
+        /// Gets a pinnable reference to the builder.
         /// Does not ensure there is a null char after <see cref="Length"/>
         /// This overload is pattern matched in the C# 7.3+ compiler so you can omit
         /// the explicit method call, and write eg "fixed (char* c = builder)"

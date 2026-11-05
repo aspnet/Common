@@ -1,11 +1,10 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.DataIngestion.Readers.Tests;
@@ -19,15 +18,15 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         "https://raw.githubusercontent.com/microsoft/markitdown/main/README.md"
     ];
 
-    [ConditionalTheory]
+    [Theory]
     [MemberData(nameof(Links))]
     public override Task SupportsStreams(string source) => base.SupportsStreams(source);
 
-    [ConditionalTheory]
+    [Theory]
     [MemberData(nameof(Links))]
     public override Task SupportsFiles(string source) => base.SupportsFiles(source);
 
-    [ConditionalFact]
+    [Fact]
     public override async Task SupportsTables()
     {
         string markdownContent = """
@@ -59,7 +58,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         Assert.Equal(expected, documentTable.Cells.Map(element => element!.GetMarkdown().Trim()));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task SupportsTablesWithoutTrailingPipes()
     {
         // Markdown tables without trailing pipes (|) at the end of each row should be parsed correctly.
@@ -100,7 +99,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         Assert.Null(documentTable.Cells[3, 2]); // Empty description cell is null
     }
 
-    [ConditionalFact]
+    [Fact]
     public override async Task SupportsImages()
     {
         string contentType1 = "image/png";
@@ -142,7 +141,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         Assert.Equal("Three", images[2].AlternativeText);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task SupportsTablesWithImages()
     {
         byte[] imageBytes = Enumerable.Range(55, 111).Select(i => (byte)i).ToArray();
@@ -174,7 +173,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         Assert.Equal("Latest logo", img.AlternativeText);
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task SupportsInlineHtml()
     {
         string markdownContent = "This has <sup>[1]</sup> inline HTML.";
@@ -186,7 +185,7 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         Assert.Equal(markdownContent, paragraph.GetMarkdown());
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task SupportsMultipleInlineHtmlElements()
     {
         string markdownContent = """

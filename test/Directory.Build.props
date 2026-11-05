@@ -2,12 +2,22 @@
   <PropertyGroup>
     <!-- Do not generate documentation, and do not warn about enabling /doc for tests. -->
     <GenerateDocumentationFile Condition="'$(GenerateDocumentationFile)' == ''">false</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);RT0000</NoWarn>
+    <!-- xUnit1051: methods accepting CancellationToken should use TestContext.Current.CancellationToken.
+         Fixing it would require updating thousands of call sites; suppress it repo-wide instead. -->
+    <NoWarn>$(NoWarn);RT0000;xUnit1051</NoWarn>
+    <!-- Use xUnit v3 test runner -->
+    <TestRunnerName>XUnitV3</TestRunnerName>
+    <!-- xUnit v3 requires test projects to be executable -->
+    <OutputType>Exe</OutputType>
+    <!-- Enable dotnet test to use Microsoft.Testing.Platform protocol directly
+         instead of the VSTest testhost (which requires testhost.dll/Newtonsoft.Json). -->
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
   </PropertyGroup>
 
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
   <PropertyGroup>
     <TargetFrameworks>$(LatestTargetFramework)</TargetFrameworks>
+    <ConditionalNet472 Condition="'$(IsWindowsBuild)' == 'true' AND ('$(CustomTargetFrameworks)' == '' OR $(CustomTargetFrameworks.Contains('net462')))">;net472</ConditionalNet472>
   </PropertyGroup>
 </Project>

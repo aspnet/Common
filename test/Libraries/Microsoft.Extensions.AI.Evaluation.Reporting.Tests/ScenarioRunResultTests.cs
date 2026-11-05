@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Microsoft.Extensions.AI.Evaluation.Reporting.Formats;
@@ -205,6 +206,121 @@ public class ScenarioRunResultTests
         Assert.Equal(dataset.GeneratorVersion, deserialized.GeneratorVersion);
 
         ValidateEquivalence(entry.EvaluationResult, deserialized.ScenarioRunResults[0].EvaluationResult);
+    }
+
+    [Fact]
+    public void SerializeDatasetForTypeScriptContract()
+    {
+        var metricWithNoValue = new EvaluationMetric("none", reason: "No score was produced.");
+        var nullableNumericMetric = new NumericMetric("nullableNumeric");
+        var nullableBooleanMetric = new BooleanMetric("nullableBoolean");
+        var nullableStringMetric = new StringMetric("nullableString");
+
+        var functionCall = new FunctionCallContent(
+            callId: "call-contract-001",
+            name: "lookup",
+            arguments: new Dictionary<string, object?> { ["query"] = "fixed" })
+        {
+            InformationalOnly = true
+        };
+
+        var entry = new ScenarioRunResult(
+            scenarioName: "Contract.Witness",
+            iterationName: "iteration-fixed",
+            executionName: "execution-fixed",
+            creationTime: new DateTime(2026, 7, 21, 12, 34, 56, DateTimeKind.Utc),
+            messages:
+            [
+                new ChatMessage(
+                    ChatRole.User,
+                    [
+                        new AIContent(),
+                        new DataContent(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, "image/png"),
+                        functionCall
+                    ])
+            ],
+            modelResponse: new ChatResponse(
+                new ChatMessage(
+                    ChatRole.Assistant,
+                    [new FunctionResultContent("call-contract-001", result: "fixed-result")])),
+            evaluationResult: new EvaluationResult(
+                metricWithNoValue,
+                nullableNumericMetric,
+                nullableBooleanMetric,
+                nullableStringMetric))
+        {
+            FormatVersion = null
+        };
+
+        var dataset = new Dataset(
+            [entry],
+            createdAt: new DateTime(2026, 7, 21, 12, 35, 0, DateTimeKind.Utc),
+            generatorVersion: null);
+
+        string json = JsonSerializer.Serialize(dataset, JsonUtilities.Compact.DatasetTypeInfo);
+        using JsonDocument document = JsonDocument.Parse(json);
+
+        JsonElement scenario = document.RootElement.GetProperty("scenarioRunResults")[0];
+        JsonElement metrics = scenario.GetProperty("evaluationResult").GetProperty("metrics");
+        Assert.False(metrics.GetProperty("none").TryGetProperty("value", out _));
+        Assert.False(metrics.GetProperty("nullableNumeric").TryGetProperty("value", out _));
+        Assert.False(metrics.GetProperty("nullableBoolean").TryGetProperty("value", out _));
+        Assert.False(metrics.GetProperty("nullableString").TryGetProperty("value", out _));
+        Assert.False(scenario.TryGetProperty("formatVersion", out _));
+
+        JsonElement contents = scenario.GetProperty("messages")[0].GetProperty("contents");
+        Assert.False(contents[0].TryGetProperty("$type", out _));
+        Assert.False(contents[1].TryGetProperty("mediaType", out _));
+        Assert.True(contents[2].GetProperty("informationalOnly").GetBoolean());
+
+        string? witnessPath = Environment.GetEnvironmentVariable("AI_EVALUATION_DATASET_WITNESS_PATH");
+        if (!string.IsNullOrEmpty(witnessPath))
+        {
+            string? witnessDirectory = Path.GetDirectoryName(witnessPath);
+            if (!string.IsNullOrEmpty(witnessDirectory))
+            {
+                Directory.CreateDirectory(witnessDirectory);
+            }
+
+            string testModule = $$"""
+                // Licensed to the .NET Foundation under one or more agreements.
+                // The .NET Foundation licenses this file to you under the MIT license.
+
+                import { describe, expect, it } from 'vitest';
+                import { createScoreSummary } from '../../components';
+
+                const dataset = {{json}} satisfies Dataset;
+
+                describe('production Dataset contract witness', () => {
+                    it('matches the TypeScript contract and shared summary boundary', () => {
+                        const scenario = dataset.scenarioRunResults[0];
+                        const metrics = scenario.evaluationResult.metrics;
+                        const contents = scenario.messages[0].contents;
+
+                        expect(metrics.none).not.toHaveProperty('value');
+                        expect(metrics.nullableNumeric).not.toHaveProperty('value');
+                        expect(metrics.nullableBoolean).not.toHaveProperty('value');
+                        expect(metrics.nullableString).not.toHaveProperty('value');
+                        expect(scenario).not.toHaveProperty('formatVersion');
+                        expect(contents[0]).not.toHaveProperty('$type');
+                        expect(contents[1]).toEqual({ $type: 'data', uri: 'data:image/png;base64,iVBORw==' });
+                        expect(contents[1]).not.toHaveProperty('mediaType');
+                        expect(contents[2]).toMatchObject({
+                            $type: 'functionCall',
+                            callId: 'call-contract-001',
+                            name: 'lookup',
+                            informationalOnly: true,
+                        });
+
+                        const summary = createScoreSummary(dataset);
+                        expect(summary.primaryResult.flattenedNodes.some(node =>
+                            node.scenario?.scenarioName === 'Contract.Witness')).toBe(true);
+                    });
+                });
+                """;
+
+            File.WriteAllText(witnessPath, testModule);
+        }
     }
 
     [Fact]

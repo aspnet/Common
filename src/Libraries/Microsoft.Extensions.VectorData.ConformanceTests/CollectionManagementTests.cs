@@ -10,11 +10,11 @@ namespace VectorData.ConformanceTests;
 public abstract class CollectionManagementTests<TKey>(VectorStoreFixture fixture) : IAsyncLifetime
     where TKey : notnull
 {
-    public Task InitializeAsync()
-        => fixture.VectorStore.EnsureCollectionDeletedAsync(CollectionName);
+    public ValueTask InitializeAsync()
+        => new(fixture.VectorStore.EnsureCollectionDeletedAsync(CollectionName));
 
     [Fact]
-    public async Task Collection_Ensure_Exists_Delete()
+    public virtual async Task Collection_Ensure_Exists_Delete()
     {
         var collection = GetCollection();
 
@@ -29,7 +29,7 @@ public abstract class CollectionManagementTests<TKey>(VectorStoreFixture fixture
     }
 
     [Fact]
-    public async Task EnsureCollectionExists_twice_does_not_throw()
+    public virtual async Task EnsureCollectionExists_twice_does_not_throw()
     {
         var collection = GetCollection();
 
@@ -39,7 +39,7 @@ public abstract class CollectionManagementTests<TKey>(VectorStoreFixture fixture
     }
 
     [Fact]
-    public async Task Store_CollectionExists()
+    public virtual async Task Store_CollectionExists()
     {
         var store = fixture.VectorStore;
         var collection = GetCollection();
@@ -50,7 +50,7 @@ public abstract class CollectionManagementTests<TKey>(VectorStoreFixture fixture
     }
 
     [Fact]
-    public async Task Store_DeleteCollection()
+    public virtual async Task Store_DeleteCollection()
     {
         var store = fixture.VectorStore;
         var collection = GetCollection();
@@ -61,7 +61,7 @@ public abstract class CollectionManagementTests<TKey>(VectorStoreFixture fixture
     }
 
     [Fact]
-    public async Task Store_ListCollections()
+    public virtual async Task Store_ListCollections()
     {
         var store = fixture.VectorStore;
         var collection = GetCollection();
@@ -75,7 +75,7 @@ public abstract class CollectionManagementTests<TKey>(VectorStoreFixture fixture
     }
 
     [Fact]
-    public void Collection_metadata()
+    public virtual void Collection_metadata()
     {
         var collection = GetCollection();
 
@@ -111,5 +111,9 @@ public abstract class CollectionManagementTests<TKey>(VectorStoreFixture fixture
             ]
         };
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return default;
+    }
 }

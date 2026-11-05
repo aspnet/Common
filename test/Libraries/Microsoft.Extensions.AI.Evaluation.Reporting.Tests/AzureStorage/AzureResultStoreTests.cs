@@ -35,10 +35,18 @@ public class AzureResultStoreTests : ResultStoreTester, IAsyncLifetime
         _dirClient = _fsClient?.GetDirectoryClient(Path.GetRandomFileName());
     }
 
-    public Task InitializeAsync() => Task.CompletedTask;
-
-    public async Task DisposeAsync()
+    public ValueTask InitializeAsync()
     {
+#if NET
+        return ValueTask.CompletedTask;
+#else
+        return new ValueTask(Task.CompletedTask);
+#endif
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
         if (_dirClient is not null)
         {
             await _dirClient.DeleteAsync();

@@ -5,7 +5,6 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading.Tasks;
-using Microsoft.TestUtilities;
 using Xunit;
 
 #pragma warning disable CA2214 // Do not call overridable methods in constructors
@@ -29,7 +28,7 @@ public abstract class ImageGeneratorIntegrationTests : IDisposable
 
     protected abstract IImageGenerator? CreateGenerator();
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GenerateImagesAsync_SingleImageGeneration()
     {
         SkipIfNotEnabled();
@@ -62,7 +61,7 @@ public abstract class ImageGeneratorIntegrationTests : IDisposable
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task GenerateImagesAsync_MultipleImages()
     {
         SkipIfNotEnabled();
@@ -87,7 +86,7 @@ public abstract class ImageGeneratorIntegrationTests : IDisposable
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task EditImagesAsync_SingleImage()
     {
         SkipIfNotEnabled();
@@ -127,9 +126,6 @@ public abstract class ImageGeneratorIntegrationTests : IDisposable
     {
         string? skipIntegration = TestRunnerConfiguration.Instance["SkipIntegrationTests"];
 
-        if (skipIntegration is not null || _generator is null)
-        {
-            throw new SkipTestException("Generator is not enabled.");
-        }
+        Assert.SkipUnless(skipIntegration is null && _generator is not null, "Generator is not enabled.");
     }
 }

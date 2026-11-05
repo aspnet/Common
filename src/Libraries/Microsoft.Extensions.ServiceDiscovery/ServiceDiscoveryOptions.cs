@@ -12,10 +12,11 @@ namespace Microsoft.Extensions.ServiceDiscovery;
 public sealed class ServiceDiscoveryOptions
 {
     /// <summary>
-    /// Gets or sets a value indicating whether all URI schemes for URIs resolved by the service discovery system are allowed.
-    /// If this value is <see langword="true"/>, all URI schemes are allowed.
-    /// If this value is <see langword="false"/>, only the schemes specified in <see cref="AllowedSchemes"/> are allowed.
+    /// Gets or sets a value that indicates whether all URI schemes for URIs resolved by the service discovery system are allowed.
     /// </summary>
+    /// <value>
+    /// <see langword="true"/> to allow all URI schemes; <see langword="false"/> to allow only schemes specified in <see cref="AllowedSchemes"/>.
+    /// </value>
     public bool AllowAllSchemes { get; set; } = true;
 
     /// <summary>

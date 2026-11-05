@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Unit tests for Microsoft.Extensions.Documents.Abstractions.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.Documents.Abstractions\Microsoft.Extensions.Documents.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

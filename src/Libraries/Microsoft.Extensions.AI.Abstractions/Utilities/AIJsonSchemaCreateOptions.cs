@@ -20,7 +20,7 @@ public sealed record class AIJsonSchemaCreateOptions
     public static AIJsonSchemaCreateOptions Default { get; } = new AIJsonSchemaCreateOptions();
 
     /// <summary>
-    /// Gets a callback that is invoked for every schema that is generated within the type graph.
+    /// Gets or initializes a callback that is invoked for every schema that is generated within the type graph.
     /// </summary>
     public Func<AIJsonSchemaCreateContext, JsonNode, JsonNode>? TransformSchemaNode { get; init; }
 
@@ -49,7 +49,7 @@ public sealed record class AIJsonSchemaCreateOptions
     public Func<ParameterInfo, string?>? ParameterDescriptionProvider { get; init; }
 
     /// <summary>
-    /// Gets a <see cref="AIJsonSchemaTransformOptions"/> governing transformations on the JSON schema after it has been generated.
+    /// Gets or initializes a <see cref="AIJsonSchemaTransformOptions"/> governing transformations on the JSON schema after it has been generated.
     /// </summary>
     public AIJsonSchemaTransformOptions? TransformOptions { get; init; }
 

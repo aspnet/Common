@@ -108,8 +108,10 @@ public class LongTests
         const long Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfGreaterThan(Zero, -1));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfGreaterThan(Zero, -1, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -119,8 +121,10 @@ public class LongTests
         const long Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfGreaterThanOrEqual(Zero, -1));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfGreaterThanOrEqual(Zero, -1, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -130,8 +134,10 @@ public class LongTests
         const long Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfLessThan(Zero, 1));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfLessThan(Zero, 1, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -141,8 +147,10 @@ public class LongTests
         const long Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfLessThanOrEqual(Zero, 1));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfLessThanOrEqual(Zero, 1, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -152,8 +160,10 @@ public class LongTests
         const long Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfZero(Zero));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfZero(Zero, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -163,8 +173,10 @@ public class LongTests
         const long Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfOutOfRange(Zero, 1, 2));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfOutOfRange(Zero, 1, 2, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -268,8 +280,10 @@ public class LongTests
         const ulong One = 1;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfGreaterThan(One, 0UL));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfGreaterThan(One, 0UL, nameof(One)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -279,8 +293,10 @@ public class LongTests
         const ulong One = 1;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfGreaterThanOrEqual(One, 0UL));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfGreaterThanOrEqual(One, 0UL, nameof(One)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -290,8 +306,10 @@ public class LongTests
         const ulong Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfLessThan(Zero, 1UL));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfLessThan(Zero, 1UL, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -301,8 +319,10 @@ public class LongTests
         const ulong Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfLessThanOrEqual(Zero, 1UL));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfLessThanOrEqual(Zero, 1UL, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -312,8 +332,10 @@ public class LongTests
         const ulong Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfZero(Zero));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfZero(Zero, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 
@@ -323,8 +345,10 @@ public class LongTests
         const ulong Zero = 0;
 
         var exceptionImplicitArgumentName = Record.Exception(() => Throw.IfOutOfRange(Zero, 1UL, 2UL));
+        Assert.NotNull(exceptionImplicitArgumentName);
         var exceptionExplicitArgumentName = Record.Exception(() => Throw.IfOutOfRange(Zero, 1UL, 2UL, nameof(Zero)));
 
+        Assert.NotNull(exceptionExplicitArgumentName);
         Assert.Equal(exceptionExplicitArgumentName.Message, exceptionImplicitArgumentName.Message);
     }
 

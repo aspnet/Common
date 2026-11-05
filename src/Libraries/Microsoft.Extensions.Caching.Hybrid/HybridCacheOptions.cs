@@ -1,6 +1,10 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System;
+using System.ComponentModel;
+using Microsoft.Shared.DiagnosticIds;
+
 namespace Microsoft.Extensions.Caching.Hybrid;
 
 /// <summary>
@@ -23,6 +27,17 @@ public class HybridCacheOptions
     /// <summary>
     /// Gets or sets a value indicating whether compression for this <see cref="HybridCache"/> instance is disabled.
     /// </summary>
+    /// <remarks>
+    /// The default <see cref="HybridCache"/> implementation does not provide built-in compression, so this option has no effect.
+    /// To compress cached data, configure a serializer that performs compression.
+    /// </remarks>
+#pragma warning disable CS0436 // Type conflicts with imported type
+    [Obsolete(
+        DiagnosticIds.Obsoletions.HybridCacheDisableCompressionMessage,
+        DiagnosticId = DiagnosticIds.Obsoletions.HybridCacheDisableCompressionDiagId,
+        UrlFormat = DiagnosticIds.UrlFormat)]
+#pragma warning restore CS0436 // Type conflicts with imported type
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public bool DisableCompression { get; set; }
 
     /// <summary>

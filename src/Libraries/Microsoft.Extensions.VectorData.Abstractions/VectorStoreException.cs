@@ -36,7 +36,7 @@ public class VectorStoreException : Exception
     {
     }
 
-    /// <summary>Gets the name of the vector store system.</summary>
+    /// <summary>Gets or initializes the name of the vector store system.</summary>
     /// <remarks>
     /// Where possible, this value maps to the "db.system.name" attribute defined in the
     /// OpenTelemetry Semantic Conventions for database calls and systems; see <see href="https://opentelemetry.io/docs/specs/semconv/database/"/>.
@@ -45,17 +45,17 @@ public class VectorStoreException : Exception
     public string? VectorStoreSystemName { get; init; }
 
     /// <summary>
-    /// Gets the name of the vector store (database).
+    /// Gets or initializes the name of the vector store (database).
     /// </summary>
     public string? VectorStoreName { get; init; }
 
     /// <summary>
-    /// Gets the name of the vector store collection that the failing operation was performed on.
+    /// Gets or initializes the name of the vector store collection that the failing operation was performed on.
     /// </summary>
     public string? CollectionName { get; init; }
 
     /// <summary>
-    /// Gets the name of the vector store operation that failed.
+    /// Gets or initializes the name of the vector store operation that failed.
     /// </summary>
     public string? OperationName { get; init; }
 }

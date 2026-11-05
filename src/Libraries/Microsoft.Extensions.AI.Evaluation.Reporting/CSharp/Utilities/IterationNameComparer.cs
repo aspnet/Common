@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Microsoft.Extensions.AI.Evaluation.Reporting.Utilities;
 
@@ -12,20 +13,24 @@ internal static class IterationNameComparer
          Comparer<string>.Create(
              (first, second) =>
              {
-                 if (int.TryParse(first, out int firstInteger) &&
-                     int.TryParse(second, out int secondInteger))
+                 int comparison;
+
+                 if (int.TryParse(first, NumberStyles.Integer, CultureInfo.InvariantCulture, out int firstInteger) &&
+                     int.TryParse(second, NumberStyles.Integer, CultureInfo.InvariantCulture, out int secondInteger))
                  {
-                     return firstInteger.CompareTo(secondInteger);
+                     comparison = firstInteger.CompareTo(secondInteger);
                  }
                  else if (
-                     double.TryParse(first, out double firstDouble) &&
-                     double.TryParse(second, out double secondDouble))
+                     double.TryParse(first, NumberStyles.Float, CultureInfo.InvariantCulture, out double firstDouble) &&
+                     double.TryParse(second, NumberStyles.Float, CultureInfo.InvariantCulture, out double secondDouble))
                  {
-                     return firstDouble.CompareTo(secondDouble);
+                     comparison = firstDouble.CompareTo(secondDouble);
                  }
                  else
                  {
                      return string.Compare(first, second, StringComparison.Ordinal);
                  }
+
+                 return comparison is 0 ? string.Compare(first, second, StringComparison.Ordinal) : comparison;
              });
 }

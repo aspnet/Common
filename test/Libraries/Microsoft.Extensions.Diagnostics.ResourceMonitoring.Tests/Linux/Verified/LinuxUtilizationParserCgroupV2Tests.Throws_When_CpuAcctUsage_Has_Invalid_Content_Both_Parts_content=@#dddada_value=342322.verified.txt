@@ -5,6 +5,6 @@
 at Microsoft.Shared.Diagnostics.Throw.InvalidOperationException(String message)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.ParseCpuUsageFromFile(IFileSystem fileSystem, FileInfo cpuUsageFile)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetCgroupCpuUsageInNanoseconds()
-at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass25_0.<Throws_When_CpuAcctUsage_Has_Invalid_Content_Both_Parts>b__0()
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass26_0.<Throws_When_CpuAcctUsage_Has_Invalid_Content_Both_Parts>b__0()
 at Xunit.Record.Exception(Func`1 testCode)
 }

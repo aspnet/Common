@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.0.0" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>{00000000-0000-0000-0000-000000000000}</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="{VERSION}" />
+    <PackageReference Include="MessagePack" Version="{VERSION}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\aichatweb.Web\aichatweb.Web.csproj" />
+  </ItemGroup>
+
+</Project>

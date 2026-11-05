@@ -54,30 +54,10 @@ public sealed class HostedFileContent : AIContent
     public string? Name { get; set; }
 
     /// <summary>Gets or sets the size of the file in bytes.</summary>
-    [Experimental(DiagnosticIds.Experiments.AIFiles, UrlFormat = DiagnosticIds.UrlFormat)]
-    [JsonIgnore]
-    public long? SizeInBytes
-    {
-        get => SizeInBytesCore;
-        set => SizeInBytesCore = value;
-    }
-
-    [JsonInclude]
-    [JsonPropertyName("sizeInBytes")]
-    internal long? SizeInBytesCore { get; set; }
+    public long? SizeInBytes { get; set; }
 
     /// <summary>Gets or sets when the file was created.</summary>
-    [Experimental(DiagnosticIds.Experiments.AIFiles, UrlFormat = DiagnosticIds.UrlFormat)]
-    [JsonIgnore]
-    public DateTimeOffset? CreatedAt
-    {
-        get => CreatedAtCore;
-        set => CreatedAtCore = value;
-    }
-
-    [JsonInclude]
-    [JsonPropertyName("createdAt")]
-    internal DateTimeOffset? CreatedAtCore { get; set; }
+    public DateTimeOffset? CreatedAt { get; set; }
 
     /// <summary>Gets or sets the purpose for which the file was uploaded.</summary>
     /// <remarks>

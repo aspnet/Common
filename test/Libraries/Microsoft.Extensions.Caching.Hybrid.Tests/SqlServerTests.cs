@@ -3,7 +3,7 @@
 
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit.Abstractions;
+using Xunit;
 
 namespace Microsoft.Extensions.Caching.Hybrid.Tests;
 

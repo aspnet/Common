@@ -9,29 +9,31 @@
     <PackageVersion Include="Grpc.AspNetCore" Version="2.65.0" />
     <PackageVersion Include="System.IO.Packaging" Version="8.0.1" />
     <PackageVersion Include="JsonSchema.Net" Version="7.2.3" />
-    <PackageVersion Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.1" />
     <PackageVersion Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.1.3" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.0" />
     <PackageVersion Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" Version="$(MicrosoftMLTokenizersVersion)" />
     <PackageVersion Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="$(MicrosoftMLTokenizersVersion)" />
-    <PackageVersion Include="Microsoft.SemanticKernel.Connectors.InMemory" Version="$(MicrosoftSemanticKernelConnectorsVersion)" />
-    <PackageVersion Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="$(MicrosoftSemanticKernelConnectorsVersion)" />
-    <PackageVersion Include="Microsoft.TemplateEngine.Authoring.TemplateVerifier" Version="9.0.201" />
-    <PackageVersion Include="Microsoft.TemplateEngine.TestHelper" Version="9.0.200-rtm.25066.4" />
+    <PackageVersion Include="CommunityToolkit.VectorData.InMemory" Version="1.0.0" />
+    <PackageVersion Include="CommunityToolkit.VectorData.SqliteVec" Version="1.0.1-preview" />
+    <PackageVersion Include="Microsoft.TemplateEngine.Authoring.TemplateVerifier.XunitV3" Version="11.0.100-preview.3.26207.106" />
     <PackageVersion Include="Moq" Version="4.18.4" />
     <PackageVersion Include="Moq.AutoMock" Version="3.1.0" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <!-- Lift CVE-impacted transitive dependency; remove once the direct dependency updates. -->
+    <PackageVersion Include="NuGet.Packaging" Version="6.8.2" />
+    <!-- Lift CVE-impacted transitive dependency; remove once the direct dependency updates. -->
+    <PackageVersion Include="NuGet.Protocol" Version="6.8.2" />
+    <!-- Lift CVE-impacted transitive dependency; remove once the direct dependency updates. -->
+    <PackageVersion Include="OpenTelemetry.Api" Version="1.15.3" />
     <PackageVersion Include="OpenTelemetry.Exporter.InMemory" Version="1.9.0" />
     <PackageVersion Include="Polly.Testing" Version="8.4.2" />
     <PackageVersion Include="SharpFuzz" Version="2.1.1" />
     <PackageVersion Include="StrongNamer" Version="0.2.5" />
     <PackageVersion Include="System.Configuration.ConfigurationManager" Version="$(SystemConfigurationConfigurationManagerVersion)" />
-    <PackageVersion Include="Verify.Xunit" Version="28.15.0" />
-    <PackageVersion Include="Xunit.Combinatorial" Version="1.6.24" />
-    <PackageVersion Include="xunit" Version="$(XUnitVersion)" />
-    <PackageVersion Include="xunit.extensibility.execution" Version="$(XUnitVersion)" />
-    <PackageVersion Include="Xunit.SkippableFact" Version="1.4.13" />
+    <PackageVersion Include="Verify.XunitV3" Version="31.20.0" />
+    <PackageVersion Include="Xunit.Combinatorial" Version="2.0.24" />
   </ItemGroup>
 
   <ItemGroup Label="IntegrationTestReferences">
@@ -43,7 +45,7 @@
     <PackageVersion Include="PdfPig" Version="0.1.10" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
     <PackageVersion Include="Microsoft.AspNetCore.Mvc" Version="2.1.3" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="2.1.3" />
   </ItemGroup>
@@ -58,8 +60,15 @@
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(MicrosoftAspNetCoreTestHostVersion)" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == '$(LatestTargetFramework)'">
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(MicrosoftAspNetCoreMvcTestingNet10Version)" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(MicrosoftAspNetCoreTestHostNet10Version)" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == '$(LatestTargetFramework)'">
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(MicrosoftAspNetCoreMvcTestingNet11Version)" />
+    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(MicrosoftAspNetCoreTestHostNet11Version)" />
+    <PackageVersion Update="Microsoft.Data.SqlClient" Version="7.0.0" />
+    <PackageVersion Update="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="$(MicrosoftExtensionsConfigurationEnvironmentVariablesNet11Version)" />
+    <PackageVersion Update="Microsoft.Extensions.Configuration.UserSecrets" Version="$(MicrosoftExtensionsConfigurationUserSecretsNet11Version)" />
   </ItemGroup>
 </Project>

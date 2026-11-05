@@ -48,16 +48,6 @@ public static partial class AIJsonUtilities
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         };
 
-        // Temporary workaround: these types are [Experimental] and can't be added as [JsonDerivedType] on AIContent yet,
-        // or else consuming assemblies that used source generation with AIContent would implicitly reference them.
-        // Once they're no longer [Experimental] and added as [JsonDerivedType] on AIContent, these lines should be removed.
-        AddAIContentTypeChain(options, typeof(CodeInterpreterToolCallContent), typeDiscriminatorId: "codeInterpreterToolCall", checkBuiltIn: false);
-        AddAIContentTypeChain(options, typeof(CodeInterpreterToolResultContent), typeDiscriminatorId: "codeInterpreterToolResult", checkBuiltIn: false);
-        AddAIContentTypeChain(options, typeof(ImageGenerationToolCallContent), typeDiscriminatorId: "imageGenerationToolCall", checkBuiltIn: false);
-        AddAIContentTypeChain(options, typeof(ImageGenerationToolResultContent), typeDiscriminatorId: "imageGenerationToolResult", checkBuiltIn: false);
-        AddAIContentTypeChain(options, typeof(WebSearchToolCallContent), typeDiscriminatorId: "webSearchToolCall", checkBuiltIn: false);
-        AddAIContentTypeChain(options, typeof(WebSearchToolResultContent), typeDiscriminatorId: "webSearchToolResult", checkBuiltIn: false);
-
         if (JsonSerializer.IsReflectionEnabledByDefault)
         {
             // If reflection-based serialization is enabled by default, use it as a fallback for all other types.
@@ -118,16 +108,6 @@ public static partial class AIJsonUtilities
     [JsonSerializable(typeof(IEnumerable<string>))]
     [JsonSerializable(typeof(AIContent))]
     [JsonSerializable(typeof(IEnumerable<AIContent>))]
-
-    // Temporary workaround: These should be implicitly added in once they're no longer [Experimental]
-    // and are included via [JsonDerivedType] on AIContent.
-    [JsonSerializable(typeof(CodeInterpreterToolCallContent))]
-    [JsonSerializable(typeof(CodeInterpreterToolResultContent))]
-    [JsonSerializable(typeof(ImageGenerationToolCallContent))]
-    [JsonSerializable(typeof(ImageGenerationToolResultContent))]
-    [JsonSerializable(typeof(WebSearchToolCallContent))]
-    [JsonSerializable(typeof(WebSearchToolResultContent))]
-    [JsonSerializable(typeof(ResponseContinuationToken))]
 
     // IEmbeddingGenerator
     [JsonSerializable(typeof(EmbeddingGenerationOptions))]

@@ -50,6 +50,7 @@ internal static class AssertExtensions
                 {
                     var actualApprovalRequest = (ToolApprovalRequestContent)chatItem;
                     Assert.Equal(expectedApprovalRequest.RequestId, actualApprovalRequest.RequestId);
+                    Assert.Equal(expectedApprovalRequest.RequiresConfirmation, actualApprovalRequest.RequiresConfirmation);
                     Assert.Equal(expectedApprovalRequest.ToolCall.CallId, actualApprovalRequest.ToolCall.CallId);
                     Assert.Equal(expectedApprovalRequest.ToolCall.GetType(), actualApprovalRequest.ToolCall.GetType());
                     AssertToolCallNameAndArguments(expectedApprovalRequest.ToolCall, actualApprovalRequest.ToolCall);

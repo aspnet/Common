@@ -1,9 +1,11 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Diagnostics.ResourceMonitoring.Test.Helpers;
@@ -12,14 +14,12 @@ using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.Shared.Instruments;
-using Microsoft.TestUtilities;
 using Moq;
 using VerifyXunit;
 using Xunit;
 
 namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring.Windows.Test;
 
-[OSSkipCondition(OperatingSystems.Linux | OperatingSystems.MacOSX, SkipReason = "Windows specific.")]
 public sealed class WindowsSnapshotProviderTests
 {
     private const string VerifiedDataDirectory = "Verified";
@@ -30,6 +30,8 @@ public sealed class WindowsSnapshotProviderTests
 
     public WindowsSnapshotProviderTests()
     {
+        Assert.SkipUnless(RuntimeInformation.IsOSPlatform(OSPlatform.Windows), "Skipped on Linux/macOS");
+
         _options = Options.Options.Create<ResourceMonitoringOptions>(new());
         using var meter = new Meter(nameof(BasicConstructor));
         _meterFactoryMock = new Mock<IMeterFactory>();
@@ -39,7 +41,7 @@ public sealed class WindowsSnapshotProviderTests
         _fakeLogger = new FakeLogger<WindowsSnapshotProvider>();
     }
 
-    [ConditionalFact]
+    [Fact]
     public void BasicConstructor()
     {
         var provider = new WindowsSnapshotProvider(_fakeLogger, _meterFactoryMock.Object, _options);
@@ -51,7 +53,7 @@ public sealed class WindowsSnapshotProviderTests
         Assert.Equal(memoryStatus.TotalPhys, provider.Resources.MaximumMemoryInBytes);
     }
 
-    [ConditionalFact]
+    [Fact]
     public void GetSnapshot_DoesNotThrowExceptions()
     {
         var provider = new WindowsSnapshotProvider(_fakeLogger, _meterFactoryMock.Object, _options);
@@ -60,7 +62,7 @@ public sealed class WindowsSnapshotProviderTests
         Assert.Null(exception);
     }
 
-    [ConditionalFact]
+    [Fact]
     public Task SnapshotProvider_EmitsLogRecord()
     {
         var provider = new WindowsSnapshotProvider(_fakeLogger, _meterFactoryMock.Object, _options);
@@ -71,7 +73,7 @@ public sealed class WindowsSnapshotProviderTests
         return Verifier.Verify(logRecords[0]).UseDirectory(VerifiedDataDirectory);
     }
 
-    [ConditionalTheory]
+    [Theory]
     [CombinatorialData]
     public void SnapshotProvider_EmitsCpuMetrics(bool useZeroToOneRange)
     {
@@ -112,7 +114,7 @@ public sealed class WindowsSnapshotProviderTests
         Assert.Equal(0.05 * multiplier, metricCollector.LastMeasurement?.Value); // Still consuming 5% of the CPU
     }
 
-    [ConditionalTheory]
+    [Theory]
     [CombinatorialData]
     public void SnapshotProvider_EmitsMemoryMetrics(bool useZeroToOneRange)
     {
@@ -162,7 +164,7 @@ public sealed class WindowsSnapshotProviderTests
         Assert.Equal(1 * multiplier, Math.Round(metricCollector.LastMeasurement.Value)); // Consuming 100% of the memory
     }
 
-    [ConditionalFact]
+    [Fact]
     public void Provider_Returns_MemoryConsumption()
     {
         // This is a synthetic test to have full test coverage:
@@ -170,7 +172,7 @@ public sealed class WindowsSnapshotProviderTests
         Assert.InRange(usage, 0, long.MaxValue);
     }
 
-    [ConditionalFact]
+    [Fact]
     public void Provider_Creates_Meter_With_Correct_Name()
     {
         using var meterFactory = new TestMeterFactory();
@@ -179,5 +181,31 @@ public sealed class WindowsSnapshotProviderTests
 
         var meter = meterFactory.Meters.Single();
         Assert.Equal(ResourceUtilizationInstruments.MeterName, meter.Name);
+    }
+
+    [Fact]
+    public void Provider_Registers_Instruments_With_Descriptions()
+    {
+        using var meterFactory = new TestMeterFactory();
+
+        _ = new WindowsSnapshotProvider(_fakeLogger, meterFactory, _options);
+
+        var meter = meterFactory.Meters.Single();
+        var instruments = new List<Instrument>();
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, _) =>
+            {
+                if (ReferenceEquals(meter, instrument.Meter))
+                {
+                    instruments.Add(instrument);
+                }
+            }
+        };
+
+        listener.Start();
+
+        Assert.NotEmpty(instruments);
+        Assert.All(instruments, instrument => Assert.False(string.IsNullOrWhiteSpace(instrument.Description), $"Instrument '{instrument.Name}' has no description."));
     }
 }

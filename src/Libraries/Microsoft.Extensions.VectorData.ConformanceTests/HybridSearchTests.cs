@@ -17,7 +17,7 @@ public abstract class HybridSearchTests<TKey>(
     where TKey : notnull
 {
     [Fact]
-    public async Task HybridSearchAsync()
+    public virtual async Task HybridSearchAsync()
     {
         // Arrange
         var vector = new ReadOnlyMemory<float>([1, 0, 0, 0]);
@@ -33,7 +33,7 @@ public abstract class HybridSearchTests<TKey>(
     }
 
     [Fact]
-    public async Task HybridSearchAsync_with_filter()
+    public virtual async Task HybridSearchAsync_with_filter()
     {
         // Arrange
         var vector = new ReadOnlyMemory<float>([1, 0, 0, 0]);
@@ -54,7 +54,7 @@ public abstract class HybridSearchTests<TKey>(
     }
 
     [Fact]
-    public async Task HybridSearchAsync_with_top()
+    public virtual async Task HybridSearchAsync_with_top()
     {
         // Arrange
         var vector = new ReadOnlyMemory<float>([1, 0, 0, 0]);
@@ -71,7 +71,7 @@ public abstract class HybridSearchTests<TKey>(
     }
 
     [Fact]
-    public async Task HybridSearchAsync_with_Skip()
+    public virtual async Task HybridSearchAsync_with_Skip()
     {
         // Arrange
         var vector = new ReadOnlyMemory<float>([1, 0, 0, 0]);
@@ -88,7 +88,7 @@ public abstract class HybridSearchTests<TKey>(
     }
 
     [Fact]
-    public async Task HybridSearchAsync_with_multiple_keywords_ranks_matched_keywords_higher()
+    public virtual async Task HybridSearchAsync_with_multiple_keywords_ranks_matched_keywords_higher()
     {
         // Arrange
         var vector = new ReadOnlyMemory<float>([1, 0, 0, 0]);
@@ -105,7 +105,7 @@ public abstract class HybridSearchTests<TKey>(
     }
 
     [Fact]
-    public async Task HybridSearchAsync_with_multiple_text_properties()
+    public virtual async Task HybridSearchAsync_with_multiple_text_properties()
     {
         // Arrange
         var vector = new ReadOnlyMemory<float>([1, 0, 0, 0]);
@@ -131,7 +131,7 @@ public abstract class HybridSearchTests<TKey>(
     }
 
     [Fact]
-    public Task HybridSearchAsync_without_explicitly_specified_property_fails()
+    public virtual Task HybridSearchAsync_without_explicitly_specified_property_fails()
         => Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await multiTextFixture.HybridSearchable
                 .HybridSearchAsync(new ReadOnlyMemory<float>([1, 0, 0, 0]), ["Apples"], top: 3)

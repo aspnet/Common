@@ -33,9 +33,24 @@ public class FakeHostTests
             })
             .StartAsync();
 
-        await Task.Delay(100); // Give some time for the host to shut down
+        // poll up to 50 times (5 seconds total) until the host has shut down and its service provider has been disposed
+        ObjectDisposedException? captured = null;
+        for (var i = 0; i < 50; i++)
+        {
+            try
+            {
+                host.Services.GetService<IHost>();
+            }
+            catch (ObjectDisposedException ex)
+            {
+                captured = ex;
+                break;
+            }
 
-        Assert.Throws<ObjectDisposedException>(() => host.Services.GetService<IHost>());
+            await Task.Delay(100);
+        }
+
+        Assert.NotNull(captured);
     }
 
     [Fact]
@@ -50,7 +65,12 @@ public class FakeHostTests
         var sut = new FakeHost(hostMock.Object, new FakeHostOptions { StartUpTimeout = TimeSpan.Zero });
 #pragma warning restore CA2000
         await sut.StartAsync();
-        await Task.Delay(TimeSpan.FromMilliseconds(100));
+
+        // poll up to 50 times (5 seconds total) until the inner IHost.StartAsync invocation has been recorded
+        for (var i = 0; i < 50 && hostMock.Invocations.Count == 0; i++)
+        {
+            await Task.Delay(100);
+        }
 
         hostMock.VerifyAll();
     }

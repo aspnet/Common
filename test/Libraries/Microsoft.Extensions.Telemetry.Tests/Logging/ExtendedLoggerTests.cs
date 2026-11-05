@@ -531,7 +531,12 @@ public static class ExtendedLoggerTests
         if (includeExceptionMessage)
         {
             var exceptionMessage = snap[3].GetStructuredStateValue("exception.message");
+#if NETFRAMEWORK
+            // On .NET Framework, AggregateException.Message does not include inner exception messages
+            Assert.Equal("EM4", exceptionMessage);
+#else
             Assert.Equal("EM4 (EM1) (EM2) (EM3)", exceptionMessage);
+#endif
 
             Assert.Contains("EM1", stackTrace);
             Assert.Contains("EM2", stackTrace);

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Primitives;
 namespace Microsoft.Extensions.ServiceDiscovery;
 
 /// <summary>
-/// Builder to create a <see cref="ServiceEndpointSource"/> instances.
+/// Represents a builder that creates <see cref="ServiceEndpointSource"/> instances.
 /// </summary>
 public interface IServiceEndpointBuilder
 {

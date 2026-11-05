@@ -25,28 +25,28 @@ namespace System.Reflection
         }
 
         /// <summary>
-        /// The <see cref="System.Type" /> of the member or generic parameter
+        /// Gets the <see cref="System.Type" /> of the member or generic parameter
         /// to which this NullabilityInfo belongs.
         /// </summary>
         public Type Type { get; }
 
         /// <summary>
-        /// The nullability read state of the member.
+        /// Gets the nullability read state of the member.
         /// </summary>
         public NullabilityState ReadState { get; internal set; }
 
         /// <summary>
-        /// The nullability write state of the member.
+        /// Gets the nullability write state of the member.
         /// </summary>
         public NullabilityState WriteState { get; internal set; }
 
         /// <summary>
-        /// If the member type is an array, gives the <see cref="NullabilityInfo" /> of the elements of the array, null otherwise.
+        /// Gets the <see cref="NullabilityInfo" /> of the elements of the array if the member type is an array; otherwise, <see langword="null"/>.
         /// </summary>
         public NullabilityInfo? ElementType { get; }
 
         /// <summary>
-        /// If the member type is a generic type, gives the array of <see cref="NullabilityInfo" /> for each type parameter.
+        /// Gets the array of <see cref="NullabilityInfo" /> values for each type parameter if the member type is a generic type.
         /// </summary>
         public NullabilityInfo[] GenericTypeArguments { get; }
     }

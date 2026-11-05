@@ -41,6 +41,8 @@ public class VerbatimMultiPartHttpHandler(string expectedInput, string sentJsonO
 {
     public string? ExpectedRequestUriContains { get; init; }
 
+    public string? ExpectedAudioFilename { get; init; }
+
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)
@@ -111,8 +113,16 @@ public class VerbatimMultiPartHttpHandler(string expectedInput, string sentJsonO
                 // Text field
                 string name = ExtractNameFromHeaders(headers);
 
-                // Skip file fields
-                if (!name.StartsWith("file"))
+                // For file fields, optionally check the filename
+                if (name.StartsWith("file"))
+                {
+                    if (ExpectedAudioFilename is not null)
+                    {
+                        string? actualFilename = ExtractFilenameFromHeaders(headers);
+                        Assert.Equal(ExpectedAudioFilename, actualFilename);
+                    }
+                }
+                else
                 {
                     if (parameters.ContainsKey(name))
                     {
@@ -177,6 +187,25 @@ public class VerbatimMultiPartHttpHandler(string expectedInput, string sentJsonO
         int start = headers.IndexOf(NamePrefix) + NamePrefix.Length;
         int end = headers.IndexOf(";", start);
 
+        if (end == -1)
+        {
+            end = headers.Length;
+        }
+
+        return headers.Substring(start, end - start).Trim('"');
+    }
+
+    private static string? ExtractFilenameFromHeaders(string headers)
+    {
+        const string FilenamePrefix = "filename=";
+        int start = headers.IndexOf(FilenamePrefix);
+        if (start < 0)
+        {
+            return null;
+        }
+
+        start += FilenamePrefix.Length;
+        int end = headers.IndexOf(";", start);
         if (end == -1)
         {
             end = headers.Length;

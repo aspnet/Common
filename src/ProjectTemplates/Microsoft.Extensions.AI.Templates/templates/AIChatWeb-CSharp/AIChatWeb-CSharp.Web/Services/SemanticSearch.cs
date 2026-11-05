@@ -4,11 +4,7 @@ using Microsoft.Extensions.VectorData;
 namespace AIChatWeb_CSharp.Web.Services;
 
 public class SemanticSearch(
-#if (IsQdrant)
     VectorStoreCollection<Guid, IngestedChunk> vectorCollection,
-#else
-    VectorStoreCollection<string, IngestedChunk> vectorCollection,
-#endif
     [FromKeyedServices("ingestion_directory")] DirectoryInfo ingestionDirectory,
     DataIngestor dataIngestor)
 {

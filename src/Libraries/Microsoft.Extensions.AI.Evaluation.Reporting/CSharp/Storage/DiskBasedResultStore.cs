@@ -348,7 +348,7 @@ public sealed class DiskBasedResultStore : IEvaluationResultStore
                 IEnumerable<FileInfo> resultFiles =
                     scenarioDir
                         .EnumerateFiles("*.json", InTopDirectoryOnly)
-                        .OrderBy(f => f.Name, IterationNameComparer.Default);
+                        .OrderBy(f => Path.GetFileNameWithoutExtension(f.Name), IterationNameComparer.Default);
 
                 foreach (FileInfo resultFile in resultFiles)
                 {

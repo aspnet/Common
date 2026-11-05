@@ -8,7 +8,7 @@ namespace Microsoft.Extensions.LocalAnalyzers.Utilities;
 internal static class SymbolExtensions
 {
     /// <summary>
-    /// True if the symbol is externally visible outside this assembly.
+    /// Determines whether the symbol is externally visible outside this assembly.
     /// </summary>
     public static bool IsExternallyVisible(this ISymbol symbol)
     {

@@ -11,7 +11,7 @@ namespace Microsoft.Extensions.AI;
 /// Defines the context for transforming a schema node withing a larger schema document.
 /// </summary>
 /// <remarks>
-/// This struct is being passed to the user-provided <see cref="AIJsonSchemaTransformOptions.TransformSchemaNode"/> 
+/// This struct is being passed to the user-provided <see cref="AIJsonSchemaTransformOptions.TransformSchemaNode"/>
 /// callback by the <see cref="AIJsonUtilities.CreateJsonSchema"/> method and cannot be instantiated directly.
 /// </remarks>
 public readonly struct AIJsonSchemaTransformContext

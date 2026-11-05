@@ -68,6 +68,7 @@ public class OpenTelemetryRealtimeClientTests
                     OutputTokenCount = 25,
                     TotalTokenCount = 40,
                     CachedInputTokenCount = 3,
+                    ReasoningTokenCount = 6,
                     InputAudioTokenCount = 10,
                     InputTextTokenCount = 5,
                     OutputAudioTokenCount = 18,
@@ -119,6 +120,7 @@ public class OpenTelemetryRealtimeClientTests
         Assert.Equal("chat", activity.GetTagItem("gen_ai.operation.name"));
 
         Assert.Equal("test-model", activity.GetTagItem("gen_ai.request.model"));
+        Assert.True(activity.GetTagItem("gen_ai.request.stream") is true);
         Assert.Equal(500, activity.GetTagItem("gen_ai.request.max_tokens"));
 
         // Realtime-specific attributes
@@ -132,10 +134,14 @@ public class OpenTelemetryRealtimeClientTests
         Assert.Equal(15, activity.GetTagItem("gen_ai.usage.input_tokens"));
         Assert.Equal(25, activity.GetTagItem("gen_ai.usage.output_tokens"));
         Assert.Equal(3, activity.GetTagItem("gen_ai.usage.cache_read.input_tokens"));
+        Assert.Equal(6, activity.GetTagItem("gen_ai.usage.reasoning.output_tokens"));
         Assert.Equal(10, activity.GetTagItem("gen_ai.usage.input_audio_tokens"));
         Assert.Equal(5, activity.GetTagItem("gen_ai.usage.input_text_tokens"));
         Assert.Equal(18, activity.GetTagItem("gen_ai.usage.output_audio_tokens"));
         Assert.Equal(7, activity.GetTagItem("gen_ai.usage.output_text_tokens"));
+
+        var timeToFirstChunk = Assert.IsType<double>(activity.GetTagItem("gen_ai.response.time_to_first_chunk"));
+        Assert.True(timeToFirstChunk >= 0);
 
         Assert.True(activity.Duration.TotalMilliseconds > 0);
 
@@ -175,7 +181,14 @@ public class OpenTelemetryRealtimeClientTests
         else
         {
             Assert.False(tags.ContainsKey("gen_ai.system_instructions"));
-            Assert.False(tags.ContainsKey("gen_ai.tool.definitions"));
+            Assert.Equal(ReplaceWhitespace("""
+                [
+                  {
+                    "type": "function",
+                    "name": "Search"
+                  }
+                ]
+                """), ReplaceWhitespace(tags["gen_ai.tool.definitions"]));
         }
     }
 

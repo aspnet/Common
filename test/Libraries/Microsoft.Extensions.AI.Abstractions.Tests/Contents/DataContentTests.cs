@@ -300,6 +300,17 @@ public sealed class DataContentTests
         Assert.Equal("hello world", Encoding.ASCII.GetString(content.Data.ToArray()));
     }
 
+    [Theory]
+    [InlineData("data:text/plain,1+1=2", new byte[] { 0x31, 0x2B, 0x31, 0x3D, 0x32 })]
+    [InlineData("data:application/octet-stream,%FF%00%80", new byte[] { 0xFF, 0x00, 0x80 })]
+    [InlineData("data:text/plain;charset=iso-8859-1,caf%E9", new byte[] { 0x63, 0x61, 0x66, 0xE9 })]
+    public void NonBase64Data_PercentDecodedToOctets(string uri, byte[] expectedData)
+    {
+        // Per RFC 2397, each %xx escape is the octet it names, and '+' is a literal character
+        Assert.Equal(expectedData, new DataContent(uri).Data.ToArray());
+        Assert.Equal(expectedData, new DataContent(new Uri(uri)).Data.ToArray());
+    }
+
     [Fact]
     public void FileName_Roundtrips()
     {
@@ -598,6 +609,8 @@ public sealed class DataContentTests
         DataContent content = new(testData, "application/json");
 
         string filename = $"test_{Guid.NewGuid()}.json";
+        string cwdBefore = Directory.GetCurrentDirectory();
+        string expectedAbsolute = Path.Combine(cwdBefore, filename);
         string? savedPath = null;
 
         try
@@ -606,14 +619,14 @@ public sealed class DataContentTests
 
             // The returned path should be in the current directory
             Assert.Equal(filename, Path.GetFileName(savedPath));
-            Assert.True(File.Exists(savedPath));
-            Assert.Equal(testData, await File.ReadAllBytesAsync(savedPath));
+            Assert.True(File.Exists(expectedAbsolute));
+            Assert.Equal(testData, await File.ReadAllBytesAsync(expectedAbsolute));
         }
         finally
         {
-            if (savedPath is not null && File.Exists(savedPath))
+            if (File.Exists(expectedAbsolute))
             {
-                File.Delete(savedPath);
+                File.Delete(expectedAbsolute);
             }
         }
     }
@@ -654,6 +667,8 @@ public sealed class DataContentTests
         byte[] testData = [7, 8, 9];
         DataContent content = new(testData, "text/plain") { Name = $"testfile_{Guid.NewGuid()}.txt" };
 
+        string cwdBefore = Directory.GetCurrentDirectory();
+        string expectedAbsolute = Path.Combine(cwdBefore, content.Name!);
         string? savedPath = null;
 
         try
@@ -662,14 +677,14 @@ public sealed class DataContentTests
 
             // The returned path should be in the current directory using content's name
             Assert.Equal(content.Name, Path.GetFileName(savedPath));
-            Assert.True(File.Exists(savedPath));
-            Assert.Equal(testData, await File.ReadAllBytesAsync(savedPath));
+            Assert.True(File.Exists(expectedAbsolute));
+            Assert.Equal(testData, await File.ReadAllBytesAsync(expectedAbsolute));
         }
         finally
         {
-            if (savedPath is not null && File.Exists(savedPath))
+            if (File.Exists(expectedAbsolute))
             {
-                File.Delete(savedPath);
+                File.Delete(expectedAbsolute);
             }
         }
     }

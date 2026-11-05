@@ -41,8 +41,11 @@ public class ResponseCreatedRealtimeServerMessage : RealtimeServerMessage
     }
 
     /// <summary>
-    /// Gets or sets the output audio options for the response. If null, the default conversation audio options will be used.
+    /// Gets or sets the output audio options for the response.
     /// </summary>
+    /// <value>
+    /// If <see langword="null"/>, the default conversation audio options are used.
+    /// </value>
     public RealtimeAudioFormat? OutputAudioOptions { get; set; }
 
     /// <summary>
@@ -85,9 +88,12 @@ public class ResponseCreatedRealtimeServerMessage : RealtimeServerMessage
     public IList<RealtimeConversationItem>? Items { get; set; }
 
     /// <summary>
-    /// Gets or sets the output modalities for the response. like "text", "audio".
-    /// If null, then default conversation modalities will be used.
+    /// Gets or sets the output modalities for the response.
+    /// For example, <c>"text"</c> and <c>"audio"</c>.
     /// </summary>
+    /// <value>
+    /// If <see langword="null"/>, the default conversation modalities are used.
+    /// </value>
     public IList<string>? OutputModalities { get; set; }
 
     /// <summary>

@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Shared.ProjectTemplates.Tests;
 using Xunit;
-using Xunit.Abstractions;
 using static Microsoft.Shared.ProjectTemplates.Tests.TemplateTestUtilities;
 
 namespace Microsoft.Agents.AI.ProjectTemplates.Tests;
@@ -37,9 +36,9 @@ public class AIAgentWebAPIExecutionTests : TemplateExecutionTestBase<AIAgentWebA
     public static IEnumerable<object[]> GetSupportedProjectConfigurations()
     {
         (string name, string[] values)[] allOptionValues = [
-            ("--provider",          ["azureopenai", "githubmodels", "ollama", "openai"]),
+            ("--provider",          ["azureopenai", "ollama", "openai"]),
             ("--managed-identity",  ["true", "false"]),
-            ("--framework",         ["net8.0", "net9.0", "net10.0"])
+            ("--framework",         ["net8.0", "net9.0", "net10.0", "net11.0"])
         ];
 
         foreach (var args in GetPossibleOptions(allOptionValues))

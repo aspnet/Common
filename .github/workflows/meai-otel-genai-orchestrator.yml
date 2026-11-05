@@ -1,0 +1,93 @@
+name: "MEAI: Otel GenAI Orchestrator"
+
+# Orchestration only: resolve the upstream open-telemetry/semantic-conventions-genai
+# ref to scan and produce a single API/convention integration target, then run the
+# MEAI Otel GenAI Worker for it. Deterministic discovery (no agent), so this is a
+# plain workflow. The worker is invoked as a reusable workflow (workflow_call) so it
+# runs in this run's context and inherits the orchestrator's actor, satisfying the
+# worker's gh-aw activation role check. (A GITHUB_TOKEN workflow_dispatch would run
+# as github-actions[bot], which has no repo role and fails activation.)
+
+on:
+  schedule:
+    - cron: "23 8 * * *" # daily at 08:23 UTC (00:23 PST / 01:23 PDT)
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: >-
+          Optional git ref (branch, tag, or commit SHA) in
+          open-telemetry/semantic-conventions-genai to scan instead of the
+          default-branch HEAD. Leave empty to scan the default-branch HEAD.
+        required: false
+        type: string
+      dry_run:
+        description: "Compute and print the target without running the worker."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: meai-otel-genai-orchestrator
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    name: Discover upstream target
+    # Only run on a schedule for the canonical (non-fork) repository; allow manual
+    # dispatch anywhere (e.g. for testing in a fork).
+    if: ${{ !github.event.repository.fork || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.discover.outputs.targets }}
+      count: ${{ steps.discover.outputs.count }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      UPSTREAM_REF: ${{ github.event.inputs.upstream_ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Discover the upstream gen-ai integration target
+        id: discover
+        run: |
+          set -euo pipefail
+          targets="$(bash .github/scripts/meai-otel-genai-orchestrator-discover.sh)"
+          count="$(jq 'length' <<<"$targets")"
+          echo "Discovered ${count} target(s):"
+          jq '.' <<<"$targets"
+          {
+            echo "targets<<__EOF__"; jq -c '.' <<<"$targets"; echo "__EOF__"
+            echo "count=${count}"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "## Discovered ${count} gen-ai integration target(s)"
+            echo '```json'; jq '.' <<<"$targets"; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  produce:
+    name: Produce gen-ai integration
+    needs: discover
+    if: ${{ needs.discover.outputs.count != '0' && !inputs.dry_run }}
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      # The worker's compiled reusable workflow requests discussions: write on its
+      # gh-aw-generated jobs (the compiler grants the union of all safe-output scopes,
+      # even ones we don't use). A reusable workflow can't exceed the caller's
+      # permissions, so this must be granted here even though we never touch discussions.
+      discussions: write
+      actions: read
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        target: ${{ fromJSON(needs.discover.outputs.targets) }}
+    # Call the worker as a reusable workflow so it runs in this run's context and
+    # inherits the orchestrator's actor, satisfying the worker's gh-aw role check.
+    uses: ./.github/workflows/meai-otel-genai-worker.lock.yml
+    with:
+      target: ${{ toJSON(matrix.target) }}
+    secrets: inherit

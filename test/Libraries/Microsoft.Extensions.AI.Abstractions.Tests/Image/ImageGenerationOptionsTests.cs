@@ -20,6 +20,7 @@ public class ImageGenerationOptionsTests
         Assert.Null(options.MediaType);
         Assert.Null(options.ModelId);
         Assert.Null(options.RawRepresentationFactory);
+        Assert.Null(options.StreamingCount);
 
         ImageGenerationOptions clone = options.Clone();
         Assert.Null(clone.ResponseFormat);
@@ -28,6 +29,7 @@ public class ImageGenerationOptionsTests
         Assert.Null(clone.MediaType);
         Assert.Null(clone.ModelId);
         Assert.Null(clone.RawRepresentationFactory);
+        Assert.Null(clone.StreamingCount);
     }
 
     [Fact]
@@ -35,7 +37,9 @@ public class ImageGenerationOptionsTests
     {
         ImageGenerationOptions options = new();
 
+#pragma warning disable MEAI001 // IImageGenerator is experimental
         Func<IImageGenerator, object?> factory = generator => new { Representation = "raw data" };
+#pragma warning restore MEAI001
 
         options.ResponseFormat = ImageGenerationResponseFormat.Data;
         options.Count = 5;
@@ -43,6 +47,7 @@ public class ImageGenerationOptionsTests
         options.MediaType = "image/png";
         options.ModelId = "modelId";
         options.RawRepresentationFactory = factory;
+        options.StreamingCount = 2;
 
         Assert.Equal(ImageGenerationResponseFormat.Data, options.ResponseFormat);
         Assert.Equal(5, options.Count);
@@ -50,6 +55,7 @@ public class ImageGenerationOptionsTests
         Assert.Equal("image/png", options.MediaType);
         Assert.Equal("modelId", options.ModelId);
         Assert.Same(factory, options.RawRepresentationFactory);
+        Assert.Equal(2, options.StreamingCount);
 
         ImageGenerationOptions clone = options.Clone();
         Assert.Equal(ImageGenerationResponseFormat.Data, clone.ResponseFormat);
@@ -58,6 +64,7 @@ public class ImageGenerationOptionsTests
         Assert.Equal("image/png", clone.MediaType);
         Assert.Equal("modelId", clone.ModelId);
         Assert.Same(factory, clone.RawRepresentationFactory);
+        Assert.Equal(2, clone.StreamingCount);
     }
 
     [Fact]
@@ -72,9 +79,9 @@ public class ImageGenerationOptionsTests
             ModelId = "test-model",
         };
 
-        string json = JsonSerializer.Serialize(options, TestJsonSerializerContext.Default.ImageGenerationOptions);
+        string json = JsonSerializer.Serialize(options, AIJsonUtilities.DefaultOptions);
 
-        ImageGenerationOptions? deserialized = JsonSerializer.Deserialize(json, TestJsonSerializerContext.Default.ImageGenerationOptions);
+        ImageGenerationOptions? deserialized = JsonSerializer.Deserialize<ImageGenerationOptions>(json, AIJsonUtilities.DefaultOptions);
         Assert.NotNull(deserialized);
 
         Assert.Equal(ImageGenerationResponseFormat.Data, deserialized.ResponseFormat);
@@ -116,7 +123,9 @@ public class ImageGenerationOptionsTests
     [Theory]
     [InlineData(ImageGenerationResponseFormat.Uri)]
     [InlineData(ImageGenerationResponseFormat.Data)]
+#pragma warning disable MEAI001 // ImageGenerationResponseFormat.Hosted is experimental
     [InlineData(ImageGenerationResponseFormat.Hosted)]
+#pragma warning restore MEAI001
     public void ImageGenerationResponseFormat_Values_AreValid(ImageGenerationResponseFormat responseFormat)
     {
         Assert.True(Enum.IsDefined(typeof(ImageGenerationResponseFormat), responseFormat));
@@ -127,8 +136,8 @@ public class ImageGenerationOptionsTests
     {
         foreach (ImageGenerationResponseFormat responseFormat in Enum.GetValues(typeof(ImageGenerationResponseFormat)))
         {
-            string json = JsonSerializer.Serialize(responseFormat, TestJsonSerializerContext.Default.ImageGenerationResponseFormat);
-            ImageGenerationResponseFormat deserialized = JsonSerializer.Deserialize(json, TestJsonSerializerContext.Default.ImageGenerationResponseFormat);
+            string json = JsonSerializer.Serialize(responseFormat, AIJsonUtilities.DefaultOptions);
+            ImageGenerationResponseFormat deserialized = JsonSerializer.Deserialize<ImageGenerationResponseFormat>(json, AIJsonUtilities.DefaultOptions);
             Assert.Equal(responseFormat, deserialized);
         }
     }

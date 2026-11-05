@@ -490,6 +490,64 @@
       ]
     },
     {
+      "Type": "abstract class Microsoft.Extensions.AI.FailoverChatClient : Microsoft.Extensions.AI.RoutingChatClient",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.AI.FailoverChatClient.FailoverChatClient();",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "sealed override System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse> Microsoft.Extensions.AI.FailoverChatClient.GetResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "sealed override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> Microsoft.Extensions.AI.FailoverChatClient.GetStreamingResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "virtual System.Threading.Tasks.ValueTask Microsoft.Extensions.AI.FailoverChatClient.OnRoutingUpdateAsync(Microsoft.Extensions.AI.RoutingContext context, Microsoft.Extensions.AI.FailoverChatClientAttempt attempt, bool isTerminal, System.Threading.CancellationToken cancellationToken);",
+          "Stage": "Experimental"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "int? Microsoft.Extensions.AI.FailoverChatClient.MaximumAttemptsPerRequest { get; set; }",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.AI.FailoverChatClientAttempt",
+      "Stage": "Experimental",
+      "Properties": [
+        {
+          "Member": "Microsoft.Extensions.AI.IChatClient Microsoft.Extensions.AI.FailoverChatClientAttempt.Client { get; }",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "System.TimeSpan Microsoft.Extensions.AI.FailoverChatClientAttempt.Duration { get; }",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "System.Exception? Microsoft.Extensions.AI.FailoverChatClientAttempt.Exception { get; }",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "bool Microsoft.Extensions.AI.FailoverChatClientAttempt.OutputCommitted { get; }",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "bool Microsoft.Extensions.AI.FailoverChatClientAttempt.ResponseCompleted { get; }",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "System.TimeSpan? Microsoft.Extensions.AI.FailoverChatClientAttempt.TimeToFirstUpdate { get; }",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
       "Type": "class Microsoft.Extensions.AI.FunctionInvocationContext",
       "Stage": "Stable",
       "Methods": [
@@ -1426,6 +1484,28 @@
       ]
     },
     {
+      "Type": "sealed class Microsoft.Extensions.AI.OrderedFailoverChatClient : Microsoft.Extensions.AI.FailoverChatClient",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.AI.OrderedFailoverChatClient.OrderedFailoverChatClient(System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.IChatClient> clients, bool leaveOpen = false);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "override void Microsoft.Extensions.AI.OrderedFailoverChatClient.Dispose(bool disposing);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "override System.Threading.Tasks.ValueTask Microsoft.Extensions.AI.OrderedFailoverChatClient.OnRoutingUpdateAsync(Microsoft.Extensions.AI.RoutingContext context, Microsoft.Extensions.AI.FailoverChatClientAttempt attempt, bool isTerminal, System.Threading.CancellationToken cancellationToken);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "override System.Threading.Tasks.ValueTask<Microsoft.Extensions.AI.IChatClient> Microsoft.Extensions.AI.OrderedFailoverChatClient.SelectClientAsync(Microsoft.Extensions.AI.RoutingContext context, System.Threading.CancellationToken cancellationToken);",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
       "Type": "sealed class Microsoft.Extensions.AI.RealtimeClientBuilder",
       "Stage": "Experimental",
       "Methods": [
@@ -1522,6 +1602,46 @@
         {
           "Member": "static Microsoft.Extensions.AI.ChatClientBuilder Microsoft.Extensions.AI.ReducingChatClientBuilderExtensions.UseChatReducer(this Microsoft.Extensions.AI.ChatClientBuilder builder, Microsoft.Extensions.AI.IChatReducer? reducer = null, System.Action<Microsoft.Extensions.AI.ReducingChatClient>? configure = null);",
           "Stage": "Experimental"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.AI.SemanticRoutingChatClient : Microsoft.Extensions.AI.RoutingChatClient",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.AI.SemanticRoutingChatClient.SemanticRoutingChatClient(Microsoft.Extensions.AI.IEmbeddingGenerator<string, Microsoft.Extensions.AI.Embedding<float>> embeddingGenerator, System.Collections.Generic.IReadOnlyDictionary<Microsoft.Extensions.AI.IChatClient, System.Collections.Generic.IReadOnlyList<string>> clientProfiles, Microsoft.Extensions.AI.IChatClient defaultClient, float scoreThreshold = 0.3f, int topK = 1, Microsoft.Extensions.AI.SemanticRoutingChatClient.ScoreAggregation scoreAggregation = Microsoft.Extensions.AI.SemanticRoutingChatClient.ScoreAggregation.Mean, bool leaveOpen = false);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "override void Microsoft.Extensions.AI.SemanticRoutingChatClient.Dispose(bool disposing);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "override System.Threading.Tasks.ValueTask<Microsoft.Extensions.AI.IChatClient> Microsoft.Extensions.AI.SemanticRoutingChatClient.SelectClientAsync(Microsoft.Extensions.AI.RoutingContext context, System.Threading.CancellationToken cancellationToken);",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
+      "Type": "enum Microsoft.Extensions.AI.SemanticRoutingChatClient.ScoreAggregation",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.AI.SemanticRoutingChatClient.ScoreAggregation.ScoreAggregation();",
+          "Stage": "Experimental"
+        }
+      ],
+      "Fields": [
+        {
+          "Member": "const Microsoft.Extensions.AI.SemanticRoutingChatClient.ScoreAggregation Microsoft.Extensions.AI.SemanticRoutingChatClient.ScoreAggregation.Mean",
+          "Stage": "Experimental",
+          "Value": "0"
+        },
+        {
+          "Member": "const Microsoft.Extensions.AI.SemanticRoutingChatClient.ScoreAggregation Microsoft.Extensions.AI.SemanticRoutingChatClient.ScoreAggregation.Sum",
+          "Stage": "Experimental",
+          "Value": "1"
         }
       ]
     },

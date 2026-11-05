@@ -244,7 +244,9 @@ internal sealed class HttpRequestReader : IHttpRequestReader
         var route = requestMetadata.RequestRoute;
         if (route == TelemetryConstants.Unknown)
         {
-            logRecord.Path = requestMetadata.RequestName;
+            logRecord.Path = requestMetadata.RequestName == TelemetryConstants.Unknown
+                ? TelemetryConstants.Redacted
+                : requestMetadata.RequestName;
             return;
         }
 

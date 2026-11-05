@@ -8,7 +8,6 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DataIngestion.Tests.Utils;
-using Microsoft.TestUtilities;
 using Xunit;
 
 namespace Microsoft.Extensions.DataIngestion.Readers.Tests;
@@ -19,7 +18,7 @@ public abstract class DocumentReaderConformanceTests
 
     protected abstract IngestionDocumentReader CreateDocumentReader(bool extractImages = false);
 
-    [ConditionalFact]
+    [Fact]
     public async Task ThrowsWhenIdentifierIsNotProvided()
     {
         var reader = CreateDocumentReader();
@@ -32,7 +31,7 @@ public abstract class DocumentReaderConformanceTests
         await Assert.ThrowsAsync<ArgumentException>("identifier", async () => await reader.ReadAsync(stream, identifier: string.Empty, mediaType: "some"));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task ThrowsIfCancellationRequestedStream()
     {
         var reader = CreateDocumentReader();
@@ -43,7 +42,7 @@ public abstract class DocumentReaderConformanceTests
         await Assert.ThrowsAsync<TaskCanceledException>(async () => await reader.ReadAsync(stream, "id", "mediaType", cts.Token));
     }
 
-    [ConditionalFact]
+    [Fact]
     public async Task ThrowsIfCancellationRequestedFile()
     {
         string filePath = Path.Combine(Path.GetTempPath(), Path.GetTempFileName() + ".txt");
@@ -74,7 +73,7 @@ public abstract class DocumentReaderConformanceTests
         "https://www.bondcap.com/report/pdf/Trends_Artificial_Intelligence.pdf", // PDF file (presentation)
     ];
 
-    [ConditionalTheory]
+    [Theory]
     [MemberData(nameof(Links))]
     public virtual async Task SupportsStreams(string source)
     {
@@ -87,7 +86,7 @@ public abstract class DocumentReaderConformanceTests
         SimpleAsserts(document, source, source);
     }
 
-    [ConditionalTheory]
+    [Theory]
     [MemberData(nameof(Links))]
     public virtual async Task SupportsFiles(string source)
     {
@@ -105,7 +104,7 @@ public abstract class DocumentReaderConformanceTests
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual Task SupportsImages() => SupportsImagesCore(
         new("https://winprotocoldocs-bhdugrdyduf5h2e4.b02.azurefd.net/MC-SQLR/%5bMC-SQLR%5d.pdf")); // SQL Server Resolution Protocol
 
@@ -128,7 +127,7 @@ public abstract class DocumentReaderConformanceTests
         }
     }
 
-    [ConditionalFact]
+    [Fact]
     public virtual async Task SupportsTables()
     {
         string[,] expected =
@@ -172,7 +171,8 @@ public abstract class DocumentReaderConformanceTests
         }
         catch (Exception ex)
         {
-            throw new SkipTestException($"Unable to download the test file: '{ex.Message}'");
+            Assert.Skip($"Unable to download the test file: '{ex.Message}'");
+            throw; // Unreachable, but needed to satisfy compiler return requirement.
         }
     }
 

@@ -8,7 +8,6 @@ using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,10 +21,14 @@ using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.AI;
 
-/// <summary>Represents a delegating realtime session that implements the OpenTelemetry Semantic Conventions for Generative AI systems.</summary>
+/// <summary>Represents a delegating realtime session that follows the OpenTelemetry Semantic Conventions for Generative AI systems where applicable.</summary>
 /// <remarks>
 /// <para>
-/// This class provides an implementation of the Semantic Conventions for Generative AI systems v1.38, defined at <see href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />.
+/// This class follows the patterns of the Semantic Conventions for Generative AI systems v1.41 where applicable, as defined at
+/// <see href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />, with custom extensions for realtime-specific behavior.
+/// The specification does not currently define a realtime operation; a custom operation name is used.
+/// </para>
+/// <para>
 /// The specification is still experimental and subject to change; as such, the telemetry output by this session is also subject to change.
 /// </para>
 /// <para>
@@ -33,15 +36,18 @@ namespace Microsoft.Extensions.AI;
 /// <list type="bullet">
 ///   <item><c>gen_ai.operation.name</c> - Operation name ("chat")</item>
 ///   <item><c>gen_ai.request.model</c> - Model name from options</item>
+///   <item><c>gen_ai.request.stream</c> - Indicates streaming response requests; always <see langword="true"/> as realtime is inherently streaming</item>
 ///   <item><c>gen_ai.provider.name</c> - Provider name from metadata</item>
 ///   <item><c>gen_ai.response.id</c> - Response ID from ResponseDone messages</item>
 ///   <item><c>gen_ai.response.model</c> - Model ID from response</item>
+///   <item><c>gen_ai.response.time_to_first_chunk</c> - Time to first streaming response chunk</item>
 ///   <item><c>gen_ai.usage.input_tokens</c> - Input token count</item>
 ///   <item><c>gen_ai.usage.output_tokens</c> - Output token count</item>
+///   <item><c>gen_ai.usage.reasoning.output_tokens</c> - Reasoning output token count</item>
 ///   <item><c>gen_ai.request.max_tokens</c> - Max output tokens from options</item>
 ///   <item><c>gen_ai.system_instructions</c> - Instructions from options (sensitive data)</item>
 ///   <item><c>gen_ai.conversation.id</c> - Conversation ID from response</item>
-///   <item><c>gen_ai.tool.definitions</c> - Tool definitions (sensitive data)</item>
+///   <item><c>gen_ai.tool.definitions</c> - Tool definitions</item>
 ///   <item><c>gen_ai.input.messages</c> - Input tool/MCP messages (sensitive data)</item>
 ///   <item><c>gen_ai.output.messages</c> - Output tool/MCP messages (sensitive data)</item>
 ///   <item><c>server.address</c> / <c>server.port</c> - Server endpoint info</item>
@@ -57,7 +63,7 @@ namespace Microsoft.Extensions.AI;
 /// </list>
 /// </para>
 /// <para>
-/// Additionally, the following custom attributes are supported (not part of OpenTelemetry GenAI semantic conventions as of v1.40):
+/// Additionally, the following custom attributes are supported (not part of OpenTelemetry GenAI semantic conventions as of v1.41):
 /// <list type="bullet">
 ///   <item><c>gen_ai.request.tool_choice</c> - Tool choice mode ("none", "auto", "required") or specific tool name</item>
 ///   <item><c>gen_ai.realtime.voice</c> - Voice setting from options</item>
@@ -114,19 +120,8 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
         _activitySource = new(name);
         _meter = new(name);
 
-        _tokenUsageHistogram = _meter.CreateHistogram<int>(
-            OpenTelemetryConsts.GenAI.Client.TokenUsage.Name,
-            OpenTelemetryConsts.TokensUnit,
-            OpenTelemetryConsts.GenAI.Client.TokenUsage.Description,
-            advice: new() { HistogramBucketBoundaries = OpenTelemetryConsts.GenAI.Client.TokenUsage.ExplicitBucketBoundaries }
-            );
-
-        _operationDurationHistogram = _meter.CreateHistogram<double>(
-            OpenTelemetryConsts.GenAI.Client.OperationDuration.Name,
-            OpenTelemetryConsts.SecondsUnit,
-            OpenTelemetryConsts.GenAI.Client.OperationDuration.Description,
-            advice: new() { HistogramBucketBoundaries = OpenTelemetryConsts.GenAI.Client.OperationDuration.ExplicitBucketBoundaries }
-            );
+        _tokenUsageHistogram = OtelMetricHelpers.CreateGenAITokenUsageHistogram(_meter);
+        _operationDurationHistogram = OtelMetricHelpers.CreateGenAIOperationDurationHistogram(_meter);
 
         _jsonSerializerOptions = AIJsonUtilities.DefaultOptions;
     }
@@ -207,7 +202,9 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
         string? requestModelId = options?.Model ?? _defaultModelId;
 
         // Start timing from the beginning of the streaming operation
-        Stopwatch? stopwatch = _operationDurationHistogram.Enabled ? Stopwatch.StartNew() : null;
+        bool trackStreamingResponseTime = _activitySource.HasListeners();
+        Stopwatch? stopwatch = _operationDurationHistogram.Enabled || trackStreamingResponseTime ? Stopwatch.StartNew() : null;
+        double? timeToFirstChunk = null;
 
         // Determine if we should capture messages for telemetry
         bool captureMessages = EnableSensitiveData && _activitySource.HasListeners();
@@ -220,8 +217,8 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
         catch (Exception ex)
         {
             // Create an activity for the error case
-            using Activity? errorActivity = CreateAndConfigureActivity(options);
-            TraceStreamingResponse(errorActivity, requestModelId, response: null, ex, stopwatch);
+            using Activity? errorActivity = CreateAndConfigureActivity(options, streamingResponse: true);
+            TraceStreamingResponse(errorActivity, requestModelId, response: null, ex, stopwatch, timeToFirstChunk);
             throw;
         }
 
@@ -249,6 +246,11 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
                     throw;
                 }
 
+                if (timeToFirstChunk is null && stopwatch is not null)
+                {
+                    timeToFirstChunk = stopwatch.Elapsed.TotalSeconds;
+                }
+
                 // Track output modalities
                 if (outputModalities is not null)
                 {
@@ -273,12 +275,12 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
                 if (message is ResponseCreatedRealtimeServerMessage responseDoneMsg &&
                     responseDoneMsg.Type == RealtimeServerMessageType.ResponseDone)
                 {
-                    using Activity? responseActivity = CreateAndConfigureActivity(options);
+                    using Activity? responseActivity = CreateAndConfigureActivity(options, streamingResponse: true);
 
                     // Add output modalities and messages tags
                     AddOutputModalitiesTag(responseActivity, outputModalities);
                     AddOutputMessagesTag(responseActivity, outputMessages);
-                    TraceStreamingResponse(responseActivity, requestModelId, responseDoneMsg, error, stopwatch);
+                    TraceStreamingResponse(responseActivity, requestModelId, responseDoneMsg, error, stopwatch, timeToFirstChunk);
                 }
 
                 yield return message;
@@ -289,10 +291,10 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
             // Trace error if an exception was thrown during streaming
             if (error is not null)
             {
-                using Activity? errorActivity = CreateAndConfigureActivity(options);
+                using Activity? errorActivity = CreateAndConfigureActivity(options, streamingResponse: true);
                 AddOutputModalitiesTag(errorActivity, outputModalities);
                 AddOutputMessagesTag(errorActivity, outputMessages);
-                TraceStreamingResponse(errorActivity, requestModelId, response: null, error, stopwatch);
+                TraceStreamingResponse(errorActivity, requestModelId, response: null, error, stopwatch, timeToFirstChunk);
             }
 
             await responseEnumerator.DisposeAsync().ConfigureAwait(false);
@@ -356,7 +358,7 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
 
             case InputAudioBufferAppendRealtimeClientMessage audioAppendMsg:
                 var audioMessage = new RealtimeOtelMessage { Role = "user" };
-                audioMessage.Parts.Add(new RealtimeOtelBlobPart
+                audioMessage.Parts.Add(new OtelBlobPart
                 {
                     Content = audioAppendMsg.Content.Base64Data.ToString(),
                     MimeType = audioAppendMsg.Content.MediaType,
@@ -369,7 +371,7 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
                 return new RealtimeOtelMessage
                 {
                     Role = "user",
-                    Parts = { new RealtimeOtelGenericPart { Type = "audio_commit" } },
+                    Parts = { new OtelGenericPart { Type = "audio_commit" } },
                 };
 
             case CreateResponseRealtimeClientMessage responseCreateMsg:
@@ -378,7 +380,7 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
                 // Add instructions if present
                 if (!string.IsNullOrWhiteSpace(responseCreateMsg.Instructions))
                 {
-                    responseMessage.Parts.Add(new RealtimeOtelGenericPart
+                    responseMessage.Parts.Add(new OtelGenericPart
                     {
                         Type = "instructions",
                         Content = responseCreateMsg.Instructions,
@@ -443,7 +445,7 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
                 }
 
                 var textAudioOtelMessage = new RealtimeOtelMessage { Role = "assistant" };
-                textAudioOtelMessage.Parts.Add(new RealtimeOtelGenericPart
+                textAudioOtelMessage.Parts.Add(new OtelGenericPart
                 {
                     Type = partType,
                     Content = content,
@@ -452,7 +454,7 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
 
             case InputAudioTranscriptionRealtimeServerMessage transcriptionMsg when !string.IsNullOrEmpty(transcriptionMsg.Transcription):
                 var transcriptionOtelMessage = new RealtimeOtelMessage { Role = "user" };
-                transcriptionOtelMessage.Parts.Add(new RealtimeOtelGenericPart
+                transcriptionOtelMessage.Parts.Add(new OtelGenericPart
                 {
                     Type = "input_transcription",
                     Content = transcriptionMsg.Transcription,
@@ -461,7 +463,7 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
 
             case ErrorRealtimeServerMessage errorMsg when errorMsg.Error is not null:
                 var errorOtelMessage = new RealtimeOtelMessage { Role = "system" };
-                errorOtelMessage.Parts.Add(new RealtimeOtelGenericPart
+                errorOtelMessage.Parts.Add(new OtelGenericPart
                 {
                     Type = "error",
                     Content = errorMsg.Error.Message,
@@ -498,13 +500,13 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
     /// <summary>Serializes a single message to OTel format (as an array with one element).</summary>
     private static string SerializeMessage(RealtimeOtelMessage message)
     {
-        return JsonSerializer.Serialize(new[] { message }, RealtimeOtelContext.Default.IEnumerableRealtimeOtelMessage);
+        return JsonSerializer.Serialize(new[] { message }, OtelContext.Default.IEnumerableRealtimeOtelMessage);
     }
 
     /// <summary>Serializes content items to OTel format.</summary>
     private static string SerializeMessages(IEnumerable<RealtimeOtelMessage> messages)
     {
-        return JsonSerializer.Serialize(messages, RealtimeOtelContext.Default.IEnumerableRealtimeOtelMessage);
+        return JsonSerializer.Serialize(messages, OtelContext.Default.IEnumerableRealtimeOtelMessage);
     }
 
     /// <summary>Extracts content from an AIContent list and converts to OTel format.</summary>
@@ -526,11 +528,11 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
             {
                 // Standard text content
                 case TextContent tc when !string.IsNullOrEmpty(tc.Text):
-                    message.Parts.Add(new RealtimeOtelGenericPart { Content = tc.Text });
+                    message.Parts.Add(new OtelGenericPart { Content = tc.Text });
                     break;
 
                 case TextReasoningContent trc when !string.IsNullOrEmpty(trc.Text):
-                    message.Parts.Add(new RealtimeOtelGenericPart { Type = "reasoning", Content = trc.Text });
+                    message.Parts.Add(new OtelGenericPart { Type = "reasoning", Content = trc.Text });
                     break;
 
                 // Function call content
@@ -544,7 +546,7 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
                     break;
 
                 case FunctionResultContent frc:
-                    message.Parts.Add(new RealtimeOtelToolCallResponsePart
+                    message.Parts.Add(new OtelToolCallResponsePart
                     {
                         Id = frc.CallId,
                         Response = frc.Result,
@@ -553,50 +555,50 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
 
                 // Data content (binary data)
                 case DataContent dc:
-                    message.Parts.Add(new RealtimeOtelBlobPart
+                    message.Parts.Add(new OtelBlobPart
                     {
                         Content = dc.Base64Data.ToString(),
                         MimeType = dc.MediaType,
-                        Modality = DeriveModalityFromMediaType(dc.MediaType),
+                        Modality = OtelMessageSerializer.DeriveModalityFromMediaType(dc.MediaType),
                     });
                     break;
 
                 // URI content
                 case UriContent uc:
-                    message.Parts.Add(new RealtimeOtelUriPart
+                    message.Parts.Add(new OtelUriPart
                     {
                         Uri = uc.Uri.AbsoluteUri,
                         MimeType = uc.MediaType,
-                        Modality = DeriveModalityFromMediaType(uc.MediaType),
+                        Modality = OtelMessageSerializer.DeriveModalityFromMediaType(uc.MediaType),
                     });
                     break;
 
                 // Hosted file content
                 case HostedFileContent fc:
-                    message.Parts.Add(new RealtimeOtelFilePart
+                    message.Parts.Add(new OtelFilePart
                     {
                         FileId = fc.FileId,
                         MimeType = fc.MediaType,
-                        Modality = DeriveModalityFromMediaType(fc.MediaType),
+                        Modality = OtelMessageSerializer.DeriveModalityFromMediaType(fc.MediaType),
                     });
                     break;
 
                 // Non-standard "generic" parts
                 case HostedVectorStoreContent vsc:
-                    message.Parts.Add(new RealtimeOtelGenericPart { Type = "vector_store", Content = vsc.VectorStoreId });
+                    message.Parts.Add(new OtelGenericPart { Type = "vector_store", Content = vsc.VectorStoreId });
                     break;
 
                 case ErrorContent ec:
-                    message.Parts.Add(new RealtimeOtelGenericPart { Type = "error", Content = ec.Message });
+                    message.Parts.Add(new OtelGenericPart { Type = "error", Content = ec.Message });
                     break;
 
                 // MCP server tool content
                 case McpServerToolCallContent mstcc:
-                    message.Parts.Add(new RealtimeOtelServerToolCallPart<RealtimeOtelMcpToolCall>
+                    message.Parts.Add(new OtelServerToolCallPart<OtelMcpToolCall>
                     {
                         Id = mstcc.CallId,
                         Name = mstcc.Name,
-                        ServerToolCall = new RealtimeOtelMcpToolCall
+                        ServerToolCall = new OtelMcpToolCall
                         {
                             Arguments = mstcc.Arguments as IReadOnlyDictionary<string, object?> ?? mstcc.Arguments?.ToDictionary(k => k.Key, v => v.Value),
                             ServerName = mstcc.ServerName,
@@ -605,10 +607,10 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
                     break;
 
                 case McpServerToolResultContent mstrc:
-                    message.Parts.Add(new RealtimeOtelServerToolCallResponsePart<RealtimeOtelMcpToolCallResponse>
+                    message.Parts.Add(new OtelServerToolCallResponsePart<OtelMcpToolCallResponse>
                     {
                         Id = mstrc.CallId,
-                        ServerToolCallResponse = new RealtimeOtelMcpToolCallResponse
+                        ServerToolCallResponse = new OtelMcpToolCallResponse
                         {
                             Output = mstrc.Outputs,
                         },
@@ -642,7 +644,7 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
 
                     if (element.ValueKind != JsonValueKind.Undefined)
                     {
-                        message.Parts.Add(new RealtimeOtelGenericPart
+                        message.Parts.Add(new OtelGenericPart
                         {
                             Type = content.GetType().Name,
                             Content = element,
@@ -656,34 +658,8 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
         return message.Parts.Count > 0 ? message : null;
     }
 
-    /// <summary>Derives modality from media type for telemetry purposes.</summary>
-    private static string? DeriveModalityFromMediaType(string? mediaType)
-    {
-        if (string.IsNullOrEmpty(mediaType))
-        {
-            return null;
-        }
-
-        if (mediaType!.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-        {
-            return "image";
-        }
-
-        if (mediaType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
-        {
-            return "audio";
-        }
-
-        if (mediaType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
-        {
-            return "video";
-        }
-
-        return null;
-    }
-
     /// <summary>Creates an activity for a realtime session request, or returns <see langword="null"/> if not enabled.</summary>
-    private Activity? CreateAndConfigureActivity(RealtimeSessionOptions? options)
+    private Activity? CreateAndConfigureActivity(RealtimeSessionOptions? options, bool streamingResponse = false)
     {
         Activity? activity = null;
         if (_activitySource.HasListeners())
@@ -700,6 +676,11 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
                     .AddTag(OpenTelemetryConsts.GenAI.Operation.Name, OpenTelemetryConsts.GenAI.ChatName)
                     .AddTag(OpenTelemetryConsts.GenAI.Request.Model, modelId)
                     .AddTag(OpenTelemetryConsts.GenAI.Provider.Name, _providerName);
+
+                if (streamingResponse)
+                {
+                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Request.Stream, true);
+                }
 
                 if (_serverAddress is not null)
                 {
@@ -735,24 +716,16 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
                         {
                             _ = activity.AddTag(
                                 OpenTelemetryConsts.GenAI.SystemInstructions,
-                                JsonSerializer.Serialize(new object[1] { new RealtimeOtelGenericPart { Content = options.Instructions } }, RealtimeOtelContext.Default.IListObject));
+                                JsonSerializer.Serialize(new object[1] { new OtelGenericPart { Content = options.Instructions } }, OtelContext.Default.IListObject));
                         }
 
-                        if (options.Tools is { Count: > 0 })
-                        {
-                            _ = activity.AddTag(
-                                OpenTelemetryConsts.GenAI.Tool.Definitions,
-                                JsonSerializer.Serialize(options.Tools.Select(t => t switch
-                                {
-                                    _ when t.GetService<AIFunctionDeclaration>() is { } af => new RealtimeOtelFunction
-                                    {
-                                        Name = af.Name,
-                                        Description = af.Description,
-                                        Parameters = af.JsonSchema,
-                                    },
-                                    _ => new RealtimeOtelFunction { Type = t.Name },
-                                }), RealtimeOtelContext.Default.IEnumerableRealtimeOtelFunction));
-                        }
+                    }
+
+                    if (options.Tools is { Count: > 0 })
+                    {
+                        _ = activity.AddTag(
+                            OpenTelemetryConsts.GenAI.Tool.Definitions,
+                            JsonSerializer.Serialize(options.Tools.Select(t => OtelFunction.Create(t, includeOptionalProperties: EnableSensitiveData)), OtelContext.Default.IEnumerableOtelFunction));
                     }
                 }
             }
@@ -767,7 +740,8 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
         string? requestModelId,
         ResponseCreatedRealtimeServerMessage? response,
         Exception? error,
-        Stopwatch? stopwatch)
+        Stopwatch? stopwatch,
+        double? timeToFirstChunk = null)
     {
         if (_operationDurationHistogram.Enabled && stopwatch is not null)
         {
@@ -833,17 +807,7 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
             }
         }
 
-        if (error is not null)
-        {
-            _ = activity?
-                .AddTag(OpenTelemetryConsts.Error.Type, error.GetType().FullName)
-                .SetStatus(ActivityStatusCode.Error, error.Message);
-
-            if (_logger is not null)
-            {
-                OpenTelemetryLog.OperationException(_logger, error);
-            }
-        }
+        OpenTelemetryLog.RecordOperationError(activity, _logger, error);
 
         if (response is not null && activity is not null)
         {
@@ -859,6 +823,11 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
             if (!string.IsNullOrWhiteSpace(response.ResponseId))
             {
                 _ = activity.AddTag(OpenTelemetryConsts.GenAI.Response.Id, response.ResponseId);
+            }
+
+            if (timeToFirstChunk is double timeToFirstChunkValue)
+            {
+                _ = activity.AddTag(OpenTelemetryConsts.GenAI.Response.TimeToFirstChunk, timeToFirstChunkValue);
             }
 
             if (!string.IsNullOrWhiteSpace(response.Status))
@@ -881,6 +850,11 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
                 if (responseUsage.CachedInputTokenCount is long cachedInputTokens)
                 {
                     _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.CacheReadInputTokens, (int)cachedInputTokens);
+                }
+
+                if (responseUsage.ReasoningTokenCount is long reasoningTokens)
+                {
+                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.ReasoningOutputTokens, (int)reasoningTokens);
                 }
 
                 if (responseUsage.InputAudioTokenCount is long inputAudioTokens)
@@ -938,113 +912,27 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
 
     #region OTel Serialization Types
 
-    private sealed class RealtimeOtelGenericPart
-    {
-        public string Type { get; set; } = "text";
-        public object? Content { get; set; }
-    }
-
-    private sealed class RealtimeOtelBlobPart
-    {
-        public string Type { get; set; } = "blob";
-        public string? Content { get; set; } // base64-encoded binary data
-        public string? MimeType { get; set; }
-        public string? Modality { get; set; }
-    }
-
-    private sealed class RealtimeOtelUriPart
-    {
-        public string Type { get; set; } = "uri";
-        public string? Uri { get; set; }
-        public string? MimeType { get; set; }
-        public string? Modality { get; set; }
-    }
-
-    private sealed class RealtimeOtelFilePart
-    {
-        public string Type { get; set; } = "file";
-        public string? FileId { get; set; }
-        public string? MimeType { get; set; }
-        public string? Modality { get; set; }
-    }
-
-    private sealed class RealtimeOtelFunction
-    {
-        public string Type { get; set; } = "function";
-        public string? Name { get; set; }
-        public string? Description { get; set; }
-        public JsonElement? Parameters { get; set; }
-    }
-
-    private sealed class RealtimeOtelMessage
-    {
-        public string? Role { get; set; }
-        public List<object> Parts { get; set; } = [];
-    }
-
-    private sealed class RealtimeOtelToolCallPart
-    {
-        public string Type { get; set; } = "tool_call";
-        public string? Id { get; set; }
-        public string? Name { get; set; }
-        public IDictionary<string, object?>? Arguments { get; set; }
-    }
-
-    private sealed class RealtimeOtelToolCallResponsePart
-    {
-        public string Type { get; set; } = "tool_call_response";
-        public string? Id { get; set; }
-        public object? Response { get; set; }
-    }
-
-    private sealed class RealtimeOtelServerToolCallPart<T>
-        where T : class
-    {
-        public string Type { get; set; } = "server_tool_call";
-        public string? Id { get; set; }
-        public string? Name { get; set; }
-        public T? ServerToolCall { get; set; }
-    }
-
-    private sealed class RealtimeOtelServerToolCallResponsePart<T>
-        where T : class
-    {
-        public string Type { get; set; } = "server_tool_call_response";
-        public string? Id { get; set; }
-        public T? ServerToolCallResponse { get; set; }
-    }
-
-    private sealed class RealtimeOtelMcpToolCall
-    {
-        public string Type { get; set; } = "mcp";
-        public string? ServerName { get; set; }
-        public IReadOnlyDictionary<string, object?>? Arguments { get; set; }
-    }
-
-    private sealed class RealtimeOtelMcpToolCallResponse
-    {
-        public string Type { get; set; } = "mcp";
-        public object? Output { get; set; }
-    }
+    // Realtime-specific OTel serialization POCOs.
+    //
+    // Types whose layout is shared 1:1 with OpenTelemetryChatClient live in
+    // Common/OtelMessageParts.cs. The types below are either entirely realtime-specific or
+    // contain realtime-specific fields. The shared JsonSerializerContext lives in Common/OtelContext.cs.
 
     #endregion
+}
 
-    [JsonSourceGenerationOptions(
-        PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonSerializable(typeof(IList<object>))]
-    [JsonSerializable(typeof(RealtimeOtelGenericPart))]
-    [JsonSerializable(typeof(RealtimeOtelBlobPart))]
-    [JsonSerializable(typeof(RealtimeOtelUriPart))]
-    [JsonSerializable(typeof(RealtimeOtelFilePart))]
-    [JsonSerializable(typeof(IEnumerable<RealtimeOtelFunction>))]
-    [JsonSerializable(typeof(IEnumerable<RealtimeOtelMessage>))]
-    [JsonSerializable(typeof(RealtimeOtelMessage))]
-    [JsonSerializable(typeof(RealtimeOtelToolCallPart))]
-    [JsonSerializable(typeof(RealtimeOtelToolCallResponsePart))]
-    [JsonSerializable(typeof(RealtimeOtelServerToolCallPart<RealtimeOtelMcpToolCall>))]
-    [JsonSerializable(typeof(RealtimeOtelServerToolCallResponsePart<RealtimeOtelMcpToolCallResponse>))]
+#pragma warning disable SA1402 // File may only contain a single type — realtime-specific OTel POCOs are co-located with the realtime session.
 
-    private sealed partial class RealtimeOtelContext : JsonSerializerContext;
+internal sealed class RealtimeOtelMessage
+{
+    public string? Role { get; set; }
+    public List<object> Parts { get; set; } = [];
+}
+
+internal sealed class RealtimeOtelToolCallPart
+{
+    public string Type { get; set; } = "tool_call";
+    public string? Id { get; set; }
+    public string? Name { get; set; }
+    public IDictionary<string, object?>? Arguments { get; set; }
 }

@@ -22,12 +22,12 @@ public class RealtimeAudioFormat
     }
 
     /// <summary>
-    /// Gets the media type of the audio (e.g., "audio/pcm", "audio/pcmu", "audio/pcma").
+    /// Gets or initializes the media type of the audio (e.g., "audio/pcm", "audio/pcmu", "audio/pcma").
     /// </summary>
     public string MediaType { get; init; }
 
     /// <summary>
-    /// Gets the sample rate of the audio in Hertz.
+    /// Gets or initializes the sample rate of the audio in Hertz.
     /// </summary>
     public int SampleRate { get; init; }
 }

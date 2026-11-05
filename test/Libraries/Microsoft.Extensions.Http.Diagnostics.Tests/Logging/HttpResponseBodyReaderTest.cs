@@ -275,4 +275,40 @@ public class HttpResponseBodyReaderTest
 
         Assert.Equal(reader.ResponseReadTimeout, timeout);
     }
+
+    [Theory]
+    [CombinatorialData]
+    public async Task Reader_DebuggerAttached_ReadsBodyAndLeavesContentReadable(bool seekable, bool bufferContent)
+    {
+        var options = new LoggingOptions
+        {
+            BodySizeLimit = 32,
+            ResponseBodyContentTypes = new HashSet<string> { TextPlain }
+        };
+
+        var httpResponseBodyReader = new HttpResponseBodyReader(options, DebuggerState.Attached);
+        var content = RandomStringGenerator.Generate(options.BodySizeLimit * 2);
+        var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        using var httpResponse = new HttpResponseMessage
+        {
+            Content = new StreamContent(seekable ? memoryStream : new NotSeekableStream(memoryStream))
+        };
+        httpResponse.Content.Headers.Add("Content-Type", TextPlain);
+
+        var responseBody = await httpResponseBodyReader.ReadAsync(httpResponse, CancellationToken.None);
+
+        responseBody.Should().Be(content.Substring(0, options.BodySizeLimit));
+
+        if (bufferContent)
+        {
+            // This is what HttpClient does once the handler pipeline is done when
+            // HttpCompletionOption.ResponseContentRead is used, i.e. for GetAsync/PostAsJsonAsync.
+            await httpResponse.Content.LoadIntoBufferAsync();
+        }
+
+        // The caller must still be able to read the whole body.
+        var response = await httpResponse.Content.ReadAsStringAsync();
+
+        response.Should().Be(content);
+    }
 }

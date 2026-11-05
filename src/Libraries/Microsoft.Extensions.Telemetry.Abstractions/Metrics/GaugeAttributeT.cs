@@ -90,4 +90,9 @@ public sealed class GaugeAttribute<T> : Attribute
     /// Gets or sets the unit of measurement for the metric.
     /// </summary>
     public string? Unit { get; set; }
+
+    /// <summary>
+    /// Gets or sets the description of the metric.
+    /// </summary>
+    public string? Description { get; set; }
 }

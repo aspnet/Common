@@ -1,89 +1,89 @@
 <Project>
-  <ItemGroup Condition="'$(InjectCompilerFeatureRequiredOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="'$(InjectCompilerFeatureRequiredOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\CompilerFeatureRequiredAttribute\*.cs" LinkBase="LegacySupport\CompilerFeatureRequiredAttribute" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectRequiredMemberOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="'$(InjectRequiredMemberOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\RequiredMemberAttribute\*.cs" LinkBase="LegacySupport\RequiredMemberAttribute" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectSystemIndexOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="'$(InjectSystemIndexOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\SystemIndex\*.cs" LinkBase="LegacySupport\SystemIndex" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectDiagnosticAttributesOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="'$(InjectDiagnosticAttributesOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp' AND '$(TargetFramework)' != 'netstandard2.1'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\DiagnosticAttributes\*.cs" LinkBase="LegacySupport\DiagnosticAttributes" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectIsExternalInitOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="('$(InjectIsExternalInitOnLegacy)' == 'true' or '$(InjectCompilerFeatureRequiredOnLegacy)' == 'true') AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\IsExternalInit\*.cs" LinkBase="LegacySupport\IsExternalInit" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectTrimAttributesOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="'$(InjectTrimAttributesOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\TrimAttributes\*.cs" LinkBase="LegacySupport\TrimAttributes" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectCallerAttributesOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1')">
+  <ItemGroup Condition="'$(InjectCallerAttributesOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\CallerAttributes\*.cs" LinkBase="LegacySupport\CallerAttributes" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectSkipLocalsInitAttributeOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="'$(InjectSkipLocalsInitAttributeOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\SkipLocalsInitAttribute\*.cs" LinkBase="LegacySupport\SkipLocalsInitAttribute" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectStringHashOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0')">
+  <ItemGroup Condition="'$(InjectStringHashOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\StringHash\*.cs" LinkBase="LegacySupport\StringHash" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectBitOperationsOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0')">
+  <ItemGroup Condition="'$(InjectBitOperationsOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\BitOperations\*.cs" LinkBase="LegacySupport\BitOperations" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectStringBuilderOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0')">
+  <ItemGroup Condition="'$(InjectStringBuilderOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\StringBuilderExtensions\*.cs" LinkBase="LegacySupport\StringBuilderExtensions" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectStringSyntaxAttributeOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'net6.0')">
+  <ItemGroup Condition="'$(InjectStringSyntaxAttributeOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\StringSyntaxAttribute\*.cs" LinkBase="LegacySupport\StringSyntaxAttribute" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectGetOrAddOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0')">
+  <ItemGroup Condition="'$(InjectGetOrAddOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\GetOrAdd\*.cs" LinkBase="LegacySupport\GetOrAdd" />
   </ItemGroup>
 
-   <ItemGroup Condition="'$(InjectDictionaryExtensionsOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0')">
+   <ItemGroup Condition="'$(InjectDictionaryExtensionsOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\DictionaryExtensions\*.cs" LinkBase="LegacySupport\DictionaryExtensions" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectTaskWaitAsyncOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="'$(InjectTaskWaitAsyncOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\TaskWaitAsync\*.cs" LinkBase="LegacySupport\TaskWaitAsync" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectExperimentalAttributeOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net7.0')">
+  <ItemGroup Condition="'$(InjectExperimentalAttributeOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\ExperimentalAttribute\*.cs" LinkBase="LegacySupport\ExperimentalAttribute" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectObsoleteAttributeOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="'$(InjectObsoleteAttributeOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\ObsoleteAttribute\*.cs" LinkBase="LegacySupport\ObsoleteAttribute" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectPlatformAttributesOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="'$(InjectPlatformAttributesOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\PlatformAttributes\*.cs" LinkBase="LegacySupport\PlatformAttributes" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectCollectionBuilderAttributesOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="'$(InjectCollectionBuilderAttributesOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\CollectionBuilder\*.cs" LinkBase="LegacySupport\CollectionBuilder" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectMediaTypeMapOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0' or '$(TargetFramework)' == 'net10.0')">
+  <ItemGroup Condition="'$(InjectMediaTypeMapOnLegacy)' == 'true'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\MediaTypeMap\*.cs" LinkBase="LegacySupport\MediaTypeMap" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectNullabilityInfoContextOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp3.1')">
+  <ItemGroup Condition="'$(InjectNullabilityInfoContextOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\NullabilityInfoContext\*.cs" LinkBase="LegacySupport\NullabilityInfoContext" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(InjectUnreachableExceptionOnLegacy)' == 'true' AND ('$(TargetFramework)' == 'net462' or '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netstandard2.1' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'net6.0')">
+  <ItemGroup Condition="'$(InjectUnreachableExceptionOnLegacy)' == 'true' AND '$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
     <Compile Include="$(MSBuildThisFileDirectory)\..\..\src\LegacySupport\UnreachableException\*.cs" LinkBase="LegacySupport\UnreachableException" />
   </ItemGroup>
 

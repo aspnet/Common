@@ -2,19 +2,16 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using Microsoft.Shared.DiagnosticIds;
 
 namespace Microsoft.Extensions.AI;
 
 /// <summary>
-/// Represents an image generation tool call invocation by a hosted service.
+/// Represents the result of an image generation tool invocation by a hosted service.
 /// </summary>
 /// <remarks>
-/// This content type represents when a hosted AI service invokes an image generation tool.
-/// It is informational only and represents the call itself, not the result.
+/// This content type is used to represent the result of an image generation tool invocation by a hosted service.
+/// It is informational only.
 /// </remarks>
-[Experimental(DiagnosticIds.Experiments.AIImageGeneration, UrlFormat = DiagnosticIds.UrlFormat)]
 public sealed class ImageGenerationToolResultContent : ToolResultContent
 {
     /// <summary>

@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 #pragma warning disable CA1307 // Specify StringComparison
+#pragma warning disable MEAI001 // OpenAIRequestPolicies is experimental
 
 namespace Microsoft.Extensions.AI;
 
@@ -15,7 +16,15 @@ namespace Microsoft.Extensions.AI;
 internal static class RequestOptionsExtensions
 {
     /// <summary>Creates a <see cref="RequestOptions"/> configured for use with OpenAI.</summary>
-    public static RequestOptions ToRequestOptions(this CancellationToken cancellationToken, bool streaming)
+    public static RequestOptions ToRequestOptions(this CancellationToken cancellationToken, bool streaming) =>
+        ToRequestOptions(cancellationToken, streaming, policies: null);
+
+    /// <summary>
+    /// Creates a <see cref="RequestOptions"/> configured for use with OpenAI, applying any
+    /// caller-registered <see cref="OpenAIRequestPolicies"/> after Microsoft.Extensions.AI's own
+    /// internal policies.
+    /// </summary>
+    public static RequestOptions ToRequestOptions(this CancellationToken cancellationToken, bool streaming, OpenAIRequestPolicies? policies)
     {
         RequestOptions requestOptions = new()
         {
@@ -24,6 +33,8 @@ internal static class RequestOptionsExtensions
         };
 
         requestOptions.AddPolicy(MeaiUserAgentPolicy.Instance, PipelinePosition.PerCall);
+
+        policies?.ApplyTo(requestOptions);
 
         return requestOptions;
     }

@@ -15,7 +15,7 @@ public class VectorStoreMetadata
     public string? VectorStoreSystemName { get; init; }
 
     /// <summary>
-    /// Gets the name of the vector store (database).
+    /// Gets or initializes the name of the vector store (database).
     /// </summary>
     public string? VectorStoreName { get; init; }
 }

@@ -1,0 +1,41 @@
+parameters:
+  - name: buildScript
+    type: string
+  - name: buildConfig
+    type: string
+  - name: repoLogPath
+    type: string
+  - name: warnAsError
+    type: number
+    default: 1
+
+steps:
+  - task: NodeTool@0
+    displayName: Add NodeJS/npm
+    inputs:
+      versionSpec: "20.x"
+      checkLatest: true
+
+  - script: ${{ parameters.buildScript }}
+            -restore
+            -warnAsError ${{ parameters.warnAsError }}
+            /bl:${{ parameters.repoLogPath }}/restore.binlog
+    displayName: Restore
+
+  - pwsh: |
+        $(Build.SourcesDirectory)/scripts/Slngen.ps1 -All -NoLaunch
+    displayName: Create solution
+
+  - script: ${{ parameters.buildScript }}
+            -restore
+            -warnAsError ${{ parameters.warnAsError }}
+            /bl:${{ parameters.repoLogPath }}/restore2.binlog
+    displayName: Restore solution
+
+  - script: ${{ parameters.buildScript }}
+            -build
+            -configuration ${{ parameters.buildConfig }}
+            -warnAsError ${{ parameters.warnAsError }}
+            /bl:${{ parameters.repoLogPath }}/build.binlog
+            $(_OfficialBuildIdArgs)
+    displayName: Build

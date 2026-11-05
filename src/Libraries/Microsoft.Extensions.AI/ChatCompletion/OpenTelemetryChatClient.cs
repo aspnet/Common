@@ -7,11 +7,7 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.Json.Serialization.Metadata;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -26,7 +22,7 @@ namespace Microsoft.Extensions.AI;
 
 /// <summary>Represents a delegating chat client that implements the OpenTelemetry Semantic Conventions for Generative AI systems.</summary>
 /// <remarks>
-/// This class provides an implementation of the Semantic Conventions for Generative AI systems v1.40, defined at <see href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />.
+/// This class provides an implementation of the Semantic Conventions for Generative AI systems v1.41, defined at <see href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />.
 /// The specification is still experimental and subject to change; as such, the telemetry output by this client is also subject to change.
 /// </remarks>
 public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
@@ -74,19 +70,8 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
         _activitySource = new(name);
         _meter = new(name);
 
-        _tokenUsageHistogram = _meter.CreateHistogram<int>(
-            OpenTelemetryConsts.GenAI.Client.TokenUsage.Name,
-            OpenTelemetryConsts.TokensUnit,
-            OpenTelemetryConsts.GenAI.Client.TokenUsage.Description,
-            advice: new() { HistogramBucketBoundaries = OpenTelemetryConsts.GenAI.Client.TokenUsage.ExplicitBucketBoundaries }
-            );
-
-        _operationDurationHistogram = _meter.CreateHistogram<double>(
-            OpenTelemetryConsts.GenAI.Client.OperationDuration.Name,
-            OpenTelemetryConsts.SecondsUnit,
-            OpenTelemetryConsts.GenAI.Client.OperationDuration.Description,
-            advice: new() { HistogramBucketBoundaries = OpenTelemetryConsts.GenAI.Client.OperationDuration.ExplicitBucketBoundaries }
-            );
+        _tokenUsageHistogram = OtelMetricHelpers.CreateGenAITokenUsageHistogram(_meter);
+        _operationDurationHistogram = OtelMetricHelpers.CreateGenAIOperationDurationHistogram(_meter);
 
         _timeToFirstChunkHistogram = _meter.CreateHistogram<double>(
             OpenTelemetryConsts.GenAI.Client.TimeToFirstChunk.Name,
@@ -184,9 +169,9 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
         _ = Throw.IfNull(messages);
         _jsonSerializerOptions.MakeReadOnly();
 
-        using Activity? activity = CreateAndConfigureActivity(options);
-        bool trackChunkTimes = _timeToFirstChunkHistogram.Enabled || _timePerOutputChunkHistogram.Enabled;
-        Stopwatch? stopwatch = _operationDurationHistogram.Enabled || trackChunkTimes ? Stopwatch.StartNew() : null;
+        using Activity? activity = CreateAndConfigureActivity(options, streaming: true);
+        bool recordChunkHistograms = _timeToFirstChunkHistogram.Enabled || _timePerOutputChunkHistogram.Enabled;
+        Stopwatch? stopwatch = _operationDurationHistogram.Enabled || recordChunkHistograms || activity is not null ? Stopwatch.StartNew() : null;
         string? requestModelId = options?.ModelId ?? _defaultModelId;
 
         AddInputMessagesTags(messages, options, activity);
@@ -207,8 +192,9 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
         TimeSpan lastChunkElapsed = default;
         bool isFirstChunk = true;
         bool responseModelSet = false;
+        double? timeToFirstChunk = null;
         TagList chunkMetricTags = default;
-        if (trackChunkTimes)
+        if (recordChunkHistograms)
         {
             AddMetricTags(ref chunkMetricTags, requestModelId, response: null);
         }
@@ -234,9 +220,9 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
                     throw;
                 }
 
-                if (trackChunkTimes)
+                if (recordChunkHistograms)
                 {
-                    Debug.Assert(stopwatch is not null, "stopwatch should have been initialized when trackChunkTimes is true");
+                    Debug.Assert(stopwatch is not null, "stopwatch should have been initialized when recordChunkHistograms is true");
                     TimeSpan currentElapsed = stopwatch!.Elapsed;
                     double delta = (currentElapsed - lastChunkElapsed).TotalSeconds;
 
@@ -249,6 +235,7 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
                     if (isFirstChunk)
                     {
                         isFirstChunk = false;
+                        timeToFirstChunk = delta;
                         if (_timeToFirstChunkHistogram.Enabled)
                         {
                             _timeToFirstChunkHistogram.Record(delta, chunkMetricTags);
@@ -261,6 +248,11 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
 
                     lastChunkElapsed = currentElapsed;
                 }
+                else if (activity is not null && timeToFirstChunk is null)
+                {
+                    Debug.Assert(stopwatch is not null, "stopwatch should have been initialized when activity is not null");
+                    timeToFirstChunk = stopwatch!.Elapsed.TotalSeconds;
+                }
 
                 trackedUpdates.Add(update);
                 yield return update;
@@ -272,282 +264,14 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
         }
         finally
         {
-            TraceResponse(activity, requestModelId, trackedUpdates.ToChatResponse(), error, stopwatch);
+            TraceResponse(activity, requestModelId, trackedUpdates.ToChatResponse(), error, stopwatch, timeToFirstChunk);
 
             await responseEnumerator.DisposeAsync();
         }
     }
 
-    internal static string SerializeChatMessages(
-        IEnumerable<ChatMessage> messages, ChatFinishReason? chatFinishReason = null, JsonSerializerOptions? customContentSerializerOptions = null)
-    {
-        List<object> output = [];
-
-        string? finishReason =
-            chatFinishReason?.Value is null ? null :
-            chatFinishReason == ChatFinishReason.Length ? "length" :
-            chatFinishReason == ChatFinishReason.ContentFilter ? "content_filter" :
-            chatFinishReason == ChatFinishReason.ToolCalls ? "tool_call" :
-            "stop";
-
-        foreach (ChatMessage message in messages)
-        {
-            OtelMessage m = new()
-            {
-                FinishReason = finishReason,
-                Role =
-                    message.Role == ChatRole.Assistant ? "assistant" :
-                    message.Role == ChatRole.Tool ? "tool" :
-                    message.Role == ChatRole.System || message.Role == new ChatRole("developer") ? "system" :
-                    "user",
-                Name = message.AuthorName,
-            };
-
-            foreach (AIContent content in message.Contents)
-            {
-                switch (content)
-                {
-                    // These are all specified in the convention:
-
-                    case TextContent tc when !string.IsNullOrWhiteSpace(tc.Text):
-                        m.Parts.Add(new OtelGenericPart { Content = tc.Text });
-                        break;
-
-                    case TextReasoningContent trc when !string.IsNullOrWhiteSpace(trc.Text):
-                        m.Parts.Add(new OtelGenericPart { Type = "reasoning", Content = trc.Text });
-                        break;
-
-                    case FunctionCallContent fcc:
-                        m.Parts.Add(new OtelToolCallRequestPart
-                        {
-                            Id = fcc.CallId,
-                            Name = fcc.Name,
-                            Arguments = fcc.Arguments,
-                        });
-                        break;
-
-                    case FunctionResultContent frc:
-                        m.Parts.Add(new OtelToolCallResponsePart
-                        {
-                            Id = frc.CallId,
-                            Response = frc.Result,
-                        });
-                        break;
-
-                    case DataContent dc:
-                        m.Parts.Add(new OtelBlobPart
-                        {
-                            Content = dc.Base64Data.ToString(),
-                            MimeType = dc.MediaType,
-                            Modality = DeriveModalityFromMediaType(dc.MediaType),
-                        });
-                        break;
-
-                    case UriContent uc:
-                        m.Parts.Add(new OtelUriPart
-                        {
-                            Uri = uc.Uri.AbsoluteUri,
-                            MimeType = uc.MediaType,
-                            Modality = DeriveModalityFromMediaType(uc.MediaType),
-                        });
-                        break;
-
-                    case HostedFileContent fc:
-                        m.Parts.Add(new OtelFilePart
-                        {
-                            FileId = fc.FileId,
-                            MimeType = fc.MediaType,
-                            Modality = DeriveModalityFromMediaType(fc.MediaType),
-                        });
-                        break;
-
-                    // These are non-standard and are using the "generic" non-text part that provides an extensibility mechanism:
-
-                    case HostedVectorStoreContent vsc:
-                        m.Parts.Add(new OtelGenericPart { Type = "vector_store", Content = vsc.VectorStoreId });
-                        break;
-
-                    case ErrorContent ec:
-                        m.Parts.Add(new OtelGenericPart { Type = "error", Content = ec.Message });
-                        break;
-
-                    // Server tool call content types as specified in the OpenTelemetry semantic conventions:
-
-                    case CodeInterpreterToolCallContent citcc:
-                        m.Parts.Add(new OtelServerToolCallPart<OtelCodeInterpreterToolCall>
-                        {
-                            Id = citcc.CallId,
-                            Name = "code_interpreter",
-                            ServerToolCall = new OtelCodeInterpreterToolCall
-                            {
-                                Code = ExtractCodeFromInputs(citcc.Inputs),
-                            },
-                        });
-                        break;
-
-                    case CodeInterpreterToolResultContent citrc:
-                        m.Parts.Add(new OtelServerToolCallResponsePart<OtelCodeInterpreterToolCallResponse>
-                        {
-                            Id = citrc.CallId,
-                            ServerToolCallResponse = new OtelCodeInterpreterToolCallResponse
-                            {
-                                Output = citrc.Outputs,
-                            },
-                        });
-                        break;
-
-                    case ImageGenerationToolCallContent igtcc:
-                        m.Parts.Add(new OtelServerToolCallPart<OtelImageGenerationToolCall>
-                        {
-                            Id = igtcc.CallId,
-                            Name = "image_generation",
-                            ServerToolCall = new OtelImageGenerationToolCall(),
-                        });
-                        break;
-
-                    case ImageGenerationToolResultContent igtrc:
-                        m.Parts.Add(new OtelServerToolCallResponsePart<OtelImageGenerationToolCallResponse>
-                        {
-                            Id = igtrc.CallId,
-                            ServerToolCallResponse = new OtelImageGenerationToolCallResponse
-                            {
-                                Output = igtrc.Outputs,
-                            },
-                        });
-                        break;
-
-                    case McpServerToolCallContent mstcc:
-                        m.Parts.Add(new OtelServerToolCallPart<OtelMcpToolCall>
-                        {
-                            Id = mstcc.CallId,
-                            Name = mstcc.Name,
-                            ServerToolCall = new OtelMcpToolCall
-                            {
-                                Arguments = mstcc.Arguments,
-                                ServerName = mstcc.ServerName,
-                            },
-                        });
-                        break;
-
-                    case McpServerToolResultContent mstrc:
-                        m.Parts.Add(new OtelServerToolCallResponsePart<OtelMcpToolCallResponse>
-                        {
-                            Id = mstrc.CallId,
-                            ServerToolCallResponse = new OtelMcpToolCallResponse
-                            {
-                                Output = mstrc.Outputs,
-                            },
-                        });
-                        break;
-
-                    case ToolApprovalRequestContent fareqc when fareqc.ToolCall is McpServerToolCallContent mcpToolCall:
-                        m.Parts.Add(new OtelServerToolCallPart<OtelMcpApprovalRequest>
-                        {
-                            Id = fareqc.RequestId,
-                            Name = mcpToolCall.Name,
-                            ServerToolCall = new OtelMcpApprovalRequest
-                            {
-                                Arguments = mcpToolCall.Arguments,
-                                ServerName = mcpToolCall.ServerName,
-                            },
-                        });
-                        break;
-
-                    case ToolApprovalResponseContent farespc when farespc.ToolCall is McpServerToolCallContent:
-                        m.Parts.Add(new OtelServerToolCallResponsePart<OtelMcpApprovalResponse>
-                        {
-                            Id = farespc.RequestId,
-                            ServerToolCallResponse = new OtelMcpApprovalResponse
-                            {
-                                Approved = farespc.Approved,
-                            },
-                        });
-                        break;
-
-                    default:
-                        JsonElement element = _emptyObject;
-                        try
-                        {
-                            JsonTypeInfo? unknownContentTypeInfo =
-                                customContentSerializerOptions?.TryGetTypeInfo(content.GetType(), out JsonTypeInfo? ctsi) is true ? ctsi :
-                                _defaultOptions.TryGetTypeInfo(content.GetType(), out JsonTypeInfo? dtsi) ? dtsi :
-                                null;
-
-                            if (unknownContentTypeInfo is not null)
-                            {
-                                element = JsonSerializer.SerializeToElement(content, unknownContentTypeInfo);
-                            }
-                        }
-                        catch
-                        {
-                            // Ignore the contents of any parts that can't be serialized.
-                        }
-
-                        m.Parts.Add(new OtelGenericPart
-                        {
-                            Type = content.GetType().FullName!,
-                            Content = element,
-                        });
-                        break;
-                }
-            }
-
-            output.Add(m);
-        }
-
-        return JsonSerializer.Serialize(output, _defaultOptions.GetTypeInfo(typeof(IList<object>)));
-    }
-
-    private static string? DeriveModalityFromMediaType(string? mediaType)
-    {
-        if (mediaType is not null)
-        {
-            int pos = mediaType.IndexOf('/');
-            if (pos >= 0)
-            {
-                ReadOnlySpan<char> topLevel = mediaType.AsSpan(0, pos);
-                return
-                    topLevel.Equals("image", StringComparison.OrdinalIgnoreCase) ? "image" :
-                    topLevel.Equals("audio", StringComparison.OrdinalIgnoreCase) ? "audio" :
-                    topLevel.Equals("video", StringComparison.OrdinalIgnoreCase) ? "video" :
-                    null;
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>Extracts code text from code interpreter inputs.</summary>
-    /// <remarks>
-    /// Code interpreter inputs typically contain a DataContent with a "text/x-python" or similar
-    /// media type representing the code to execute.
-    /// </remarks>
-    private static string? ExtractCodeFromInputs(IList<AIContent>? inputs)
-    {
-        if (inputs is not null)
-        {
-            foreach (var input in inputs)
-            {
-                // Check for DataContent with text MIME types
-                if (input is DataContent dc && dc.HasTopLevelMediaType("text"))
-                {
-                    // Return the data as a string (decode bytes as UTF8)
-                    return Encoding.UTF8.GetString(dc.Data.ToArray());
-                }
-
-                // Check for TextContent
-                if (input is TextContent tc && !string.IsNullOrEmpty(tc.Text))
-                {
-                    return tc.Text;
-                }
-            }
-        }
-
-        return null;
-    }
-
     /// <summary>Creates an activity for a chat request, or returns <see langword="null"/> if not enabled.</summary>
-    private Activity? CreateAndConfigureActivity(ChatOptions? options)
+    private Activity? CreateAndConfigureActivity(ChatOptions? options, bool streaming = false)
     {
         Activity? activity = null;
         if (_activitySource.HasListeners())
@@ -569,6 +293,11 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
                     .AddTag(OpenTelemetryConsts.GenAI.Operation.Name, OpenTelemetryConsts.GenAI.ChatName)
                     .AddTag(OpenTelemetryConsts.GenAI.Request.Model, modelId)
                     .AddTag(OpenTelemetryConsts.GenAI.Provider.Name, _providerName);
+
+                if (streaming)
+                {
+                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Request.Stream, true);
+                }
 
                 if (_serverAddress is not null)
                 {
@@ -641,16 +370,7 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
                     {
                         _ = activity.AddTag(
                             OpenTelemetryConsts.GenAI.Tool.Definitions,
-                            JsonSerializer.Serialize(options.Tools.Select(t => t switch
-                            {
-                                _ when t.GetService<AIFunctionDeclaration>() is { } af => new OtelFunction
-                                {
-                                    Name = af.Name,
-                                    Description = af.Description,
-                                    Parameters = af.JsonSchema,
-                                },
-                                _ => new OtelFunction { Type = t.Name },
-                            }), OtelContext.Default.IEnumerableOtelFunction));
+                            JsonSerializer.Serialize(options.Tools.Select(t => OtelFunction.Create(t, includeOptionalProperties: EnableSensitiveData)), OtelContext.Default.IEnumerableOtelFunction));
                     }
 
                     if (EnableSensitiveData)
@@ -678,7 +398,8 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
         string? requestModelId,
         ChatResponse? response,
         Exception? error,
-        Stopwatch? stopwatch)
+        Stopwatch? stopwatch,
+        double? timeToFirstChunk = null)
     {
         if (_operationDurationHistogram.Enabled && stopwatch is not null)
         {
@@ -712,17 +433,7 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
             }
         }
 
-        if (error is not null)
-        {
-            _ = activity?
-                .AddTag(OpenTelemetryConsts.Error.Type, error.GetType().FullName)
-                .SetStatus(ActivityStatusCode.Error, error.Message);
-
-            if (_logger is not null)
-            {
-                OpenTelemetryLog.OperationException(_logger, error);
-            }
-        }
+        OpenTelemetryLog.RecordOperationError(activity, _logger, error);
 
         if (response is not null)
         {
@@ -747,6 +458,11 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
                     _ = activity.AddTag(OpenTelemetryConsts.GenAI.Response.Model, response.ModelId);
                 }
 
+                if (timeToFirstChunk is double timeToFirstChunkValue)
+                {
+                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Response.TimeToFirstChunk, timeToFirstChunkValue);
+                }
+
                 if (response.Usage?.InputTokenCount is long inputTokens)
                 {
                     _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.InputTokens, (int)inputTokens);
@@ -760,6 +476,11 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
                 if (response.Usage?.CachedInputTokenCount is long cachedInputTokens)
                 {
                     _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.CacheReadInputTokens, (int)cachedInputTokens);
+                }
+
+                if (response.Usage?.ReasoningTokenCount is long reasoningTokens)
+                {
+                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.ReasoningOutputTokens, (int)reasoningTokens);
                 }
 
                 // Log all additional response properties as raw values on the span.
@@ -806,12 +527,12 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
             {
                 _ = activity.AddTag(
                     OpenTelemetryConsts.GenAI.SystemInstructions,
-                    JsonSerializer.Serialize(new object[1] { new OtelGenericPart { Content = options!.Instructions } }, _defaultOptions.GetTypeInfo(typeof(IList<object>))));
+                    JsonSerializer.Serialize(new object[1] { new OtelGenericPart { Content = options!.Instructions } }, OtelMessageSerializer.DefaultOptions.GetTypeInfo(typeof(IList<object>))));
             }
 
             _ = activity.AddTag(
                 OpenTelemetryConsts.GenAI.Input.Messages,
-                SerializeChatMessages(messages, customContentSerializerOptions: _jsonSerializerOptions));
+                OtelMessageSerializer.SerializeChatMessages(messages, customContentSerializerOptions: _jsonSerializerOptions));
         }
     }
 
@@ -821,174 +542,68 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
         {
             _ = activity.AddTag(
                 OpenTelemetryConsts.GenAI.Output.Messages,
-                SerializeChatMessages(response.Messages, response.FinishReason, customContentSerializerOptions: _jsonSerializerOptions));
+                OtelMessageSerializer.SerializeChatMessages(response.Messages, response.FinishReason, customContentSerializerOptions: _jsonSerializerOptions));
         }
     }
 
-    private sealed class OtelMessage
-    {
-        public string? Role { get; set; }
-        public string? Name { get; set; }
-        public List<object> Parts { get; set; } = [];
-        public string? FinishReason { get; set; }
-    }
-
-    private sealed class OtelGenericPart
-    {
-        public string Type { get; set; } = "text";
-        public object? Content { get; set; } // should be a string when Type == "text"
-    }
-
-    private sealed class OtelBlobPart
-    {
-        public string Type { get; set; } = "blob";
-        public string? Content { get; set; } // base64-encoded binary data
-        public string? MimeType { get; set; }
-        public string? Modality { get; set; }
-    }
-
-    private sealed class OtelUriPart
-    {
-        public string Type { get; set; } = "uri";
-        public string? Uri { get; set; }
-        public string? MimeType { get; set; }
-        public string? Modality { get; set; }
-    }
-
-    private sealed class OtelFilePart
-    {
-        public string Type { get; set; } = "file";
-        public string? FileId { get; set; }
-        public string? MimeType { get; set; }
-        public string? Modality { get; set; }
-    }
-
-    private sealed class OtelToolCallRequestPart
-    {
-        public string Type { get; set; } = "tool_call";
-        public string? Id { get; set; }
-        public string? Name { get; set; }
-        public IDictionary<string, object?>? Arguments { get; set; }
-    }
-
-    private sealed class OtelToolCallResponsePart
-    {
-        public string Type { get; set; } = "tool_call_response";
-        public string? Id { get; set; }
-        public object? Response { get; set; }
-    }
-
-    private sealed class OtelServerToolCallPart<T>
-        where T : class
-    {
-        public string Type { get; set; } = "server_tool_call";
-        public string? Id { get; set; }
-        public string? Name { get; set; }
-        public T? ServerToolCall { get; set; }
-    }
-
-    private sealed class OtelServerToolCallResponsePart<T>
-        where T : class
-    {
-        public string Type { get; set; } = "server_tool_call_response";
-        public string? Id { get; set; }
-        public T? ServerToolCallResponse { get; set; }
-    }
-
-    private sealed class OtelCodeInterpreterToolCall
-    {
-        public string Type { get; set; } = "code_interpreter";
-        public string? Code { get; set; }
-    }
-
-    private sealed class OtelCodeInterpreterToolCallResponse
-    {
-        public string Type { get; set; } = "code_interpreter";
-        public object? Output { get; set; }
-    }
-
-    private sealed class OtelImageGenerationToolCall
-    {
-        public string Type { get; set; } = "image_generation";
-    }
-
-    private sealed class OtelImageGenerationToolCallResponse
-    {
-        public string Type { get; set; } = "image_generation";
-        public object? Output { get; set; }
-    }
-
-    private sealed class OtelMcpToolCall
-    {
-        public string Type { get; set; } = "mcp";
-        public string? ServerName { get; set; }
-        public IDictionary<string, object?>? Arguments { get; set; }
-    }
-
-    private sealed class OtelMcpToolCallResponse
-    {
-        public string Type { get; set; } = "mcp";
-        public object? Output { get; set; }
-    }
-
-    private sealed class OtelMcpApprovalRequest
-    {
-        public string Type { get; set; } = "mcp_approval_request";
-        public string? ServerName { get; set; }
-        public IDictionary<string, object?>? Arguments { get; set; }
-    }
-
-    private sealed class OtelMcpApprovalResponse
-    {
-        public string Type { get; set; } = "mcp_approval_response";
-        public bool Approved { get; set; }
-    }
-
-    private sealed class OtelFunction
-    {
-        public string Type { get; set; } = "function";
-        public string? Name { get; set; }
-        public string? Description { get; set; }
-        public JsonElement? Parameters { get; set; }
-    }
-
-    private static readonly JsonSerializerOptions _defaultOptions = CreateDefaultOptions();
-    private static readonly JsonElement _emptyObject = JsonSerializer.SerializeToElement(new object(), _defaultOptions.GetTypeInfo(typeof(object)));
-
-    private static JsonSerializerOptions CreateDefaultOptions()
-    {
-        JsonSerializerOptions options = new(OtelContext.Default.Options)
-        {
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-        };
-
-        options.TypeInfoResolverChain.Add(AIJsonUtilities.DefaultOptions.TypeInfoResolver!);
-        options.MakeReadOnly();
-
-        return options;
-    }
-
-    [JsonSourceGenerationOptions(
-        PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonSerializable(typeof(IList<object>))]
-    [JsonSerializable(typeof(OtelMessage))]
-    [JsonSerializable(typeof(OtelGenericPart))]
-    [JsonSerializable(typeof(OtelBlobPart))]
-    [JsonSerializable(typeof(OtelUriPart))]
-    [JsonSerializable(typeof(OtelFilePart))]
-    [JsonSerializable(typeof(OtelToolCallRequestPart))]
-    [JsonSerializable(typeof(OtelToolCallResponsePart))]
-    [JsonSerializable(typeof(OtelServerToolCallPart<OtelCodeInterpreterToolCall>))]
-    [JsonSerializable(typeof(OtelServerToolCallResponsePart<OtelCodeInterpreterToolCallResponse>))]
-    [JsonSerializable(typeof(OtelServerToolCallPart<OtelImageGenerationToolCall>))]
-    [JsonSerializable(typeof(OtelServerToolCallResponsePart<OtelImageGenerationToolCallResponse>))]
-    [JsonSerializable(typeof(OtelServerToolCallPart<OtelMcpToolCall>))]
-    [JsonSerializable(typeof(OtelServerToolCallResponsePart<OtelMcpToolCallResponse>))]
-    [JsonSerializable(typeof(OtelServerToolCallPart<OtelMcpApprovalRequest>))]
-    [JsonSerializable(typeof(OtelServerToolCallResponsePart<OtelMcpApprovalResponse>))]
-    [JsonSerializable(typeof(IEnumerable<OtelFunction>))]
-    private sealed partial class OtelContext : JsonSerializerContext;
+    // Chat-specific OTel serialization POCOs.
+    //
+    // Types whose layout is shared 1:1 with OpenTelemetryRealtimeClientSession live in
+    // Common/OtelMessageParts.cs. The types below are either entirely chat-specific or
+    // contain chat-specific fields. The shared JsonSerializerContext lives in Common/OtelContext.cs,
+    // and the shared serialization helpers live in Common/OtelMessageSerializer.cs.
 }
 
+#pragma warning disable SA1402 // File may only contain a single type — chat-specific OTel POCOs are co-located with the chat client.
+
+internal sealed class OtelMessage
+{
+    public string? Role { get; set; }
+    public string? Name { get; set; }
+    public List<object> Parts { get; set; } = [];
+    public string? FinishReason { get; set; }
+}
+
+internal sealed class OtelToolCallRequestPart
+{
+    public string Type { get; set; } = "tool_call";
+    public string? Id { get; set; }
+    public string? Name { get; set; }
+    public IDictionary<string, object?>? Arguments { get; set; }
+}
+
+internal sealed class OtelCodeInterpreterToolCall
+{
+    public string Type { get; set; } = "code_interpreter";
+    public string? Code { get; set; }
+}
+
+internal sealed class OtelCodeInterpreterToolCallResponse
+{
+    public string Type { get; set; } = "code_interpreter";
+    public object? Output { get; set; }
+}
+
+internal sealed class OtelImageGenerationToolCall
+{
+    public string Type { get; set; } = "image_generation";
+}
+
+internal sealed class OtelImageGenerationToolCallResponse
+{
+    public string Type { get; set; } = "image_generation";
+    public object? Output { get; set; }
+}
+
+internal sealed class OtelMcpApprovalRequest
+{
+    public string Type { get; set; } = "mcp_approval_request";
+    public string? ServerName { get; set; }
+    public IDictionary<string, object?>? Arguments { get; set; }
+}
+
+internal sealed class OtelMcpApprovalResponse
+{
+    public string Type { get; set; } = "mcp_approval_response";
+    public bool Approved { get; set; }
+}

@@ -4,6 +4,6 @@
   StackTrace:
 at Microsoft.Shared.Diagnostics.Throw.InvalidOperationException(String message)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetMemoryUsageInBytes()
-at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass10_0.<Throws_When_Inactive_Memory_Is_Bigger_Than_Total_Memory>b__0()
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass11_0.<Throws_When_Inactive_Memory_Is_Bigger_Than_Total_Memory>b__0()
 at Xunit.Record.Exception(Func`1 testCode)
 }

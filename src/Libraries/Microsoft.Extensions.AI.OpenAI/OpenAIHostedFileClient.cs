@@ -11,7 +11,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Mime;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Shared.DiagnosticIds;
@@ -22,6 +21,7 @@ using OpenAI.Files;
 
 #pragma warning disable CA1031 // Do not catch general exception types
 #pragma warning disable IDE0058 // Expression value is never used
+#pragma warning disable OPENAI001 // Container file APIs (ContainerFileResource) are experimental
 
 namespace Microsoft.Extensions.AI;
 
@@ -104,7 +104,7 @@ internal sealed class OpenAIHostedFileClient : IHostedFileClient
 
         fileName ??= content is FileStream fs ? Path.GetFileName(fs.Name) : null;
         mediaType ??= fileName is not null ? MediaTypeMap.GetMediaType(fileName) : null;
-        fileName ??= $"{Guid.NewGuid():N}{MediaTypeMap.GetExtension(mediaType)}";
+        fileName ??= $"{Guid.NewGuid():N}{(mediaType is not null ? MediaTypeMap.GetExtension(mediaType) : null)}";
 
         if (ResolveScope(options) is string containerId)
         {
@@ -120,14 +120,14 @@ internal sealed class OpenAIHostedFileClient : IHostedFileClient
             var requestOptions = options?.RawRepresentationFactory?.Invoke(this) as RequestOptions ?? new();
             requestOptions.CancellationToken = cancellationToken;
 
-            var result = await GetContainerClient().CreateContainerFileAsync(
+            var result = await GetContainerClient().UploadContainerFileAsync(
                 containerId,
                 binaryContent,
                 multipart.Headers.ContentType!.ToString(),
                 requestOptions).ConfigureAwait(false);
 
-            using var responseDoc = JsonDocument.Parse(result.GetRawResponse().Content);
-            return ParseContainerFileJson(responseDoc.RootElement, containerId)
+            var uploadedFile = (ContainerFileResource)result;
+            return ToHostedFileContent(uploadedFile, containerId)
                 ?? throw new InvalidOperationException("The container file upload response did not include a valid file ID.");
         }
         else
@@ -161,13 +161,9 @@ internal sealed class OpenAIHostedFileClient : IHostedFileClient
             var containerClient = GetContainerClient();
             var containerResult = await containerClient.DownloadContainerFileAsync(containerId, fileId, cancellationToken).ConfigureAwait(false);
 
-            // Use protocol method to get file metadata as raw JSON. This works around
-            // https://github.com/openai/openai-dotnet/issues/733, where the SDK's typed
-            // deserialization crashes on container files with a null "bytes" value.
             var containerFileInfoResult = await containerClient.GetContainerFileAsync(
-                containerId, fileId, new RequestOptions { CancellationToken = cancellationToken }).ConfigureAwait(false);
-            using var infoDoc = JsonDocument.Parse(containerFileInfoResult.GetRawResponse().Content);
-            string? path = infoDoc.RootElement.TryGetProperty("path", out var pathProp) ? pathProp.GetString() : null;
+                containerId, fileId, cancellationToken).ConfigureAwait(false);
+            string? path = containerFileInfoResult.Value.Path;
             string containerFileName = path is not null ? Path.GetFileName(path) : fileId;
             string? containerMediaType = MediaTypeMap.GetMediaType(containerFileName) ?? "application/octet-stream";
 
@@ -197,14 +193,10 @@ internal sealed class OpenAIHostedFileClient : IHostedFileClient
         {
             if (ResolveScope(options) is string containerId)
             {
-                // Use protocol method to get file metadata as raw JSON. This works around
-                // https://github.com/openai/openai-dotnet/issues/733, where the SDK's typed
-                // deserialization crashes on container files with a null "bytes" value.
                 var containerResult = await GetContainerClient().GetContainerFileAsync(
-                    containerId, fileId, new RequestOptions { CancellationToken = cancellationToken }).ConfigureAwait(false);
+                    containerId, fileId, cancellationToken).ConfigureAwait(false);
 
-                using var doc = JsonDocument.Parse(containerResult.GetRawResponse().Content);
-                return ParseContainerFileJson(doc.RootElement, containerId);
+                return ToHostedFileContent(containerResult.Value, containerId);
             }
             else
             {
@@ -227,73 +219,29 @@ internal sealed class OpenAIHostedFileClient : IHostedFileClient
 
         if (ResolveScope(options) is string containerId)
         {
-            // Use OpenAI's protocol overload to make single-page requests, handling paging manually.
-            // This works around https://github.com/openai/openai-dotnet/issues/733, where both
-            // the convenience and protocol collection overloads crash during auto-pagination when
-            // deserializing container files with a null "bytes" value. By only taking the first raw
-            // page from each request, the SDK's internal deserialization for pagination is never triggered.
             var containerClient = GetContainerClient();
 
             int count = 0;
-            string? after = null;
+            var files = containerClient.GetContainerFilesAsync(
+                new ContainerFileCollectionOptions(containerId)
+                {
+                    PageSizeLimit = limit < int.MaxValue ? limit : null,
+                }, cancellationToken);
 
-            while (true)
+            await foreach (var file in files.ConfigureAwait(false))
             {
-                AsyncCollectionResult result = containerClient.GetContainerFilesAsync(
-                    containerId, limit < int.MaxValue ? limit : null,
-                    null, after, new() { CancellationToken = cancellationToken });
-
-                // Get only the first raw page. We must not let the SDK auto-paginate
-                // because its pagination logic deserializes the full response, which crashes.
-                IAsyncEnumerator<ClientResult> pages = result.GetRawPagesAsync().GetAsyncEnumerator(cancellationToken);
-                JsonDocument doc;
-                try
+                if (count >= limit)
                 {
-                    if (!await pages.MoveNextAsync().ConfigureAwait(false))
-                    {
-                        break;
-                    }
-
-                    doc = JsonDocument.Parse(pages.Current.GetRawResponse().Content);
-                }
-                finally
-                {
-                    await pages.DisposeAsync().ConfigureAwait(false);
+                    yield break;
                 }
 
-                using (doc)
+                if (ToHostedFileContent(file, containerId) is not { } hostedFile)
                 {
-                    var root = doc.RootElement;
-
-                    if (root.TryGetProperty("data", out JsonElement data) && data.ValueKind is JsonValueKind.Array)
-                    {
-                        foreach (var fileElement in data.EnumerateArray())
-                        {
-                            if (count >= limit)
-                            {
-                                yield break;
-                            }
-
-                            var file = ParseContainerFileJson(fileElement, containerId);
-                            if (file is null)
-                            {
-                                continue;
-                            }
-
-                            yield return file;
-                            count++;
-                        }
-                    }
-
-                    bool hasMore = root.TryGetProperty("has_more", out var hm) && hm.ValueKind is JsonValueKind.True;
-                    string? lastId = root.TryGetProperty("last_id", out var li) ? li.GetString() : null;
-                    if (!hasMore || string.IsNullOrEmpty(lastId))
-                    {
-                        break;
-                    }
-
-                    after = lastId;
+                    continue;
                 }
+
+                yield return hostedFile;
+                count++;
             }
         }
         else
@@ -387,40 +335,23 @@ internal sealed class OpenAIHostedFileClient : IHostedFileClient
             RawRepresentation = openAIFile,
         };
 
-    /// <summary>
-    /// Parses container file metadata from a JSON element into a <see cref="HostedFileContent"/>.
-    /// </summary>
-    /// <remarks>
-    /// This parses raw JSON rather than using the OpenAI SDK's typed deserialization,
-    /// as a workaround for <see href="https://github.com/openai/openai-dotnet/issues/733"/>,
-    /// where the SDK crashes deserializing container files when the "bytes" field is null.
-    /// Once the SDK issue is fixed, call sites should revert to using the typed API.
-    /// </remarks>
-    private static HostedFileContent? ParseContainerFileJson(JsonElement element, string? scope)
+    private static HostedFileContent? ToHostedFileContent(ContainerFileResource file, string? scope)
     {
-        if (!element.TryGetProperty("id", out var idProp) || idProp.GetString() is not { } id)
+        if (string.IsNullOrEmpty(file.Id))
         {
             return null;
         }
 
-        string? path = element.TryGetProperty("path", out var pathProp) ? pathProp.GetString() : null;
-        string name = path is not null ? Path.GetFileName(path) : id;
+        string name = file.Path is { } path ? Path.GetFileName(path) : file.Id;
 
-        long? sizeInBytes = element.TryGetProperty("bytes", out var bytesProp) && bytesProp.ValueKind is JsonValueKind.Number
-            ? bytesProp.GetInt64()
-            : null;
-
-        DateTimeOffset? createdAt = element.TryGetProperty("created_at", out var createdProp) && createdProp.ValueKind is JsonValueKind.Number
-            ? DateTimeOffset.FromUnixTimeSeconds(createdProp.GetInt64())
-            : null;
-
-        return new HostedFileContent(id)
+        return new HostedFileContent(file.Id)
         {
             Name = name,
             MediaType = MediaTypeMap.GetMediaType(name),
-            SizeInBytes = sizeInBytes,
-            CreatedAt = createdAt,
+            SizeInBytes = file.SizeInBytes,
+            CreatedAt = file.CreatedAt,
             Scope = scope,
+            RawRepresentation = file,
         };
     }
 

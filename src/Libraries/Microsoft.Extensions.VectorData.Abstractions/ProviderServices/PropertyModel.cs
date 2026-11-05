@@ -21,13 +21,19 @@ public abstract class PropertyModel(string modelName, Type type)
     private Action<object, object?>? _setter;
 
     /// <summary>
-    /// Gets or sets the model name of the property. If the property corresponds to a .NET property, this name is the name of that property.
+    /// Gets or sets the model name of the property.
     /// </summary>
+    /// <remarks>
+    /// If the property corresponds to a .NET property, this name is the name of that property.
+    /// </remarks>
     public string ModelName { get; set; } = modelName;
 
     /// <summary>
-    /// Gets or sets the storage name of the property. This is the name to which the property is mapped in the vector store.
+    /// Gets or sets the storage name of the property.
     /// </summary>
+    /// <remarks>
+    /// This is the name to which the property is mapped in the vector store.
+    /// </remarks>
     public string StorageName
     {
         get => field ?? ModelName;
@@ -57,11 +63,14 @@ public abstract class PropertyModel(string modelName, Type type)
     public Dictionary<string, object?>? ProviderAnnotations { get; set; }
 
     /// <summary>
-    /// Gets a value indicating whether the property type is nullable. For value types, this is <see langword="true"/> when the type is
-    /// <see cref="Nullable{T}"/>. For reference types on .NET 6+, this uses NRT annotations via
-    /// <c>NullabilityInfoContext</c> when a <see cref="PropertyInfo"/> is available
-    /// (i.e., POCO mapping); otherwise, reference types are assumed nullable.
+    /// Gets a value indicating whether the property type is nullable.
     /// </summary>
+    /// <remarks>
+    /// For value types, this is <see langword="true"/> when the type is <see cref="Nullable{T}"/>.
+    /// For reference types on .NET 6+, this uses NRT annotations via <c>NullabilityInfoContext</c>
+    /// when a <see cref="PropertyInfo"/> is available (that is, during POCO mapping);
+    /// otherwise, reference types are assumed nullable.
+    /// </remarks>
     public bool IsNullable
     {
         get

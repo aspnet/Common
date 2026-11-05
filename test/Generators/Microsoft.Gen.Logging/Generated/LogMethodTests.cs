@@ -16,6 +16,43 @@ namespace Microsoft.Gen.Logging.Test;
 
 public class LogMethodTests
 {
+    private sealed class ThrowingLogger : ILogger
+    {
+        public static ThrowingLogger Instance { get; } = new();
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => throw new InvalidOperationException("Provider failed.");
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public object? RequestId { get; private set; }
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (state is IReadOnlyList<KeyValuePair<string, object?>> fields)
+            {
+                foreach (var field in fields)
+                {
+                    if (field.Key == "RequestId")
+                    {
+                        RequestId = field.Value;
+                    }
+                }
+            }
+        }
+    }
+
     [Fact]
     public void BasicTests()
     {
@@ -164,6 +201,18 @@ public class LogMethodTests
         ArgTestExtensions.Method10(logger, 1);
         Assert.Equal("M101", collector.LatestRecord.Message);
         Assert.Equal(1, collector.Count);
+    }
+
+    [Fact]
+    public void ThreadLocalStateIsClearedWhenLoggerThrows()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            ArgTestExtensions.Method11(ThrowingLogger.Instance, "stale-request", "alpha", "beta", "gamma"));
+
+        var logger = new CapturingLogger();
+        ArgTestExtensions.Method12(logger, "req-123");
+
+        Assert.Equal("req-123", logger.RequestId);
     }
 
     [Fact]

@@ -16,6 +16,7 @@ using Azure;
 using Azure.Storage.Files.DataLake;
 using Azure.Storage.Files.DataLake.Models;
 using Azure.Storage.Files.DataLake.Specialized;
+using Microsoft.Extensions.AI.Evaluation.Reporting.Utilities;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace Microsoft.Extensions.AI.Evaluation.Reporting.Storage;
@@ -34,7 +35,7 @@ internal sealed partial class AzureStorageResponseCache(
     private const string ContentsFileNotFound = "Cache contents file {0} was not found.";
     private const string EntryAndContentsFilesNotFound = "Cache entry file {0} and contents file {1} were not found.";
 
-    private readonly string _iterationPath = $"cache/{scenarioName}/{iterationName}";
+    private readonly string _iterationPath = BuildIterationPath(scenarioName, iterationName);
     private readonly Func<DateTime> _provideDateTime = provideDateTime;
     private readonly TimeSpan _timeToLiveForCacheEntries =
         timeToLiveForCacheEntries ?? Defaults.DefaultTimeToLiveForCacheEntries;
@@ -219,8 +220,18 @@ internal sealed partial class AzureStorageResponseCache(
         }
     }
 
+    private static string BuildIterationPath(string scenarioName, string iterationName)
+    {
+        PathValidation.ValidatePathSegment(scenarioName, nameof(scenarioName));
+        PathValidation.ValidatePathSegment(iterationName, nameof(iterationName));
+
+        return $"cache/{scenarioName}/{iterationName}";
+    }
+
     private (string entryFilePath, string contentsFilePath) GetPaths(string key)
     {
+        PathValidation.ValidatePathSegment(key, nameof(key));
+
         string entryFilePath = $"{_iterationPath}/{key}/{EntryFileName}";
         string contentsFilePath = $"{_iterationPath}/{key}/{ContentsFileName}";
 

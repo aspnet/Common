@@ -22,58 +22,60 @@ public class RealtimeSessionOptions
     public RealtimeSessionKind SessionKind { get; init; } = RealtimeSessionKind.Conversation;
 
     /// <summary>
-    /// Gets the model name to use for the session.
+    /// Gets or initializes the model name to use for the session.
     /// </summary>
     public string? Model { get; init; }
 
     /// <summary>
-    /// Gets the input audio format for the session.
+    /// Gets or initializes the input audio format for the session.
     /// </summary>
     public RealtimeAudioFormat? InputAudioFormat { get; init; }
 
     /// <summary>
-    /// Gets the transcription options for the session.
+    /// Gets or initializes the transcription options for the session.
     /// </summary>
     public TranscriptionOptions? TranscriptionOptions { get; init; }
 
     /// <summary>
-    /// Gets the output audio format for the session.
+    /// Gets or initializes the output audio format for the session.
     /// </summary>
     public RealtimeAudioFormat? OutputAudioFormat { get; init; }
 
     /// <summary>
-    /// Gets the output voice for the session.
+    /// Gets or initializes the output voice for the session.
     /// </summary>
     public string? Voice { get; init; }
 
     /// <summary>
-    /// Gets the default system instructions for the session.
+    /// Gets or initializes the default system instructions for the session.
     /// </summary>
     public string? Instructions { get; init; }
 
     /// <summary>
-    /// Gets the maximum number of response tokens for the session.
+    /// Gets or initializes the maximum number of response tokens for the session.
     /// </summary>
     public int? MaxOutputTokens { get; init; }
 
     /// <summary>
-    /// Gets the output modalities for the response. like "text", "audio".
-    /// If null, then default conversation modalities will be used.
+    /// Gets or initializes the output modalities for the response, for example, "text" and "audio".
     /// </summary>
+    /// <remarks>
+    /// If <see langword="null"/>, the default conversation modalities are used.
+    /// </remarks>
     public IReadOnlyList<string>? OutputModalities { get; init; }
 
     /// <summary>
-    /// Gets the tool choice mode for the session.
+    /// Gets or initializes the tool choice mode for the session.
     /// </summary>
     public ChatToolMode? ToolMode { get; init; }
 
     /// <summary>
-    /// Gets the AI tools available for generating the response.
+    /// Gets or initializes the AI tools available for generating the response.
     /// </summary>
     public IReadOnlyList<AITool>? Tools { get; init; }
 
     /// <summary>
-    /// Gets the voice activity detection (VAD) options for the session.
+    /// Gets or initializes the voice activity detection (VAD) options for the session.
     /// </summary>
     /// <remarks>
     /// When set, configures how the server detects user speech to manage turn-taking.

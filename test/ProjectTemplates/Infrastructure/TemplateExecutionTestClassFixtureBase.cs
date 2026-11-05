@@ -1,11 +1,11 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.IO;
 using System.Threading.Tasks;
 using Xunit;
-using Xunit.Abstractions;
+using Xunit.Sdk;
 
 namespace Microsoft.Shared.ProjectTemplates.Tests;
 
@@ -43,7 +43,7 @@ public abstract class TemplateExecutionTestClassFixtureBase : IAsyncLifetime
         _sandboxProjectsPath = Path.Combine(_sandboxOutput, "projects");
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         // Here, we clear execution test output from the previous test run, if it exists.
         // It's critical that this clearing happens *before* the tests start, *not* after they complete.
@@ -157,9 +157,11 @@ public abstract class TemplateExecutionTestClassFixtureBase : IAsyncLifetime
         _currentTestOutputHelper = outputHelper;
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
+        GC.SuppressFinalize(this);
+
         // Only here to implement IAsyncLifetime. Not currently used.
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 }

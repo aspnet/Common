@@ -108,6 +108,7 @@ public class FakesExtensionsTests
 
         var exception = Record.Exception(() => hostMock.Object.CreateClient(null, _ => false));
 
+        Assert.NotNull(exception);
         Assert.IsType<InvalidOperationException>(exception);
         Assert.Equal("No suitable address found to call the server.", exception.Message);
     }
@@ -119,6 +120,7 @@ public class FakesExtensionsTests
 
         var exception = Record.Exception(() => hostMock.Object.CreateClient(null, _ => false));
 
+        Assert.NotNull(exception);
         Assert.IsType<InvalidOperationException>(exception);
         Assert.Equal("No suitable address found to call the server.", exception.Message);
     }

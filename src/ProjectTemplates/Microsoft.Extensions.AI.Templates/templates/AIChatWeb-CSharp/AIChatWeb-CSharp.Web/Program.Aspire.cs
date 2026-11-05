@@ -1,5 +1,5 @@
 using Microsoft.Extensions.AI;
-#if (IsOpenAI || IsGHModels)
+#if (IsOpenAI)
 using OpenAI;
 #endif
 using AIChatWeb_CSharp.Web.Components;
@@ -19,7 +19,7 @@ builder.AddOllamaApiClient("chat")
 builder.AddOllamaApiClient("embeddings")
     .AddEmbeddingGenerator();
 #elif (IsAzureAIFoundry)
-#else // (IsOpenAI || IsAzureOpenAI || IsGHModels)
+#else // (IsOpenAI || IsAzureOpenAI)
 #if (IsOpenAI)
 var openai = builder.AddOpenAIClient("openai");
 #else
@@ -44,7 +44,7 @@ builder.Services.AddQdrantCollection<Guid, IngestedChunk>(IngestedChunk.Collecti
 var vectorStorePath = Path.Combine(AppContext.BaseDirectory, "vector-store.db");
 var vectorStoreConnectionString = $"Data Source={vectorStorePath}";
 builder.Services.AddSqliteVectorStore(_ => vectorStoreConnectionString);
-builder.Services.AddSqliteCollection<string, IngestedChunk>(IngestedChunk.CollectionName, vectorStoreConnectionString);
+builder.Services.AddSqliteCollection<Guid, IngestedChunk>(IngestedChunk.CollectionName, vectorStoreConnectionString);
 #endif
 builder.Services.AddSingleton<DataIngestor>();
 builder.Services.AddSingleton<SemanticSearch>();

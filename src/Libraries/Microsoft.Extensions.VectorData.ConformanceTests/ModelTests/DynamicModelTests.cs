@@ -284,7 +284,7 @@ public abstract class DynamicModelTests<TKey>(DynamicModelTests<TKey>.Fixture fi
     #region Delete
 
     [Fact]
-    public async Task Delete_single_record()
+    public virtual async Task Delete_single_record()
     {
         var recordToRemove = fixture.TestData[2];
 
@@ -436,11 +436,14 @@ public abstract class DynamicModelTests<TKey>(DynamicModelTests<TKey>.Fixture fi
         ];
     }
 
-    public Task InitializeAsync()
-        => fixture.ReseedAsync();
+    public ValueTask InitializeAsync()
+        => new(fixture.ReseedAsync());
 
-    public Task DisposeAsync()
-        => Task.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return default;
+    }
 
     public static readonly TheoryData<bool> IncludeVectorsData = [false, true];
 }

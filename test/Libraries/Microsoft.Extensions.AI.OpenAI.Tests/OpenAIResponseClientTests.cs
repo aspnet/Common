@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -477,6 +477,112 @@ public class OpenAIResponseClientTests
     }
 
     [Fact]
+    public async Task ReasoningItemNullStatus_Streaming()
+    {
+        // Some OpenAI-compatible endpoints serialize the optional "status" property of a reasoning item
+        // as null rather than omitting it. Regression test for the SSE stream being torn down with
+        // ArgumentOutOfRangeException ("Unknown ReasoningStatus value") when deserializing such items.
+        const string Input = """
+            {
+              "input":[{
+                "type":"message",
+                "role":"user",
+                "content":[{
+                  "type":"input_text",
+                  "text":"Solve this problem step by step."
+                }]
+              }],
+              "reasoning": {
+                "effort": "medium"
+              },
+              "model": "o4-mini",
+              "stream": true
+            }
+            """;
+
+        const string Output = """
+            event: response.created
+            data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_reasoning123","object":"response","created_at":1756752900,"status":"in_progress","model":"o4-mini-2025-04-16","output":[],"reasoning":{"effort":"medium"}}}
+
+            event: response.in_progress
+            data: {"type":"response.in_progress","sequence_number":1,"response":{"id":"resp_reasoning123","object":"response","created_at":1756752900,"status":"in_progress","model":"o4-mini-2025-04-16","output":[]}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","sequence_number":2,"output_index":0,"item":{"id":"rs_reasoning123","type":"reasoning","status":null,"text":""}}
+
+            event: response.reasoning_text.delta
+            data: {"type":"response.reasoning_text.delta","sequence_number":3,"item_id":"rs_reasoning123","output_index":0,"delta":"First, ","status":null}
+
+            event: response.reasoning_text.delta
+            data: {"type":"response.reasoning_text.delta","sequence_number":4,"item_id":"rs_reasoning123","output_index":0,"delta":"let's analyze "}
+
+            event: response.reasoning_text.delta
+            data: {"type":"response.reasoning_text.delta","sequence_number":5,"item_id":"rs_reasoning123","output_index":0,"delta":"the problem."}
+
+            event: response.reasoning_text.done
+            data: {"type":"response.reasoning_text.done","sequence_number":6,"item_id":"rs_reasoning123","output_index":0,"text":"First, let's analyze the problem."}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","sequence_number":7,"output_index":0,"item":{"id":"rs_reasoning123","type":"reasoning","status":null,"text":"First, let's analyze the problem."}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","sequence_number":8,"output_index":1,"item":{"id":"msg_reasoning123","type":"message","status":null,"content":[],"role":"assistant"}}
+
+            event: response.content_part.added
+            data: {"type":"response.content_part.added","sequence_number":9,"item_id":"msg_reasoning123","output_index":1,"content_index":0,"part":{"type":"output_text","annotations":[],"text":""}}
+
+            event: response.output_text.delta
+            data: {"type":"response.output_text.delta","sequence_number":10,"item_id":"msg_reasoning123","output_index":1,"content_index":0,"delta":"The solution is 42."}
+
+            event: response.output_text.done
+            data: {"type":"response.output_text.done","sequence_number":11,"item_id":"msg_reasoning123","output_index":1,"content_index":0,"text":"The solution is 42."}
+
+            event: response.content_part.done
+            data: {"type":"response.content_part.done","sequence_number":12,"item_id":"msg_reasoning123","output_index":1,"content_index":0,"part":{"type":"output_text","annotations":[],"text":"The solution is 42."}}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","sequence_number":13,"output_index":1,"item":{"id":"msg_reasoning123","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"text":"The solution is 42."}],"role":"assistant"}}
+
+            event: response.completed
+            data: {"type":"response.completed","sequence_number":14,"response":{"id":"resp_reasoning123","object":"response","created_at":1756752900,"status":"completed","model":"o4-mini-2025-04-16","output":[{"id":"rs_reasoning123","type":"reasoning","status":null,"text":"First, let's analyze the problem."},{"id":"msg_reasoning123","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"text":"The solution is 42."}],"role":"assistant"}],"usage":{"input_tokens":10,"output_tokens":25,"total_tokens":35}}}
+
+
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "o4-mini");
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (var update in client.GetStreamingResponseAsync("Solve this problem step by step.", new()
+        {
+            RawRepresentationFactory = options => new CreateResponseOptions
+            {
+                ReasoningOptions = new()
+                {
+                    ReasoningEffortLevel = ResponseReasoningEffortLevel.Medium
+                }
+            }
+        }))
+        {
+            updates.Add(update);
+        }
+
+        Assert.Equal(15, updates.Count);
+
+        // Verify reasoning text delta updates (sequence 3-5) survived the null-status items
+        var reasoningUpdates = updates.Where((u, idx) => idx >= 3 && idx <= 5).ToList();
+        Assert.Equal(3, reasoningUpdates.Count);
+        Assert.All(reasoningUpdates, u =>
+        {
+            Assert.Single(u.Contents);
+            Assert.Null(u.Role);
+            var reasoning = Assert.IsType<TextReasoningContent>(u.Contents.Single());
+            Assert.NotNull(reasoning.Text);
+        });
+    }
+
+    [Fact]
     public async Task ReasoningTextDelta_Streaming_PreservesEncryptedContent()
     {
         const string Input = """
@@ -574,6 +680,95 @@ public class OpenAIResponseClientTests
         var coalescedReasoning = assistantMessage.Contents.OfType<TextReasoningContent>().Single();
         Assert.Equal("First, let's analyze the problem.", coalescedReasoning.Text);
         Assert.Equal("secret-encrypted-data-abc123", coalescedReasoning.ProtectedData);
+    }
+
+    [Fact]
+    public async Task EncryptedReasoning_Streaming_RoundTripsReasoningItemId()
+    {
+        // Streamed response containing a reasoning item (text deltas + encrypted_content + id),
+        // followed by an assistant message. Mirrors a stateless (store=false) turn that included
+        // reasoning.encrypted_content.
+        const string FirstResponse = """
+            event: response.created
+            data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_reasoning123","object":"response","created_at":1756752900,"status":"in_progress","model":"o4-mini-2025-04-16","output":[],"reasoning":{"effort":"medium"}}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","sequence_number":1,"output_index":0,"item":{"id":"rs_reasoning123","type":"reasoning","text":""}}
+
+            event: response.reasoning_text.delta
+            data: {"type":"response.reasoning_text.delta","sequence_number":2,"item_id":"rs_reasoning123","output_index":0,"delta":"First, "}
+
+            event: response.reasoning_text.delta
+            data: {"type":"response.reasoning_text.delta","sequence_number":3,"item_id":"rs_reasoning123","output_index":0,"delta":"let's analyze the problem."}
+
+            event: response.reasoning_text.done
+            data: {"type":"response.reasoning_text.done","sequence_number":4,"item_id":"rs_reasoning123","output_index":0,"text":"First, let's analyze the problem."}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","sequence_number":5,"output_index":0,"item":{"id":"rs_reasoning123","type":"reasoning","text":"First, let's analyze the problem.","encrypted_content":"secret-encrypted-data-abc123"}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","sequence_number":6,"output_index":1,"item":{"id":"msg_reasoning123","type":"message","status":"in_progress","content":[],"role":"assistant"}}
+
+            event: response.output_text.delta
+            data: {"type":"response.output_text.delta","sequence_number":7,"item_id":"msg_reasoning123","output_index":1,"content_index":0,"delta":"The solution is 42."}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","sequence_number":8,"output_index":1,"item":{"id":"msg_reasoning123","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"text":"The solution is 42."}],"role":"assistant"}}
+
+            event: response.completed
+            data: {"type":"response.completed","sequence_number":9,"response":{"id":"resp_reasoning123","object":"response","created_at":1756752900,"status":"completed","model":"o4-mini-2025-04-16","output":[{"id":"rs_reasoning123","type":"reasoning","text":"First, let's analyze the problem.","encrypted_content":"secret-encrypted-data-abc123"},{"id":"msg_reasoning123","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"text":"The solution is 42."}],"role":"assistant"}],"usage":{"input_tokens":10,"output_tokens":25,"total_tokens":35}}}
+
+            """;
+
+        const string SecondResponse = """
+            {"id":"resp_followup","object":"response","created_at":1756752901,"status":"completed","model":"o4-mini-2025-04-16","output":[{"id":"msg_followup","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"text":"Confirmed."}],"role":"assistant"}],"usage":{"input_tokens":5,"output_tokens":2,"total_tokens":7}}
+            """;
+
+        using CapturingHttpHandler handler = new([FirstResponse, SecondResponse]);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "o4-mini");
+
+        // Turn 1: stream a response with encrypted reasoning and collect the history.
+        List<ChatResponseUpdate> updates = [];
+        await foreach (var update in client.GetStreamingResponseAsync("Solve this problem step by step.", new()
+        {
+            RawRepresentationFactory = _ => new CreateResponseOptions
+            {
+                StoredOutputEnabled = false,
+                ReasoningOptions = new() { ReasoningEffortLevel = ResponseReasoningEffortLevel.Medium },
+            },
+        }))
+        {
+            updates.Add(update);
+        }
+
+        List<ChatMessage> chatHistory = [];
+        chatHistory.AddMessages(updates);
+
+        // Simulate persisting and rehydrating the session between turns (as a hosted, human-in-the-loop
+        // approval flow does). This drops RawRepresentation (which is [JsonIgnore]), so the reasoning item's
+        // id must survive via a serialized field (AdditionalProperties) to roundtrip.
+        string serializedHistory = JsonSerializer.Serialize(chatHistory, AIJsonUtilities.DefaultOptions.GetTypeInfo(typeof(List<ChatMessage>)));
+        chatHistory = (List<ChatMessage>)JsonSerializer.Deserialize(serializedHistory, AIJsonUtilities.DefaultOptions.GetTypeInfo(typeof(List<ChatMessage>)))!;
+        chatHistory.Add(new ChatMessage(ChatRole.User, "Are you sure?"));
+
+        // Turn 2: send the history back. The reasoning item must roundtrip with its id, otherwise
+        // a stateless (store=false) service rejects the request (see dotnet/extensions issue and
+        // microsoft/agent-framework#7067).
+        await client.GetResponseAsync(chatHistory, new()
+        {
+            RawRepresentationFactory = _ => new CreateResponseOptions { StoredOutputEnabled = false },
+        });
+
+        Assert.Equal(2, handler.RequestBodies.Count);
+
+        using JsonDocument secondRequest = JsonDocument.Parse(handler.RequestBodies[1]);
+        JsonElement reasoningItem = secondRequest.RootElement.GetProperty("input").EnumerateArray()
+            .Single(item => item.TryGetProperty("type", out var t) && t.GetString() == "reasoning");
+
+        Assert.Equal("rs_reasoning123", reasoningItem.GetProperty("id").GetString());
+        Assert.Equal("secret-encrypted-data-abc123", reasoningItem.GetProperty("encrypted_content").GetString());
     }
 
     [Fact]
@@ -1892,7 +2087,7 @@ public class OpenAIResponseClientTests
         using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
 
         AITool mcpTool = rawTool ?
-            ResponseTool.CreateMcpTool("deepwiki", serverUri: new("https://mcp.deepwiki.com/mcp"), toolCallApprovalPolicy: new McpToolCallApprovalPolicy(GlobalMcpToolCallApprovalPolicy.NeverRequireApproval)).AsAITool() :
+            ResponseTool.CreateMcpTool("deepwiki", serverUri: new("https://mcp.deepwiki.com/mcp"), toolCallApprovalPolicy: new McpToolCallApprovalPolicy(DefaultMcpToolCallApprovalPolicy.NeverRequireApproval)).AsAITool() :
             new HostedMcpServerTool("deepwiki", new Uri("https://mcp.deepwiki.com/mcp"))
             {
                 ApprovalMode = HostedMcpServerToolApprovalMode.NeverRequire,
@@ -2512,7 +2707,7 @@ public class OpenAIResponseClientTests
         using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
 
         AITool mcpTool = rawTool ?
-            ResponseTool.CreateMcpTool("mymcp", serverUri: new("https://mcp.example.com/mcp"), toolCallApprovalPolicy: new McpToolCallApprovalPolicy(GlobalMcpToolCallApprovalPolicy.NeverRequireApproval)).AsAITool() :
+            ResponseTool.CreateMcpTool("mymcp", serverUri: new("https://mcp.example.com/mcp"), toolCallApprovalPolicy: new McpToolCallApprovalPolicy(DefaultMcpToolCallApprovalPolicy.NeverRequireApproval)).AsAITool() :
             new HostedMcpServerTool("mymcp", new Uri("https://mcp.example.com/mcp"))
             {
                 ApprovalMode = HostedMcpServerToolApprovalMode.NeverRequire,
@@ -5496,6 +5691,51 @@ public class OpenAIResponseClientTests
     }
 
     [Fact]
+    public async Task UserMessageWithInvalidImageDetail_OmitsDetail()
+    {
+        const string Input = """
+            {
+                "model":"gpt-4o-mini",
+                "input":[
+                    {
+                        "type":"message",
+                        "role":"user",
+                        "content":[
+                            {"type":"input_image","image_url":"data:image/png;base64,iVBORw0KGgo="}
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id":"resp_001",
+              "object":"response",
+              "created_at":1741892091,
+              "status":"completed",
+              "model":"gpt-4o-mini",
+              "output":[{"type":"message","id":"msg_001","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Done","annotations":[]}]}]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
+
+        var response = await client.GetResponseAsync([
+            new ChatMessage(ChatRole.User, [
+                new DataContent(Convert.FromBase64String("iVBORw0KGgo="), "image/png")
+                {
+                    AdditionalProperties = new AdditionalPropertiesDictionary { ["detail"] = 42 }
+                }
+            ])
+        ]);
+
+        Assert.Equal("Done", response.Text);
+    }
+
+    [Fact]
     public async Task NonStreamingResponseWithIncompleteReason_MapsFinishReason()
     {
         const string Input = """
@@ -6355,10 +6595,10 @@ public class OpenAIResponseClientTests
             data: {"type":"response.image_generation_call.partial_image","item_id":"img_call_def456","output_index":0,"partial_image_index":0,"partial_image_b64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}
 
             event: response.output_item.done
-            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_def456","image_result_b64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}}
+            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_def456","result":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}}
 
             event: response.completed
-            data: {"type":"response.completed","response":{"id":"resp_def456","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_def456","image_result_b64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}],"usage":{"input_tokens":15,"output_tokens":0,"total_tokens":15}}}
+            data: {"type":"response.completed","response":{"id":"resp_def456","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_def456","result":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}],"usage":{"input_tokens":15,"output_tokens":0,"total_tokens":15}}}
 
 
             """;
@@ -6472,10 +6712,10 @@ public class OpenAIResponseClientTests
             data: {"type":"response.image_generation_call.partial_image","item_id":"img_call_ghi789","output_index":0,"partial_image_index":2,"partial_image_b64":"SGVsbG8z"}
 
             event: response.output_item.done
-            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_ghi789","image_result_b64":"SGVsbG8z"}}
+            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_ghi789","result":"SGVsbG8z"}}
 
             event: response.completed
-            data: {"type":"response.completed","response":{"id":"resp_ghi789","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_ghi789","image_result_b64":"SGVsbG8z"}],"usage":{"input_tokens":18,"output_tokens":0,"total_tokens":18}}}
+            data: {"type":"response.completed","response":{"id":"resp_ghi789","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_ghi789","result":"SGVsbG8z"}],"usage":{"input_tokens":18,"output_tokens":0,"total_tokens":18}}}
 
 
             """;
@@ -6559,6 +6799,341 @@ public class OpenAIResponseClientTests
         Assert.Equal("img_call_ghi789", toolCall.CallId);
     }
 
+    [Fact]
+    public async Task HostedImageGenerationTool_Streaming_YieldsFinalImageAfterPartialImages()
+    {
+        const string Input = """
+            {
+                "model": "gpt-4o",
+                "tools": [
+                    {
+                        "type": "image_generation",
+                        "model": "gpt-image-1",
+                        "size": "1024x1024",
+                        "output_format": "png",
+                        "partial_images": 3
+                    }
+                ],
+                "stream": true,
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Generate an image of a lake"
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        // Partial images are "Partial1", "Partial2" and "Partial3"; the final image is "Final".
+        const string Output = """
+            event: response.created
+            data: {"type":"response.created","response":{"id":"resp_final1","object":"response","created_at":1741892091,"status":"in_progress","model":"gpt-4o-2024-11-20","output":[]}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","output_index":0,"item":{"type":"image_generation_call","id":"img_call_final1","status":"in_progress"}}
+
+            event: response.image_generation_call.in_progress
+            data: {"type":"response.image_generation_call.in_progress","item_id":"img_call_final1","output_index":0}
+
+            event: response.image_generation_call.partial_image
+            data: {"type":"response.image_generation_call.partial_image","item_id":"img_call_final1","output_index":0,"partial_image_index":0,"partial_image_b64":"UGFydGlhbDE="}
+
+            event: response.image_generation_call.partial_image
+            data: {"type":"response.image_generation_call.partial_image","item_id":"img_call_final1","output_index":0,"partial_image_index":1,"partial_image_b64":"UGFydGlhbDI="}
+
+            event: response.image_generation_call.partial_image
+            data: {"type":"response.image_generation_call.partial_image","item_id":"img_call_final1","output_index":0,"partial_image_index":2,"partial_image_b64":"UGFydGlhbDM="}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_final1","status":"completed","result":"RmluYWw="}}
+
+            event: response.completed
+            data: {"type":"response.completed","response":{"id":"resp_final1","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_final1","status":"completed","result":"RmluYWw="}],"usage":{"input_tokens":15,"output_tokens":0,"total_tokens":15}}}
+
+
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o");
+
+        var imageTool = new HostedImageGenerationTool
+        {
+            Options = new ImageGenerationOptions
+            {
+                ModelId = "gpt-image-1",
+                ImageSize = new(1024, 1024),
+                MediaType = "image/png",
+                StreamingCount = 3
+            }
+        };
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (var update in client.GetStreamingResponseAsync("Generate an image of a lake", new ChatOptions
+        {
+            Tools = [imageTool]
+        }))
+        {
+            updates.Add(update);
+        }
+
+        // The three partial images and the final image should each be yielded, in that order.
+        var results = updates.SelectMany(u => u.Contents).OfType<ImageGenerationToolResultContent>().ToList();
+        Assert.Equal(4, results.Count);
+        Assert.All(results, r => Assert.Equal("img_call_final1", r.CallId));
+        for (int i = 0; i < 3; i++)
+        {
+            var partialImage = Assert.IsType<DataContent>(Assert.Single(results[i].Outputs!));
+            Assert.Equal($"Partial{i + 1}", Encoding.UTF8.GetString(partialImage.Data.ToArray()));
+            Assert.Equal(i, partialImage.AdditionalProperties?["PartialImageIndex"]);
+        }
+
+        // The final image comes from the completed ImageGenerationCallResponseItem, not from a partial image.
+        var finalResult = results[3];
+        Assert.IsType<ImageGenerationCallResponseItem>(finalResult.RawRepresentation);
+        var finalImage = Assert.IsType<DataContent>(Assert.Single(finalResult.Outputs!));
+        Assert.Equal("image/png", finalImage.MediaType);
+        Assert.Equal("Final", Encoding.UTF8.GetString(finalImage.Data.ToArray()));
+        Assert.False(finalImage.AdditionalProperties?.ContainsKey("PartialImageIndex") ?? false);
+
+        // Coalescing into a ChatResponse should keep only the final image.
+        var response = updates.ToChatResponse();
+        var coalescedResult = Assert.Single(response.Messages.SelectMany(m => m.Contents).OfType<ImageGenerationToolResultContent>());
+        Assert.Equal("Final", Encoding.UTF8.GetString(Assert.IsType<DataContent>(Assert.Single(coalescedResult.Outputs!)).Data.ToArray()));
+    }
+
+    [Fact]
+    public async Task HostedImageGenerationTool_Streaming_WithoutPartialImages_YieldsFinalImage()
+    {
+        const string Input = """
+            {
+                "model": "gpt-4o",
+                "tools": [
+                    {
+                        "type": "image_generation",
+                        "model": "gpt-image-1",
+                        "output_format": "jpeg"
+                    }
+                ],
+                "stream": true,
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Generate an image of a tree"
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            event: response.created
+            data: {"type":"response.created","response":{"id":"resp_final2","object":"response","created_at":1741892091,"status":"in_progress","model":"gpt-4o-2024-11-20","output":[]}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","output_index":0,"item":{"type":"image_generation_call","id":"img_call_final2","status":"in_progress"}}
+
+            event: response.image_generation_call.in_progress
+            data: {"type":"response.image_generation_call.in_progress","item_id":"img_call_final2","output_index":0}
+
+            event: response.image_generation_call.generating
+            data: {"type":"response.image_generation_call.generating","item_id":"img_call_final2","output_index":0}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_final2","status":"completed","result":"RmluYWw="}}
+
+            event: response.completed
+            data: {"type":"response.completed","response":{"id":"resp_final2","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_final2","status":"completed","result":"RmluYWw="}],"usage":{"input_tokens":15,"output_tokens":0,"total_tokens":15}}}
+
+
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o");
+
+        var imageTool = new HostedImageGenerationTool
+        {
+            Options = new ImageGenerationOptions
+            {
+                ModelId = "gpt-image-1",
+                MediaType = "image/jpeg"
+            }
+        };
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (var update in client.GetStreamingResponseAsync("Generate an image of a tree", new ChatOptions
+        {
+            Tools = [imageTool]
+        }))
+        {
+            updates.Add(update);
+        }
+
+        // Exactly one image result should be yielded: the final image.
+        var streamedResult = Assert.Single(updates.SelectMany(u => u.Contents).OfType<ImageGenerationToolResultContent>());
+        Assert.IsType<ImageGenerationCallResponseItem>(streamedResult.RawRepresentation);
+
+        var response = updates.ToChatResponse();
+        var contents = response.Messages.SelectMany(m => m.Contents).ToList();
+
+        var toolCall = Assert.Single(contents.OfType<ImageGenerationToolCallContent>());
+        Assert.Equal("img_call_final2", toolCall.CallId);
+
+        var toolResult = Assert.Single(contents.OfType<ImageGenerationToolResultContent>());
+        Assert.Equal("img_call_final2", toolResult.CallId);
+        var image = Assert.IsType<DataContent>(Assert.Single(toolResult.Outputs!));
+        Assert.Equal("image/jpeg", image.MediaType);
+        Assert.Equal("Final", Encoding.UTF8.GetString(image.Data.ToArray()));
+    }
+
+    [Theory]
+    [InlineData("""{"type":"image_generation_call","id":"img_call_same1","status":"completed","result":"RmluYWw="}""")]
+    [InlineData("""{"type":"image_generation_call","id":"img_call_same1","status":"failed"}""")]
+    public async Task HostedImageGenerationTool_StreamingAndNonStreaming_ProduceSameImageContents(string imageGenerationCall)
+    {
+        const string NonStreamingInput = """
+            {
+                "model": "gpt-4o",
+                "tools": [
+                    {
+                        "type": "image_generation",
+                        "model": "gpt-image-1",
+                        "output_format": "png"
+                    }
+                ],
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Generate an image of a house"
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        string nonStreamingOutput = $$"""
+            {
+              "id": "resp_same1",
+              "object": "response",
+              "created_at": 1741891428,
+              "status": "completed",
+              "model": "gpt-4o-2024-11-20",
+              "output": [{{imageGenerationCall}}],
+              "usage": {
+                "input_tokens": 15,
+                "output_tokens": 0,
+                "total_tokens": 15
+              }
+            }
+            """;
+
+        const string StreamingInput = """
+            {
+                "model": "gpt-4o",
+                "tools": [
+                    {
+                        "type": "image_generation",
+                        "model": "gpt-image-1",
+                        "output_format": "png"
+                    }
+                ],
+                "stream": true,
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Generate an image of a house"
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        string streamingOutput = $$$$"""
+            event: response.created
+            data: {"type":"response.created","response":{"id":"resp_same1","object":"response","created_at":1741891428,"status":"in_progress","model":"gpt-4o-2024-11-20","output":[]}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","output_index":0,"item":{"type":"image_generation_call","id":"img_call_same1","status":"in_progress"}}
+
+            event: response.image_generation_call.in_progress
+            data: {"type":"response.image_generation_call.in_progress","item_id":"img_call_same1","output_index":0}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","output_index":0,"item":{{{{imageGenerationCall}}}}}
+
+            event: response.completed
+            data: {"type":"response.completed","response":{"id":"resp_same1","object":"response","created_at":1741891428,"status":"completed","model":"gpt-4o-2024-11-20","output":[{{{{imageGenerationCall}}}}],"usage":{"input_tokens":15,"output_tokens":0,"total_tokens":15}}}
+
+
+            """;
+
+        static ChatOptions CreateOptions() => new()
+        {
+            Tools = [new HostedImageGenerationTool { Options = new ImageGenerationOptions { ModelId = "gpt-image-1", MediaType = "image/png" } }]
+        };
+
+        ChatResponse nonStreamingResponse;
+        using (VerbatimHttpHandler handler = new(NonStreamingInput, nonStreamingOutput))
+        using (HttpClient httpClient = new(handler))
+        using (IChatClient client = CreateResponseClient(httpClient, "gpt-4o"))
+        {
+            nonStreamingResponse = await client.GetResponseAsync("Generate an image of a house", CreateOptions());
+        }
+
+        ChatResponse streamingResponse;
+        using (VerbatimHttpHandler handler = new(StreamingInput, streamingOutput))
+        using (HttpClient httpClient = new(handler))
+        using (IChatClient client = CreateResponseClient(httpClient, "gpt-4o"))
+        {
+            streamingResponse = await client.GetStreamingResponseAsync("Generate an image of a house", CreateOptions()).ToChatResponseAsync();
+        }
+
+        var nonStreamingContents = nonStreamingResponse.Messages.SelectMany(m => m.Contents)
+            .Where(c => c is ImageGenerationToolCallContent or ImageGenerationToolResultContent).ToList();
+        var streamingContents = streamingResponse.Messages.SelectMany(m => m.Contents)
+            .Where(c => c is ImageGenerationToolCallContent or ImageGenerationToolResultContent).ToList();
+
+        // Both paths should produce a tool call followed by a tool result carrying the same final image,
+        // including when the completed item carries no image bytes.
+        Assert.Equal(nonStreamingContents.Select(c => c.GetType()), streamingContents.Select(c => c.GetType()));
+        Assert.Equal(
+            nonStreamingContents.OfType<ImageGenerationToolCallContent>().Single().CallId,
+            streamingContents.OfType<ImageGenerationToolCallContent>().Single().CallId);
+
+        var nonStreamingResult = nonStreamingContents.OfType<ImageGenerationToolResultContent>().Single();
+        var streamingResult = streamingContents.OfType<ImageGenerationToolResultContent>().Single();
+        Assert.Equal(nonStreamingResult.CallId, streamingResult.CallId);
+        Assert.IsType<ImageGenerationCallResponseItem>(nonStreamingResult.RawRepresentation);
+        Assert.IsType<ImageGenerationCallResponseItem>(streamingResult.RawRepresentation);
+
+        var nonStreamingImage = Assert.IsType<DataContent>(Assert.Single(nonStreamingResult.Outputs!));
+        var streamingImage = Assert.IsType<DataContent>(Assert.Single(streamingResult.Outputs!));
+        Assert.Equal(nonStreamingImage.MediaType, streamingImage.MediaType);
+        Assert.Equal(nonStreamingImage.Data.ToArray(), streamingImage.Data.ToArray());
+    }
+
     [Theory]
     [InlineData(ReasoningEffort.None, ReasoningOutput.Summary, "none", "concise")]
     [InlineData(ReasoningEffort.Low, ReasoningOutput.Summary, "low", "concise")]
@@ -6625,13 +7200,14 @@ public class OpenAIResponseClientTests
     [InlineData(true)]
     public async Task OpenAIApiTypeTag_SetToResponses(bool streaming)
     {
-        const string Output = """
+        const string NonStreamingOutput = """
             {
               "id": "resp_test",
               "object": "response",
               "created_at": 1741891428,
               "status": "completed",
               "model": "gpt-4o-mini",
+              "service_tier": "default",
               "output": [
                 {
                   "id": "msg_test",
@@ -6654,6 +7230,15 @@ public class OpenAIResponseClientTests
             }
             """;
 
+        const string StreamingOutput = """
+            event: response.created
+            data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_test","object":"response","created_at":1741891428,"status":"in_progress","model":"gpt-4o-mini","service_tier":"default","output":[]}}
+
+            event: response.completed
+            data: {"type":"response.completed","sequence_number":1,"response":{"id":"resp_test","object":"response","created_at":1741891428,"status":"completed","model":"gpt-4o-mini","service_tier":"default","output":[{"id":"msg_test","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Hello!"}]}],"usage":{"input_tokens":8,"output_tokens":2,"total_tokens":10}}}
+
+            """;
+
         var sourceName = Guid.NewGuid().ToString();
         var activities = new List<Activity>();
         using var listener = new ActivityListener
@@ -6664,7 +7249,7 @@ public class OpenAIResponseClientTests
         };
         ActivitySource.AddActivityListener(listener);
 
-        using VerbatimHttpHandler handler = new(new HttpHandlerExpectedInput(), Output);
+        using VerbatimHttpHandler handler = new(new HttpHandlerExpectedInput(), streaming ? StreamingOutput : NonStreamingOutput);
         using HttpClient httpClient = new(handler);
         using IChatClient client = new OpenAIClient(new ApiKeyCredential("apikey"), new OpenAIClientOptions { Transport = new HttpClientPipelineTransport(httpClient) })
             .GetResponsesClient()
@@ -6687,6 +7272,7 @@ public class OpenAIResponseClientTests
 
         var activity = Assert.Single(activities);
         Assert.Equal("responses", activity.GetTagItem("openai.api.type"));
+        Assert.Equal("default", activity.GetTagItem("openai.response.service_tier"));
     }
 
     [Fact]
@@ -6767,6 +7353,23 @@ public class OpenAIResponseClientTests
             new OpenAIClientOptions { Transport = new HttpClientPipelineTransport(httpClient) })
         .GetResponsesClient()
         .AsIChatClient(modelId);
+
+    // Returns the supplied responses in order, one per request, capturing each request body.
+    private sealed class CapturingHttpHandler(IReadOnlyList<string> responses) : HttpMessageHandler
+    {
+        private int _index;
+
+        public List<string> RequestBodies { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, System.Threading.CancellationToken cancellationToken)
+        {
+#pragma warning disable CA2016 // ReadAsStringAsync(CancellationToken) is unavailable on all target frameworks
+            RequestBodies.Add(request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync().ConfigureAwait(false));
+#pragma warning restore CA2016
+            string body = responses[Math.Min(_index++, responses.Count - 1)];
+            return new HttpResponseMessage { Content = new StringContent(body) };
+        }
+    }
 
     private static string ResponseStatusToRequestValue(ResponseStatus status)
     {
@@ -7026,15 +7629,15 @@ public class OpenAIResponseClientTests
         var wsResult = Assert.IsType<WebSearchToolResultContent>(message.Contents[1]);
         Assert.Equal("ws_0ed9cd9f8606486b0069888072b3d08190818b61da9cf032a7", wsResult.CallId);
         Assert.NotNull(wsResult.RawRepresentation);
-        Assert.NotNull(wsResult.Results);
-        Assert.Equal(2, wsResult.Results.Count);
+        Assert.NotNull(wsResult.Outputs);
+        Assert.Equal(2, wsResult.Outputs.Count);
 
-        var source0 = Assert.IsType<UriContent>(wsResult.Results[0]);
+        var source0 = Assert.IsType<UriContent>(wsResult.Outputs[0]);
         Assert.Equal(new Uri("https://devblogs.microsoft.com/dotnet/announcing-dotnet-10"), source0.Uri);
         var source0Raw = Assert.IsType<WebSearchActionUriSource>(source0.RawRepresentation);
         Assert.Equal("\"Announcing .NET 10 - .NET Blog\"", ReadPatchValue(source0Raw, "$.title"u8));
 
-        var source1 = Assert.IsType<UriContent>(wsResult.Results[1]);
+        var source1 = Assert.IsType<UriContent>(wsResult.Outputs[1]);
         Assert.Equal(new Uri("https://dotnet.microsoft.com/en-us/download/dotnet/10.0"), source1.Uri);
         var source1Raw = Assert.IsType<WebSearchActionUriSource>(source1.RawRepresentation);
         Assert.Equal("\"Download .NET 10\"", ReadPatchValue(source1Raw, "$.title"u8));
@@ -7167,9 +7770,9 @@ public class OpenAIResponseClientTests
         var wsResult = wsResultUpdate.Contents.OfType<WebSearchToolResultContent>().First();
         Assert.Equal("ws_02441a08b3f3bf4b00698880914730819eb48b3ae0c359bff3", wsResult.CallId);
         Assert.NotNull(wsResult.RawRepresentation);
-        Assert.NotNull(wsResult.Results);
-        Assert.Single(wsResult.Results);
-        var streamSource = Assert.IsType<UriContent>(wsResult.Results[0]);
+        Assert.NotNull(wsResult.Outputs);
+        Assert.Single(wsResult.Outputs);
+        var streamSource = Assert.IsType<UriContent>(wsResult.Outputs[0]);
         Assert.Equal(new Uri("https://devblogs.microsoft.com/dotnet/announcing-dotnet-10"), streamSource.Uri);
         Assert.IsType<WebSearchActionUriSource>(streamSource.RawRepresentation);
 
@@ -7194,5 +7797,1644 @@ public class OpenAIResponseClientTests
         var textContent = message.Contents.OfType<TextContent>().Single();
         Assert.Equal(".NET 10 was officially released.", textContent.Text);
     }
-}
 
+    [Fact]
+    public async Task ToolSearchTool_OnlyToolSearch_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-4o-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-4o-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools = [new HostedToolSearchTool()],
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_SearchableFunctionsDeferred_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-4o-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "function",
+                        "name": "GetWeather",
+                        "description": "Gets the weather.",
+                        "parameters": {
+                            "type": "object",
+                            "required": [],
+                            "properties": {},
+                            "additionalProperties": false
+                        },
+                        "strict": true,
+                        "defer_loading": true
+                    },
+                    {
+                        "type": "function",
+                        "name": "GetForecast",
+                        "description": "Gets the forecast.",
+                        "parameters": {
+                            "type": "object",
+                            "required": [],
+                            "properties": {},
+                            "additionalProperties": false
+                        },
+                        "strict": true,
+                        "defer_loading": true
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-4o-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
+
+        var getWeather = AIFunctionFactory.Create(() => 42, "GetWeather", "Gets the weather.");
+        var getForecast = AIFunctionFactory.Create(() => 42, "GetForecast", "Gets the forecast.");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool(),
+                getWeather,
+                getForecast,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_MixedDeferredAndNonDeferredFunctions_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "function",
+                        "name": "GetWeather",
+                        "description": "Gets the weather.",
+                        "parameters": {
+                            "type": "object",
+                            "required": [],
+                            "properties": {},
+                            "additionalProperties": false
+                        },
+                        "strict": true,
+                        "defer_loading": true
+                    },
+                    {
+                        "type": "function",
+                        "name": "ImportantTool",
+                        "description": "An important tool.",
+                        "parameters": {
+                            "type": "object",
+                            "required": [],
+                            "properties": {},
+                            "additionalProperties": false
+                        },
+                        "strict": true
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var getWeather = AIFunctionFactory.Create(() => 42, "GetWeather", "Gets the weather.");
+        var importantTool = AIFunctionFactory.Create(() => 42, "ImportantTool", "An important tool.");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool { DeferredTools = ["GetWeather"] },
+                getWeather,
+                importantTool,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_NoFunctionTools_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "web_search"
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool(),
+                new HostedWebSearchTool(),
+            ],
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_NamespaceGrouping_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "function",
+                        "name": "ImportantTool",
+                        "description": "An important tool.",
+                        "parameters": {
+                            "type": "object",
+                            "required": [],
+                            "properties": {},
+                            "additionalProperties": false
+                        },
+                        "strict": true
+                    },
+                    {
+                        "type": "namespace",
+                        "name": "crm",
+                        "tools": [
+                            {
+                                "type": "function",
+                                "name": "GetCustomer",
+                                "description": "Gets a customer.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            },
+                            {
+                                "type": "function",
+                                "name": "ListOrders",
+                                "description": "Lists orders.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var getCustomer = AIFunctionFactory.Create(() => 42, "GetCustomer", "Gets a customer.");
+        var listOrders = AIFunctionFactory.Create(() => 42, "ListOrders", "Lists orders.");
+        var importantTool = AIFunctionFactory.Create(() => 42, "ImportantTool", "An important tool.");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool { Namespace = "crm", DeferredTools = ["GetCustomer", "ListOrders"] },
+                getCustomer,
+                listOrders,
+                importantTool,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_NamespaceAllDeferred_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "namespace",
+                        "name": "utilities",
+                        "tools": [
+                            {
+                                "type": "function",
+                                "name": "GetWeather",
+                                "description": "Gets the weather.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            },
+                            {
+                                "type": "function",
+                                "name": "GetTime",
+                                "description": "Gets the time.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var getWeather = AIFunctionFactory.Create(() => 42, "GetWeather", "Gets the weather.");
+        var getTime = AIFunctionFactory.Create(() => 42, "GetTime", "Gets the time.");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool { Namespace = "utilities" },
+                getWeather,
+                getTime,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_MultipleNamespaces_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "namespace",
+                        "name": "crm",
+                        "tools": [
+                            {
+                                "type": "function",
+                                "name": "GetCustomer",
+                                "description": "Gets a customer.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            }
+                        ]
+                    },
+                    {
+                        "type": "namespace",
+                        "name": "weather",
+                        "tools": [
+                            {
+                                "type": "function",
+                                "name": "GetWeather",
+                                "description": "Gets the weather.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var getCustomer = AIFunctionFactory.Create(() => 42, "GetCustomer", "Gets a customer.");
+        var getWeather = AIFunctionFactory.Create(() => 42, "GetWeather", "Gets the weather.");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool { Namespace = "crm", DeferredTools = ["GetCustomer"] },
+                new HostedToolSearchTool { Namespace = "weather", DeferredTools = ["GetWeather"] },
+                getCustomer,
+                getWeather,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_SameNamespaceMerged_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "namespace",
+                        "name": "crm",
+                        "tools": [
+                            {
+                                "type": "function",
+                                "name": "GetCustomer",
+                                "description": "Gets a customer.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            },
+                            {
+                                "type": "function",
+                                "name": "ListOrders",
+                                "description": "Lists orders.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var getCustomer = AIFunctionFactory.Create(() => 42, "GetCustomer", "Gets a customer.");
+        var listOrders = AIFunctionFactory.Create(() => 42, "ListOrders", "Lists orders.");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool { Namespace = "crm", DeferredTools = ["GetCustomer"] },
+                new HostedToolSearchTool { Namespace = "crm", DeferredTools = ["ListOrders"] },
+                getCustomer,
+                listOrders,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_ToolClaimedByFirstNamespace_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "namespace",
+                        "name": "primary",
+                        "tools": [
+                            {
+                                "type": "function",
+                                "name": "SharedTool",
+                                "description": "A shared tool.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var sharedTool = AIFunctionFactory.Create(() => 42, "SharedTool", "A shared tool.");
+
+        // SharedTool is claimed by both namespaces — first one ("primary") wins.
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool { Namespace = "primary" },
+                new HostedToolSearchTool { Namespace = "secondary" },
+                sharedTool,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_McpToolNamespaceGrouping_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "function",
+                        "name": "LocalFunc",
+                        "description": "A local function.",
+                        "parameters": {
+                            "type": "object",
+                            "required": [],
+                            "properties": {},
+                            "additionalProperties": false
+                        },
+                        "strict": true
+                    },
+                    {
+                        "type": "namespace",
+                        "name": "remote",
+                        "tools": [
+                            {
+                                "type": "mcp",
+                                "server_label": "my-mcp-server",
+                                "server_url": "http://localhost:8000/",
+                                "defer_loading": true
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var mcpTool = new HostedMcpServerTool("my-mcp-server", "http://localhost:8000");
+        var localFunc = AIFunctionFactory.Create(() => 42, "LocalFunc", "A local function.");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool { Namespace = "remote", DeferredTools = ["my-mcp-server"] },
+                mcpTool,
+                localFunc,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_NonDeferrableToolStaysTopLevel_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "code_interpreter",
+                        "container": {
+                            "type": "auto"
+                        }
+                    },
+                    {
+                        "type": "function",
+                        "name": "LocalFunc",
+                        "description": "A local function.",
+                        "parameters": {
+                            "type": "object",
+                            "required": [],
+                            "properties": {},
+                            "additionalProperties": false
+                        },
+                        "strict": true
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var codeTool = new HostedCodeInterpreterTool();
+        var localFunc = AIFunctionFactory.Create(() => 42, "LocalFunc", "A local function.");
+
+        // code_interpreter is not deferrable — it stays top-level even when listed in DeferredTools with a namespace.
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool { Namespace = "sandbox", DeferredTools = ["code_interpreter"] },
+                codeTool,
+                localFunc,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_NamespaceWithDescription_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "function",
+                        "name": "ImportantTool",
+                        "description": "An important tool.",
+                        "parameters": {
+                            "type": "object",
+                            "required": [],
+                            "properties": {},
+                            "additionalProperties": false
+                        },
+                        "strict": true
+                    },
+                    {
+                        "type": "namespace",
+                        "name": "crm",
+                        "description": "Customer relationship management tools.",
+                        "tools": [
+                            {
+                                "type": "function",
+                                "name": "GetCustomer",
+                                "description": "Gets a customer.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            },
+                            {
+                                "type": "function",
+                                "name": "ListOrders",
+                                "description": "Lists orders.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var getCustomer = AIFunctionFactory.Create(() => 42, "GetCustomer", "Gets a customer.");
+        var listOrders = AIFunctionFactory.Create(() => 42, "ListOrders", "Lists orders.");
+        var importantTool = AIFunctionFactory.Create(() => 42, "ImportantTool", "An important tool.");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool
+                {
+                    Namespace = "crm",
+                    NamespaceDescription = "Customer relationship management tools.",
+                    DeferredTools = ["GetCustomer", "ListOrders"],
+                },
+                getCustomer,
+                listOrders,
+                importantTool,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_NamespaceDescriptionAloneDoesNotWrap_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "function",
+                        "name": "GetWeather",
+                        "description": "Gets the weather.",
+                        "parameters": {
+                            "type": "object",
+                            "required": [],
+                            "properties": {},
+                            "additionalProperties": false
+                        },
+                        "strict": true,
+                        "defer_loading": true
+                    },
+                    {
+                        "type": "function",
+                        "name": "ImportantTool",
+                        "description": "An important tool.",
+                        "parameters": {
+                            "type": "object",
+                            "required": [],
+                            "properties": {},
+                            "additionalProperties": false
+                        },
+                        "strict": true
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var getWeather = AIFunctionFactory.Create(() => 42, "GetWeather", "Gets the weather.");
+        var importantTool = AIFunctionFactory.Create(() => 42, "ImportantTool", "An important tool.");
+
+        // NamespaceDescription set without Namespace must NOT produce a namespace wrapper.
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool
+                {
+                    NamespaceDescription = "should not appear in payload",
+                    DeferredTools = ["GetWeather"],
+                },
+                getWeather,
+                importantTool,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_NamespaceWithDescription_FirstWins_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "namespace",
+                        "name": "crm",
+                        "description": "first description wins",
+                        "tools": [
+                            {
+                                "type": "function",
+                                "name": "GetCustomer",
+                                "description": "Gets a customer.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            },
+                            {
+                                "type": "function",
+                                "name": "ListOrders",
+                                "description": "Lists orders.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var getCustomer = AIFunctionFactory.Create(() => 42, "GetCustomer", "Gets a customer.");
+        var listOrders = AIFunctionFactory.Create(() => 42, "ListOrders", "Lists orders.");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool
+                {
+                    Namespace = "crm",
+                    NamespaceDescription = "first description wins",
+                    DeferredTools = ["GetCustomer"],
+                },
+                new HostedToolSearchTool
+                {
+                    Namespace = "crm",
+                    NamespaceDescription = "second description should be ignored",
+                    DeferredTools = ["ListOrders"],
+                },
+                getCustomer,
+                listOrders,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolSearchTool_NamespaceDescription_FirstNonEmptyWins_NonStreaming()
+    {
+        // The first HostedToolSearchTool for "crm" omits NamespaceDescription; a later one
+        // supplies it. The supplied description should be used for the namespace wrapper.
+        const string Input = """
+            {
+                "model": "gpt-5.4-mini",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "hello"
+                            }
+                        ]
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "tool_search"
+                    },
+                    {
+                        "type": "namespace",
+                        "name": "crm",
+                        "description": "supplied by second tool",
+                        "tools": [
+                            {
+                                "type": "function",
+                                "name": "GetCustomer",
+                                "description": "Gets a customer.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            },
+                            {
+                                "type": "function",
+                                "name": "ListOrders",
+                                "description": "Lists orders.",
+                                "parameters": {
+                                    "type": "object",
+                                    "required": [],
+                                    "properties": {},
+                                    "additionalProperties": false
+                                },
+                                "strict": true,
+                                "defer_loading": true
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_001",
+              "object": "response",
+              "created_at": 1741892091,
+              "status": "completed",
+              "model": "gpt-5.4-mini",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_001",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [{"type": "output_text", "text": "Hello!", "annotations": []}]
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-5.4-mini");
+
+        var getCustomer = AIFunctionFactory.Create(() => 42, "GetCustomer", "Gets a customer.");
+        var listOrders = AIFunctionFactory.Create(() => 42, "ListOrders", "Lists orders.");
+
+        var response = await client.GetResponseAsync("hello", new()
+        {
+            Tools =
+            [
+                new HostedToolSearchTool
+                {
+                    Namespace = "crm",
+                    DeferredTools = ["GetCustomer"],
+                },
+                new HostedToolSearchTool
+                {
+                    Namespace = "crm",
+                    NamespaceDescription = "supplied by second tool",
+                    DeferredTools = ["ListOrders"],
+                },
+                getCustomer,
+                listOrders,
+            ],
+            AdditionalProperties = new() { ["strict"] = true },
+        });
+
+        Assert.NotNull(response);
+        Assert.Equal("Hello!", response.Text);
+    }
+
+    [Fact]
+    public async Task Tool_SchemaWithObjectAdditionalProperties_FunctionCallArgumentsReceived()
+    {
+        const string Input = """
+            {
+                "model": "gpt-4o-mini",
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "TagResource",
+                        "description": "Tags a resource with key-value labels.",
+                        "parameters": {
+                            "type": "object",
+                            "required": ["resource_name"],
+                            "properties": {
+                                "resource_name": {
+                                    "type": "string",
+                                    "description": "Name of the resource."
+                                }
+                            },
+                            "additionalProperties": {"type": "string"}
+                        },
+                        "strict": null
+                    }
+                ],
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": "Tag my-server with env=production."}]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_tag_001",
+              "object": "response",
+              "created_at": 1741891428,
+              "status": "completed",
+              "model": "gpt-4o-mini-2024-07-18",
+              "output": [
+                {
+                  "type": "function_call",
+                  "id": "fc_tag_001",
+                  "call_id": "call_tag_abc",
+                  "name": "TagResource",
+                  "arguments": "{\"resource_name\":\"my-server\",\"env\":\"production\"}",
+                  "status": "completed"
+                }
+              ],
+              "parallel_tool_calls": true,
+              "previous_response_id": null,
+              "reasoning": {"effort": null, "summary": null},
+              "store": true,
+              "temperature": 1.0,
+              "text": {"format": {"type": "text"}},
+              "tool_choice": "auto",
+              "tools": [],
+              "top_p": 1.0,
+              "usage": {
+                "input_tokens": 30,
+                "input_tokens_details": {"cached_tokens": 0},
+                "output_tokens": 20,
+                "output_tokens_details": {"reasoning_tokens": 0},
+                "total_tokens": 50
+              },
+              "user": null,
+              "metadata": {}
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
+
+        const string ExplicitSchema = """
+            {
+                "type": "object",
+                "properties": {
+                    "resource_name": {
+                        "type": "string",
+                        "description": "Name of the resource."
+                    }
+                },
+                "required": ["resource_name"],
+                "additionalProperties": {"type": "string"}
+            }
+            """;
+
+        var tool = AIFunctionFactory.CreateDeclaration("TagResource", "Tags a resource with key-value labels.", JsonDocument.Parse(ExplicitSchema).RootElement);
+
+        var response = await client.GetResponseAsync(
+            "Tag my-server with env=production.",
+            new ChatOptions { Tools = [tool] });
+
+        Assert.NotNull(response);
+        var call = Assert.IsType<FunctionCallContent>(Assert.Single(response.Messages[0].Contents));
+        Assert.Equal("TagResource", call.Name);
+        Assert.NotNull(call.Arguments);
+        Assert.Equal("my-server", ((JsonElement)call.Arguments["resource_name"]!).GetString());
+        Assert.Equal("production", ((JsonElement)call.Arguments["env"]!).GetString());
+    }
+
+    [Fact]
+    public async Task Tool_SchemaWithObjectAdditionalProperties_Streaming_FunctionCallArgumentsReceived()
+    {
+        const string Input = """
+            {
+                "model": "gpt-4o-mini",
+                "tools": [
+                    {
+                        "type": "function",
+                        "name": "TagResource",
+                        "description": "Tags a resource with key-value labels.",
+                        "parameters": {
+                            "type": "object",
+                            "required": ["resource_name"],
+                            "properties": {
+                                "resource_name": {
+                                    "type": "string",
+                                    "description": "Name of the resource."
+                                }
+                            },
+                            "additionalProperties": {"type": "string"}
+                        },
+                        "strict": null
+                    }
+                ],
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": "Tag my-server with env=production."}]
+                    }
+                ],
+                "stream": true
+            }
+            """;
+
+        const string Output = """
+            event: response.created
+            data: {"type":"response.created","response":{"id":"resp_tag_002","object":"response","created_at":1741892091,"status":"in_progress","model":"gpt-4o-mini","output":[]}}
+
+            event: response.in_progress
+            data: {"type":"response.in_progress","response":{"id":"resp_tag_002","object":"response","created_at":1741892091,"status":"in_progress","model":"gpt-4o-mini","output":[]}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"fc_tag_002","call_id":"call_tag_def","name":"TagResource","arguments":"","status":"in_progress"}}
+
+            event: response.function_call_arguments.delta
+            data: {"type":"response.function_call_arguments.delta","item_id":"fc_tag_002","output_index":0,"delta":"{\"resource_name\":\"my-server\",\"env\":\"production\"}"}
+
+            event: response.function_call_arguments.done
+            data: {"type":"response.function_call_arguments.done","item_id":"fc_tag_002","output_index":0,"arguments":"{\"resource_name\":\"my-server\",\"env\":\"production\"}"}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"function_call","id":"fc_tag_002","call_id":"call_tag_def","name":"TagResource","arguments":"{\"resource_name\":\"my-server\",\"env\":\"production\"}","status":"completed"}}
+
+            event: response.completed
+            data: {"type":"response.completed","response":{"id":"resp_tag_002","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-mini","output":[{"type":"function_call","id":"fc_tag_002","call_id":"call_tag_def","name":"TagResource","arguments":"{\"resource_name\":\"my-server\",\"env\":\"production\"}","status":"completed"}],"usage":{"input_tokens":30,"output_tokens":20,"total_tokens":50}}}
+
+            
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
+
+        const string ExplicitSchema = """
+            {
+                "type": "object",
+                "properties": {
+                    "resource_name": {
+                        "type": "string",
+                        "description": "Name of the resource."
+                    }
+                },
+                "required": ["resource_name"],
+                "additionalProperties": {"type": "string"}
+            }
+            """;
+
+        var tool = AIFunctionFactory.CreateDeclaration("TagResource", "Tags a resource with key-value labels.", JsonDocument.Parse(ExplicitSchema).RootElement);
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (var update in client.GetStreamingResponseAsync(
+            "Tag my-server with env=production.",
+            new ChatOptions { Tools = [tool] }))
+        {
+            updates.Add(update);
+        }
+
+        var functionCallUpdate = updates.FirstOrDefault(u => u.Contents.OfType<FunctionCallContent>().Any());
+        Assert.NotNull(functionCallUpdate);
+        var call = functionCallUpdate.Contents.OfType<FunctionCallContent>().Single();
+        Assert.Equal("call_tag_def", call.CallId);
+        Assert.Equal("TagResource", call.Name);
+        Assert.NotNull(call.Arguments);
+        Assert.Equal("my-server", ((JsonElement)call.Arguments["resource_name"]!).GetString());
+        Assert.Equal("production", ((JsonElement)call.Arguments["env"]!).GetString());
+
+        var response = updates.ToChatResponse();
+        Assert.Equal("resp_tag_002", response.ResponseId);
+        var coalesced = response.Messages[0].Contents.OfType<FunctionCallContent>().Single();
+        Assert.Equal("TagResource", coalesced.Name);
+        Assert.NotNull(coalesced.Arguments);
+        Assert.Equal("my-server", ((JsonElement)coalesced.Arguments["resource_name"]!).GetString());
+        Assert.Equal("production", ((JsonElement)coalesced.Arguments["env"]!).GetString());
+    }
+}

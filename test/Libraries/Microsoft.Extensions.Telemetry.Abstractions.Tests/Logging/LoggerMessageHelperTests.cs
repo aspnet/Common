@@ -71,4 +71,34 @@ public static class LoggerMessageHelperTests
         var lmp2 = LoggerMessageHelper.ThreadLocalState;
         Assert.Same(lmp1, lmp2);
     }
+
+    [Theory]
+    [InlineData(1, 0, "")]
+    [InlineData(0, 1, "")]
+    [InlineData(0, 0, "prefix")]
+    public static void ThreadLocal_IsNotSharedWhileInUse(int tags, int classifiedTags, string tagNamePrefix)
+    {
+        var outer = LoggerMessageHelper.ThreadLocalState;
+        _ = outer.ReserveTagSpace(tags);
+        _ = outer.ReserveClassifiedTagSpace(classifiedTags);
+        outer.TagNamePrefix = tagNamePrefix;
+
+        // Like a nested logging call on the same thread, e.g. from a logger provider.
+        var nested = LoggerMessageHelper.ThreadLocalState;
+        Assert.NotSame(outer, nested);
+        Assert.Equal(0, nested.TagsCount);
+        Assert.Equal(0, nested.ClassifiedTagsCount);
+        Assert.Equal(string.Empty, nested.TagNamePrefix);
+
+        nested.AddTag("nested", "value");
+        nested.Clear();
+
+        Assert.Equal(tags, outer.TagsCount);
+        Assert.Equal(classifiedTags, outer.ClassifiedTagsCount);
+        Assert.Equal(tagNamePrefix, outer.TagNamePrefix);
+        outer.Clear();
+
+        Assert.Same(nested, LoggerMessageHelper.ThreadLocalState);
+        Assert.Same(nested, LoggerMessageHelper.ThreadLocalState);
+    }
 }

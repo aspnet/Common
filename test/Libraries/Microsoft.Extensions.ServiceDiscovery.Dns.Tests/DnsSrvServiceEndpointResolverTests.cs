@@ -33,6 +33,86 @@ public class DnsSrvServiceEndpointResolverTests
         public ValueTask<ServiceResult[]> ResolveServiceAsync(string name, CancellationToken cancellationToken = default) => ResolveServiceAsyncFunc!.Invoke(name, cancellationToken);
     }
 
+    /// <summary>
+    /// Regression test for https://github.com/dotnet/extensions/issues/7175: the query suffix used to build the SRV
+    /// query must be normalized (leading dot trimmed) before composing the SRV query.
+    /// </summary>
+    [Theory]
+    [InlineData(".ns")]
+    [InlineData("ns")]
+    public async Task ResolveServiceEndpoint_DnsSrv_UsesQuerySuffix(string querySuffix)
+    {
+        string? srvQuery = null;
+        var dnsClientMock = new FakeDnsResolver
+        {
+            ResolveServiceAsyncFunc = (name, cancellationToken) =>
+            {
+                srvQuery = name;
+                ServiceResult[] response = [
+                    new ServiceResult(DateTime.UtcNow.AddSeconds(60), 99, 66, 8888, "srv-a", [new AddressResult(DateTime.UtcNow.AddSeconds(64), IPAddress.Parse("10.10.10.10"))])
+                ];
+
+                return ValueTask.FromResult(response);
+            }
+        };
+        var services = new ServiceCollection()
+            .AddSingleton<IDnsResolver>(dnsClientMock)
+            .AddServiceDiscoveryCore()
+            .AddDnsSrvServiceEndpointProvider(options => options.QuerySuffix = querySuffix)
+            .BuildServiceProvider();
+        var watcherFactory = services.GetRequiredService<ServiceEndpointWatcherFactory>();
+        ServiceEndpointWatcher watcher;
+        await using ((watcher = watcherFactory.CreateWatcher("http://basket")).ConfigureAwait(false))
+        {
+            var tcs = new TaskCompletionSource<ServiceEndpointResolverResult>();
+            watcher.OnEndpointsUpdated = tcs.SetResult;
+            watcher.Start();
+            var initialResult = await tcs.Task;
+            Assert.True(initialResult.ResolvedSuccessfully);
+        }
+
+        Assert.Equal("_default._tcp.basket.ns", srvQuery);
+    }
+
+    [Fact]
+    public async Task ResolveServiceEndpoint_DnsSrv_ServiceDomainNameCallbackTakesPrecedenceOverQuerySuffix()
+    {
+        string? srvQuery = null;
+        var dnsClientMock = new FakeDnsResolver
+        {
+            ResolveServiceAsyncFunc = (name, cancellationToken) =>
+            {
+                srvQuery = name;
+                ServiceResult[] response = [
+                    new ServiceResult(DateTime.UtcNow.AddSeconds(60), 99, 66, 8888, "srv-a", [new AddressResult(DateTime.UtcNow.AddSeconds(64), IPAddress.Parse("10.10.10.10"))])
+                ];
+
+                return ValueTask.FromResult(response);
+            }
+        };
+        var services = new ServiceCollection()
+            .AddSingleton<IDnsResolver>(dnsClientMock)
+            .AddServiceDiscoveryCore()
+            .AddDnsSrvServiceEndpointProvider(options =>
+            {
+                options.QuerySuffix = ".ns";
+                options.ServiceDomainNameCallback = query => $"{query.ServiceName}.service.consul";
+            })
+            .BuildServiceProvider();
+        var watcherFactory = services.GetRequiredService<ServiceEndpointWatcherFactory>();
+        ServiceEndpointWatcher watcher;
+        await using ((watcher = watcherFactory.CreateWatcher("http://basket")).ConfigureAwait(false))
+        {
+            var tcs = new TaskCompletionSource<ServiceEndpointResolverResult>();
+            watcher.OnEndpointsUpdated = tcs.SetResult;
+            watcher.Start();
+            var initialResult = await tcs.Task;
+            Assert.True(initialResult.ResolvedSuccessfully);
+        }
+
+        Assert.Equal("basket.service.consul", srvQuery);
+    }
+
     [Fact]
     public async Task ResolveServiceEndpoint_DnsSrv()
     {

@@ -4,6 +4,6 @@
   StackTrace:
 at Microsoft.Shared.Diagnostics.Throw.InvalidOperationException(String message)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetAvailableMemoryInBytes()
-at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass7_0.<Throws_When_AvailableMemoryInBytes_Doesnt_Contain_Just_A_Number>b__0()
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass8_0.<Throws_When_AvailableMemoryInBytes_Doesnt_Contain_Just_A_Number>b__0()
 at Xunit.Record.Exception(Func`1 testCode)
 }

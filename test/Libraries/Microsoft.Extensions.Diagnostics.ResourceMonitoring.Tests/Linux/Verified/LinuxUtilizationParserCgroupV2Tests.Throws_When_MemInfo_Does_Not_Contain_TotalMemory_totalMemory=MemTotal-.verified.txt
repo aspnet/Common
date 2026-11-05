@@ -4,6 +4,6 @@
   StackTrace:
 at Microsoft.Shared.Diagnostics.Throw.InvalidOperationException(String message)
 at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.LinuxUtilizationParserCgroupV2.GetHostAvailableMemory()
-at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass11_0.<Throws_When_MemInfo_Does_Not_Contain_TotalMemory>b__0()
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Test.LinuxUtilizationParserCgroupV2Tests.<>c__DisplayClass12_0.<Throws_When_MemInfo_Does_Not_Contain_TotalMemory>b__0()
 at Xunit.Record.Exception(Func`1 testCode)
 }

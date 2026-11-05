@@ -24,7 +24,11 @@ internal sealed class IPAddressListParser : HeaderParser<IReadOnlyList<IPAddress
 
             do
             {
+#if NET11_0_OR_GREATER
+                nextSeparatorIndex = value!.IndexOf(',', startIndex, StringComparison.Ordinal);
+#else
                 nextSeparatorIndex = value!.IndexOf(',', startIndex);
+#endif
                 var length = (nextSeparatorIndex >= 0 ? nextSeparatorIndex : value.Length) - startIndex;
 
                 if (length == 0)

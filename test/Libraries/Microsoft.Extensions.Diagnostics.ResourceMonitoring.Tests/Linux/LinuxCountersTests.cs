@@ -111,6 +111,7 @@ public class LinuxCountersTests
         samples.Count.Should().Be(22);
         samples.Should().AllSatisfy(x => x.instrument.Name.Should().Be(ResourceUtilizationInstruments.SystemNetworkConnections));
         samples.Should().AllSatisfy(x => x.value.Should().Be(2));
+        samples.Should().AllSatisfy(x => x.instrument.Description.Should().NotBeNullOrWhiteSpace());
     }
 
     [Fact]

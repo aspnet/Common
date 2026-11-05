@@ -352,4 +352,153 @@ public class OpenAISpeechToTextClientTests
         new OpenAIClient(new ApiKeyCredential("apikey"), new OpenAIClientOptions { Transport = new HttpClientPipelineTransport(httpClient) })
             .GetAudioClient(modelId)
             .AsISpeechToTextClient();
+
+    public static TheoryData<byte[], string> AudioFormatDetectionData => new()
+    {
+        // WAV: RIFF____WAVE
+        { "RIFF\x00\x00\x00\x00WAVE"u8.ToArray(), "audio.wav" },
+
+        // MP3: ID3v2 tag
+        { new byte[] { (byte)'I', (byte)'D', (byte)'3', 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, "audio.mp3" },
+
+        // MP3: MPEG sync word (0xFF 0xFB)
+        { new byte[] { 0xFF, 0xFB, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, "audio.mp3" },
+
+        // WebM/Matroska: EBML header
+        { new byte[] { 0x1A, 0x45, 0xDF, 0xA3, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, "audio.webm" },
+
+        // M4A/MP4: ISO BMFF ftyp box
+        { new byte[] { 0x00, 0x00, 0x00, 0x20, (byte)'f', (byte)'t', (byte)'y', (byte)'p', (byte)'M', (byte)'4', (byte)'A', (byte)' ' }, "audio.m4a" },
+
+        // Unknown bytes: defaults to mp3
+        { new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C }, "audio.mp3" },
+    };
+
+    [Theory]
+    [MemberData(nameof(AudioFormatDetectionData))]
+    public async Task GetTextAsync_DetectsAudioFormatFromMagicBytes(byte[] header, string expectedFilename)
+    {
+        const string Input = """
+                {
+                    "model": "gpt-4o-transcribe"
+                }
+                """;
+
+        const string Output = """
+                {
+                    "text":"Hello."
+                }
+                """;
+
+        using var audioSpeechStream = new MemoryStream(header);
+
+        using VerbatimMultiPartHttpHandler handler = new(Input, Output)
+        {
+            ExpectedAudioFilename = expectedFilename,
+        };
+        using HttpClient httpClient = new(handler);
+        using ISpeechToTextClient client = CreateSpeechToTextClient(httpClient, "gpt-4o-transcribe");
+
+        var response = await client.GetTextAsync(audioSpeechStream);
+        Assert.NotNull(response);
+    }
+
+    [Theory]
+    [MemberData(nameof(AudioFormatDetectionData))]
+    public async Task GetStreamingTextAsync_DetectsAudioFormatFromMagicBytes(byte[] header, string expectedFilename)
+    {
+        const string Input = """
+                {
+                    "model": "gpt-4o-transcribe",
+                    "stream":true
+                }
+                """;
+
+        const string Output = """
+                {
+                    "text":"Hello."
+                }
+                """;
+
+        using var audioSpeechStream = new MemoryStream(header);
+
+        using VerbatimMultiPartHttpHandler handler = new(Input, Output)
+        {
+            ExpectedRequestUriContains = "audio/transcriptions",
+            ExpectedAudioFilename = expectedFilename,
+        };
+        using HttpClient httpClient = new(handler);
+        using ISpeechToTextClient client = CreateSpeechToTextClient(httpClient, "gpt-4o-transcribe");
+
+        await foreach (var update in client.GetStreamingTextAsync(audioSpeechStream))
+        {
+            Assert.NotNull(update);
+        }
+    }
+
+    [Fact]
+    public async Task GetTextAsync_StreamPositionNotAtZero_SkipsDetectionAndDefaultsToMp3()
+    {
+        const string Input = """
+                {
+                    "model": "gpt-4o-transcribe"
+                }
+                """;
+
+        const string Output = """
+                {
+                    "text":"Hello."
+                }
+                """;
+
+        // WAV magic bytes, but position advanced past them — detection should be skipped.
+        byte[] wavHeader = "RIFF\x00\x00\x00\x00WAVE"u8.ToArray();
+        using var audioSpeechStream = new MemoryStream(wavHeader);
+        audioSpeechStream.Position = 4;
+
+        using VerbatimMultiPartHttpHandler handler = new(Input, Output)
+        {
+            ExpectedAudioFilename = "audio.mp3",
+        };
+        using HttpClient httpClient = new(handler);
+        using ISpeechToTextClient client = CreateSpeechToTextClient(httpClient, "gpt-4o-transcribe");
+
+        var response = await client.GetTextAsync(audioSpeechStream);
+        Assert.NotNull(response);
+    }
+
+    [Fact]
+    public async Task GetStreamingTextAsync_StreamPositionNotAtZero_SkipsDetectionAndDefaultsToMp3()
+    {
+        const string Input = """
+                {
+                    "model": "gpt-4o-transcribe",
+                    "stream":true
+                }
+                """;
+
+        const string Output = """
+                {
+                    "text":"Hello."
+                }
+                """;
+
+        // WAV magic bytes, but position advanced past them — detection should be skipped.
+        byte[] wavHeader = "RIFF\x00\x00\x00\x00WAVE"u8.ToArray();
+        using var audioSpeechStream = new MemoryStream(wavHeader);
+        audioSpeechStream.Position = 4;
+
+        using VerbatimMultiPartHttpHandler handler = new(Input, Output)
+        {
+            ExpectedRequestUriContains = "audio/transcriptions",
+            ExpectedAudioFilename = "audio.mp3",
+        };
+        using HttpClient httpClient = new(handler);
+        using ISpeechToTextClient client = CreateSpeechToTextClient(httpClient, "gpt-4o-transcribe");
+
+        await foreach (var update in client.GetStreamingTextAsync(audioSpeechStream))
+        {
+            Assert.NotNull(update);
+        }
+    }
 }
