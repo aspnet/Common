@@ -43,7 +43,7 @@ internal sealed class LinuxNetworkMetrics
             ResourceUtilizationInstruments.SystemNetworkConnections,
             GetMeasurements,
             unit: "{connection}",
-            description: null,
+            description: "Number of network connections by state.",
             tags: commonTags);
     }
 

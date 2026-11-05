@@ -106,7 +106,7 @@
           AfterTargets="ResolveReferences">
     <ItemGroup>
       <_Microsoft_Extensions_Logging_AbstractionsAnalyzer Include="@(Analyzer)" Condition="'%(Analyzer.NuGetPackageId)' == 'Microsoft.Extensions.Logging.Abstractions' Or
-                                                                                           ('%(Analyzer.AssemblyName)' == 'Microsoft.Extensions.Logging.Generators' and '%(Analyzer.NuGetPackageId)' == 'Microsoft.AspNetCore.App.Ref')" />
+                                                                                           '%(Analyzer.AssemblyName)' == 'Microsoft.Extensions.Logging.Generators'" />
     </ItemGroup>
 
     <!-- Remove Microsoft.Extensions.Logging.Abstractions Analyzer -->

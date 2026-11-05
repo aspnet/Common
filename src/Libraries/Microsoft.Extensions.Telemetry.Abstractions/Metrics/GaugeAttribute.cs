@@ -83,4 +83,10 @@ public sealed class GaugeAttribute : Attribute
     /// </summary>
     [Experimental(DiagnosticIds.Experiments.Telemetry)]
     public string? Unit { get; set; }
+
+    /// <summary>
+    /// Gets or sets the description of the metric.
+    /// </summary>
+    [Experimental(diagnosticId: DiagnosticIds.Experiments.Telemetry, UrlFormat = DiagnosticIds.UrlFormat)]
+    public string? Description { get; set; }
 }

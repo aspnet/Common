@@ -1,0 +1,48 @@
+<Project>
+
+  <!-- Use the .NET 11 band for net11 or opted-in net10 targets; older targets retain the .NET 10 band's framework-specific assets. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net11.0' Or ('$(TargetFramework)' == 'net10.0' And '$(ForceLatestDotnetVersions)' == 'true')">
+    <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="$(MicrosoftBclAsyncInterfacesNet11Version)" />
+    <PackageVersion Include="Microsoft.Bcl.Memory" Version="$(MicrosoftBclMemoryNet11Version)" />
+    <PackageVersion Include="Microsoft.Bcl.TimeProvider" Version="$(MicrosoftBclTimeProviderNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="$(MicrosoftExtensionsCachingAbstractionsNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="$(MicrosoftExtensionsCachingMemoryNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.SqlServer" Version="$(MicrosoftExtensionsCachingSqlServerNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="$(MicrosoftExtensionsCachingStackExchangeRedisNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="$(MicrosoftExtensionsConfigurationAbstractionsNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="$(MicrosoftExtensionsConfigurationBinderNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="$(MicrosoftExtensionsConfigurationJsonNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="$(MicrosoftExtensionsConfigurationNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="$(MicrosoftExtensionsDependencyInjectionAbstractionsNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsDependencyInjectionNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics" Version="$(MicrosoftExtensionsDiagnosticsNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="$(MicrosoftExtensionsDiagnosticsHealthChecksNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Features" Version="$(MicrosoftExtensionsFeaturesNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(MicrosoftExtensionsHostingAbstractionsNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Polly" Version="$(MicrosoftExtensionsHttpPollyNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="$(MicrosoftExtensionsHttpNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="$(MicrosoftExtensionsLoggingAbstractionsNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Configuration" Version="$(MicrosoftExtensionsLoggingConfigurationNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingConsoleNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsLoggingNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.ObjectPool" Version="$(MicrosoftExtensionsObjectPoolNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="$(MicrosoftExtensionsOptionsConfigurationExtensionsNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsOptionsNet11Version)" />
+    <PackageVersion Include="Microsoft.Extensions.Primitives" Version="$(MicrosoftExtensionsPrimitivesNet11Version)" />
+    <PackageVersion Include="System.Collections.Immutable" Version="$(SystemCollectionsImmutableNet11Version)" />
+    <PackageVersion Include="System.Diagnostics.DiagnosticSource" Version="$(SystemDiagnosticsDiagnosticSourceNet11Version)" />
+    <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="$(SystemDiagnosticsPerformanceCounterNet11Version)" />
+    <PackageVersion Include="System.IO.Hashing" Version="$(SystemIOHashingNet11Version)" />
+    <PackageVersion Include="System.IO.Pipelines" Version="$(SystemIOPipelinesNet11Version)" />
+    <PackageVersion Include="System.Memory.Data" Version="$(SystemMemoryDataNet11Version)" />
+    <PackageVersion Include="System.Net.Http.Json" Version="$(SystemNetHttpJsonNet11Version)" />
+    <PackageVersion Include="System.Numerics.Tensors" Version="$(SystemNumericsTensorsNet11Version)" />
+    <PackageVersion Include="System.Text.Encodings.Web" Version="$(SystemTextEncodingsWebNet11Version)" />
+    <PackageVersion Include="System.Text.Json" Version="$(SystemTextJsonNet11Version)" />
+    <PackageVersion Include="System.Threading.Channels" Version="$(SystemThreadingChannelsNet11Version)" />
+    <PackageVersion Update="System.Linq.AsyncEnumerable" Version="$(SystemLinqAsyncEnumerableNet11Version)" />
+    <PackageVersion Update="System.Runtime.Caching" Version="$(SystemRuntimeCachingNet11Version)" />
+  </ItemGroup>
+
+</Project>

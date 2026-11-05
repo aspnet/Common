@@ -679,4 +679,109 @@ public partial class ParserTests
 
         Assert.Empty(d);
     }
+
+    [Fact]
+    public async Task StructTypeWithDescription()
+    {
+        var d = await RunGenerator(@"
+            public struct HistogramStruct
+            {
+                [Dimension(""Dim1_FromAttribute"")]
+                public string? Dim1 { get; set; }
+            }
+
+            public static partial class MetricClass
+            {
+                [Histogram(typeof(HistogramStruct), Name=""TotalCountTest"", Unit = ""s"", Description = ""Total count."")]
+                public static partial TotalCount CreateTotalCountCounter(Meter meter);
+            }");
+
+        Assert.Empty(d);
+    }
+
+    [Theory]
+    [InlineData("bool")]
+    [InlineData("System.Boolean")]
+    [InlineData("sbyte")]
+    [InlineData("byte")]
+    [InlineData("short")]
+    [InlineData("ushort")]
+    [InlineData("int")]
+    [InlineData("System.Int32")]
+    [InlineData("uint")]
+    [InlineData("long")]
+    [InlineData("System.Int64")]
+    [InlineData("float")]
+    [InlineData("double")]
+    [InlineData("System.Double")]
+    public async Task StrongTypeWithPrimitiveTags(string type)
+    {
+        var d = await RunGenerator(@$"
+            public class PrimitiveTags
+            {{
+                public {type} Tag1 {{ get; set; }}
+
+                [TagName(""tag2"")]
+                public {type} Tag2;
+
+                public string? StringTag {{ get; set; }}
+
+                public ChildPrimitiveTags? Child {{ get; set; }}
+
+                public PrimitiveTagsStruct ChildStruct {{ get; set; }}
+            }}
+
+            public class ChildPrimitiveTags
+            {{
+                public {type} Tag3 {{ get; set; }}
+            }}
+
+            public struct PrimitiveTagsStruct
+            {{
+                [TagName(""tag4"")]
+                public {type} Tag4 {{ get; set; }}
+            }}
+
+            public static partial class MetricClass
+            {{
+                [Counter(typeof(PrimitiveTags), Name=""CounterTest"")]
+                public static partial TestCounter CreateCounter(Meter meter);
+
+                [Histogram(typeof(PrimitiveTagsStruct), Name=""HistogramTest"")]
+                public static partial TestHistogram CreateHistogram(Meter meter);
+
+                [Gauge(typeof(PrimitiveTags), Name=""GaugeTest"")]
+                public static partial TestGauge CreateGauge(Meter meter);
+            }}");
+
+        Assert.Empty(d);
+    }
+
+    [Fact]
+    public async Task StrongTypeWithPrimitiveTags_DuplicateTagName()
+    {
+        var d = await RunGenerator(@"
+            public class PrimitiveTags
+            {
+                [TagName(""server.port"")]
+                public int Port { get; set; }
+
+                public ChildPrimitiveTags? Child { get; set; }
+            }
+
+            public class ChildPrimitiveTags
+            {
+                [TagName(""server.port"")]
+                public long OtherPort { get; set; }
+            }
+
+            public static partial class MetricClass
+            {
+                [Counter(typeof(PrimitiveTags), Name=""CounterTest"")]
+                public static partial TestCounter CreateCounter(Meter meter);
+            }");
+
+        var diag = Assert.Single(d);
+        Assert.Equal(DiagDescriptors.ErrorDuplicateTagName.Id, diag.Id);
+    }
 }

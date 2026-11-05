@@ -20,6 +20,7 @@ public class ImageGenerationOptionsTests
         Assert.Null(options.MediaType);
         Assert.Null(options.ModelId);
         Assert.Null(options.RawRepresentationFactory);
+        Assert.Null(options.StreamingCount);
 
         ImageGenerationOptions clone = options.Clone();
         Assert.Null(clone.ResponseFormat);
@@ -28,6 +29,7 @@ public class ImageGenerationOptionsTests
         Assert.Null(clone.MediaType);
         Assert.Null(clone.ModelId);
         Assert.Null(clone.RawRepresentationFactory);
+        Assert.Null(clone.StreamingCount);
     }
 
     [Fact]
@@ -45,6 +47,7 @@ public class ImageGenerationOptionsTests
         options.MediaType = "image/png";
         options.ModelId = "modelId";
         options.RawRepresentationFactory = factory;
+        options.StreamingCount = 2;
 
         Assert.Equal(ImageGenerationResponseFormat.Data, options.ResponseFormat);
         Assert.Equal(5, options.Count);
@@ -52,6 +55,7 @@ public class ImageGenerationOptionsTests
         Assert.Equal("image/png", options.MediaType);
         Assert.Equal("modelId", options.ModelId);
         Assert.Same(factory, options.RawRepresentationFactory);
+        Assert.Equal(2, options.StreamingCount);
 
         ImageGenerationOptions clone = options.Clone();
         Assert.Equal(ImageGenerationResponseFormat.Data, clone.ResponseFormat);
@@ -60,6 +64,7 @@ public class ImageGenerationOptionsTests
         Assert.Equal("image/png", clone.MediaType);
         Assert.Equal("modelId", clone.ModelId);
         Assert.Same(factory, clone.RawRepresentationFactory);
+        Assert.Equal(2, clone.StreamingCount);
     }
 
     [Fact]

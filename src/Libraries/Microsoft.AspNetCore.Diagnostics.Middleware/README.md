@@ -80,7 +80,7 @@ To preserve logging scopes in buffered log records, set the experimental `Includ
 
 These components enable tracking and reporting the latency of HTTP request processing.
 
-The services can be registered using the following methods:
+The services can be registered using the following methods. They also register the latency context services (see `AddLatencyContext()`) unless those are already registered:
 
 ```csharp
 public static IServiceCollection AddRequestCheckpoint(this IServiceCollection services)
@@ -127,7 +127,6 @@ For example:
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddLatencyContext();
 builder.Services.AddRequestLatencyTelemetry();
 builder.Services.AddRequestCheckpoint();
 builder.Services.AddHttpLogging();
@@ -145,6 +144,8 @@ app.UseRequestLatencyTelemetry();
 These components enable enriching and redacting ASP.NET Core's [HTTP request logs](https://learn.microsoft.com/aspnet/core/fundamentals/http-logging/).
 
 These APIs are only available for ASP.NET Core 8+.
+
+`AddHttpLoggingRedaction()` registers a default redactor provider by calling `AddRedaction()` from the `Microsoft.Extensions.Compliance.Redaction` package. `AddHttpLogEnricher<T>()` and `AddHttpServerLatencyTelemetry()` call `AddHttpLoggingRedaction()`, so they register it too. The default redactor provider erases any data that has a data classification other than `DataClassification.None`. To use specific redactors for your data classifications, call `builder.Services.AddRedaction(...)` and configure them; this can be done before or after calling any of these methods. If you use `AddFakeRedaction()` or a custom `IRedactorProvider` implementation, it must be registered before calling any of these methods.
 
 The services can be registered using the following methods:
 

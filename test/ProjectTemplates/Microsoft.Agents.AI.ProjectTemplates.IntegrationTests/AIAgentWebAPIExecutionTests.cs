@@ -38,7 +38,7 @@ public class AIAgentWebAPIExecutionTests : TemplateExecutionTestBase<AIAgentWebA
         (string name, string[] values)[] allOptionValues = [
             ("--provider",          ["azureopenai", "ollama", "openai"]),
             ("--managed-identity",  ["true", "false"]),
-            ("--framework",         ["net8.0", "net9.0", "net10.0"])
+            ("--framework",         ["net8.0", "net9.0", "net10.0", "net11.0"])
         ];
 
         foreach (var args in GetPossibleOptions(allOptionValues))

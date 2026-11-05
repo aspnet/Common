@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Gen.Metrics.Model;
 using Microsoft.Gen.Shared;
 
@@ -148,7 +149,12 @@ internal sealed class MetricFactoryEmitter : EmitterBase
         OutOpenBrace();
         OutLn($"return {GetMetricDictionaryName(metricMethod)}.GetOrAdd({meterParam.Name}, static _meter =>");
         OutLn("    {");
-        if (string.IsNullOrEmpty(metricMethod.MetricUnit))
+        if (metricMethod.MetricDescription is { Length: > 0 } description)
+        {
+            var unit = string.IsNullOrEmpty(metricMethod.MetricUnit) ? "null" : $"@\"{metricMethod.MetricUnit}\"";
+            OutLn($"        var instrument = _meter.{createMethodName}(@\"{metricMethod.MetricName}\", {unit}, {SymbolDisplay.FormatLiteral(description, quote: true)});");
+        }
+        else if (string.IsNullOrEmpty(metricMethod.MetricUnit))
         {
             OutLn($"        var instrument = _meter.{createMethodName}(@\"{metricMethod.MetricName}\");");
         }

@@ -91,8 +91,15 @@ internal sealed class WindowsSnapshotProvider : ISnapshotProvider
         var meter = meterFactory.Create(ResourceUtilizationInstruments.MeterName);
 #pragma warning restore CA2000 // Dispose objects before losing scope
 
-        _ = meter.CreateObservableGauge(name: ResourceUtilizationInstruments.ProcessCpuUtilization, observeValue: CpuPercentage);
-        _ = meter.CreateObservableGauge(name: ResourceUtilizationInstruments.ProcessMemoryUtilization, observeValue: MemoryPercentage);
+        _ = meter.CreateObservableGauge(
+            name: ResourceUtilizationInstruments.ProcessCpuUtilization,
+            observeValue: CpuPercentage,
+            description: "The CPU consumption of the running application.");
+
+        _ = meter.CreateObservableGauge(
+            name: ResourceUtilizationInstruments.ProcessMemoryUtilization,
+            observeValue: MemoryPercentage,
+            description: "The memory consumption of the running application.");
     }
 
     public Snapshot GetSnapshot()

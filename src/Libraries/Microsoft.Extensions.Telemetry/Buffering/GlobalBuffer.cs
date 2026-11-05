@@ -21,8 +21,8 @@ internal sealed class GlobalBuffer : IDisposable
     internal LogBufferingFilterRule[] LastKnownGoodFilterRules;
 
     private const int MaxBatchSize = 256;
-    private static readonly ObjectPool<List<DeserializedLogRecord>> _recordsToEmitListPool =
-        PoolFactory.CreateListPoolWithCapacity<DeserializedLogRecord>(MaxBatchSize);
+    private static readonly ObjectPool<List<SerializedLogRecord>> _recordsToEmitListPool =
+        PoolFactory.CreateListPoolWithCapacity<SerializedLogRecord>(MaxBatchSize);
 
     private readonly IOptionsMonitor<GlobalLogBufferingOptions> _options;
     private readonly IBufferedLogger _bufferedLogger;
@@ -138,18 +138,12 @@ internal sealed class GlobalBuffer : IDisposable
         for (int offset = 0; offset < numItemsToEmit && !tempBuffer.IsEmpty; offset += MaxBatchSize)
         {
             int currentBatchSize = Math.Min(MaxBatchSize, numItemsToEmit - offset);
-            List<DeserializedLogRecord> recordsToEmit = _recordsToEmitListPool.Get();
+            List<SerializedLogRecord> recordsToEmit = _recordsToEmitListPool.Get();
             try
             {
-                for (int i = 0; i < currentBatchSize && tempBuffer.TryDequeue(out SerializedLogRecord bufferedRecord); i++)
+                for (int i = 0; i < currentBatchSize && tempBuffer.TryDequeue(out SerializedLogRecord? bufferedRecord); i++)
                 {
-                    recordsToEmit.Add(new DeserializedLogRecord(
-                        bufferedRecord.Timestamp,
-                        bufferedRecord.LogLevel,
-                        bufferedRecord.EventId,
-                        bufferedRecord.Exception,
-                        bufferedRecord.FormattedMessage,
-                        bufferedRecord.Attributes));
+                    recordsToEmit.Add(bufferedRecord);
                 }
 
                 _bufferedLogger.LogRecords(recordsToEmit);
@@ -176,7 +170,7 @@ internal sealed class GlobalBuffer : IDisposable
     private void TrimExcessRecords()
     {
         while (_activeBufferSize > _options.CurrentValue.MaxBufferSizeInBytes &&
-               _activeBuffer.TryDequeue(out SerializedLogRecord item))
+               _activeBuffer.TryDequeue(out SerializedLogRecord? item))
         {
             _ = Interlocked.Add(ref _activeBufferSize, -item.SizeInBytes);
             SerializedLogRecordFactory.Return(item);

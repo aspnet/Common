@@ -18,18 +18,12 @@ steps:
       itemPattern: '*_cobertura.xml'
       targetPath: $(Build.SourcesDirectory)
 
-  # Merge the downloaded files (Windows_cobertura.xml and Ubuntu_cobertura.xml) as one (merged.cobertura.xml)
-  - script: $(Build.SourcesDirectory)/.dotnet/dotnet dotnet-coverage merge
-            $(Build.SourcesDirectory)/*_cobertura.xml
-            --output-format cobertura
-            --output $(Build.SourcesDirectory)/merged.cobertura.xml
-    displayName: Merge code coverage reports
-
+  # Merge the downloaded files (Windows_cobertura.xml and Ubuntu_cobertura.xml) as one (CoverageResultsHtml/Cobertura.xml)
   - script: $(Build.SourcesDirectory)/.dotnet/dotnet reportgenerator
-            -reports:$(Build.SourcesDirectory)/merged.cobertura.xml
+            "-reports:$(Build.SourcesDirectory)/Windows_cobertura.xml;$(Build.SourcesDirectory)/Ubuntu_cobertura.xml"
             -targetdir:./CoverageResultsHtml
-            -reporttypes:HtmlInline_AzurePipelines
-    displayName: Generate code coverage report
+            "-reporttypes:HtmlInline_AzurePipelines;Cobertura"
+    displayName: Merge code coverage reports and generate HTML report
 
   - task: PublishCodeCoverageResults@1
     displayName: Publish coverage report
@@ -37,12 +31,12 @@ steps:
       DISABLE_COVERAGE_AUTOGENERATE: 'true'
     inputs:
       codeCoverageTool: cobertura
-      summaryFileLocation: $(Build.SourcesDirectory)/merged.cobertura.xml
+      summaryFileLocation: $(Build.SourcesDirectory)/CoverageResultsHtml/Cobertura.xml
       pathToSources: $(Build.SourcesDirectory)
       reportDirectory: ./CoverageResultsHtml
 
   - pwsh: |
-        $(Build.SourcesDirectory)/eng/scripts/ValidateProjectCoverage.ps1 -CoberturaReportXml $(Build.SourcesDirectory)/merged.cobertura.xml
+        $(Build.SourcesDirectory)/eng/scripts/ValidateProjectCoverage.ps1 -CoberturaReportXml $(Build.SourcesDirectory)/CoverageResultsHtml/Cobertura.xml
     displayName: Check per-project coverage
 
   - ${{ if and(eq(variables['System.TeamProject'], 'public'), eq(variables['Build.Reason'], 'PullRequest')) }}:

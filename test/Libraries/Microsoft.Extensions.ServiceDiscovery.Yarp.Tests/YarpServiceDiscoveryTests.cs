@@ -11,6 +11,8 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.ServiceDiscovery.Dns;
 using Microsoft.Extensions.ServiceDiscovery.Dns.Resolver;
 using Yarp.ReverseProxy.Configuration;
+using DnsResolver = Microsoft.Extensions.ServiceDiscovery.Dns.Resolver.DnsResolver;
+using DnsResolverOptions = Microsoft.Extensions.ServiceDiscovery.Dns.DnsResolverOptions;
 
 namespace Microsoft.Extensions.ServiceDiscovery.Yarp.Tests;
 

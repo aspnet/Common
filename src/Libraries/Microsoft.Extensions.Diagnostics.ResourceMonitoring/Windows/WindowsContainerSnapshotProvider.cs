@@ -123,19 +123,23 @@ internal sealed class WindowsContainerSnapshotProvider : ISnapshotProvider
 
         _ = meter.CreateObservableGauge(
             name: ResourceUtilizationInstruments.ContainerCpuLimitUtilization,
-            observeValue: () => CpuPercentage(_cpuLimit));
+            observeValue: () => CpuPercentage(_cpuLimit),
+            description: "The CPU consumption of the running containerized application relative to resource limit.");
 
         _ = meter.CreateObservableGauge(
             name: ResourceUtilizationInstruments.ContainerMemoryLimitUtilization,
-            observeValue: () => Math.Min(_metricValueMultiplier, MemoryUsage() / _memoryLimit * _metricValueMultiplier));
+            observeValue: () => Math.Min(_metricValueMultiplier, MemoryUsage() / _memoryLimit * _metricValueMultiplier),
+            description: "The memory consumption of the running containerized application relative to resource limit.");
 
         _ = meter.CreateObservableGauge(
             name: ResourceUtilizationInstruments.ContainerCpuRequestUtilization,
-            observeValue: () => CpuPercentage(_cpuRequest));
+            observeValue: () => CpuPercentage(_cpuRequest),
+            description: "The CPU consumption of the running containerized application relative to resource request.");
 
         _ = meter.CreateObservableGauge(
             name: ResourceUtilizationInstruments.ContainerMemoryRequestUtilization,
-            observeValue: () => Math.Min(_metricValueMultiplier, MemoryUsage() / _memoryRequest * _metricValueMultiplier));
+            observeValue: () => Math.Min(_metricValueMultiplier, MemoryUsage() / _memoryRequest * _metricValueMultiplier),
+            description: "The memory consumption of the running containerized application relative to resource request.");
 
         _ = meter.CreateObservableUpDownCounter(
             name: ResourceUtilizationInstruments.ContainerMemoryUsage,
@@ -146,11 +150,13 @@ internal sealed class WindowsContainerSnapshotProvider : ISnapshotProvider
         // Process based metrics:
         _ = meter.CreateObservableGauge(
             name: ResourceUtilizationInstruments.ProcessCpuUtilization,
-            observeValue: () => CpuPercentage(_cpuLimit));
+            observeValue: () => CpuPercentage(_cpuLimit),
+            description: "The CPU consumption of the running application.");
 
         _ = meter.CreateObservableGauge(
             name: ResourceUtilizationInstruments.ProcessMemoryUtilization,
-            observeValue: ProcessMemoryPercentage);
+            observeValue: ProcessMemoryPercentage,
+            description: "The memory consumption of the running application.");
     }
 
     public Snapshot GetSnapshot()

@@ -32,6 +32,7 @@ public class ImageGenerationOptions
         ModelId = other.ModelId;
         RawRepresentationFactory = other.RawRepresentationFactory;
         ResponseFormat = other.ResponseFormat;
+        StreamingCount = other.StreamingCount;
     }
 
     /// <summary>

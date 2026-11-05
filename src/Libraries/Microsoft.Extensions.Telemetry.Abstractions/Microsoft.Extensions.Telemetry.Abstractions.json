@@ -1,5 +1,5 @@
 {
-  "Name": "Microsoft.Extensions.Telemetry.Abstractions, Version=9.7.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+  "Name": "Microsoft.Extensions.Telemetry.Abstractions, Version=10.10.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
   "Types": [
     {
       "Type": "readonly struct Microsoft.Extensions.Diagnostics.Latency.Checkpoint : System.IEquatable<Microsoft.Extensions.Diagnostics.Latency.Checkpoint>",
@@ -88,6 +88,10 @@
       ],
       "Properties": [
         {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.CounterAttribute.Description { get; set; }",
+          "Stage": "Experimental"
+        },
+        {
           "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.CounterAttribute.Name { get; set; }",
           "Stage": "Stable"
         },
@@ -98,6 +102,10 @@
         {
           "Member": "System.Type? Microsoft.Extensions.Diagnostics.Metrics.CounterAttribute.Type { get; }",
           "Stage": "Stable"
+        },
+        {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.CounterAttribute.Unit { get; set; }",
+          "Stage": "Experimental"
         }
       ]
     },
@@ -116,6 +124,10 @@
       ],
       "Properties": [
         {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.CounterAttribute<T>.Description { get; set; }",
+          "Stage": "Experimental"
+        },
+        {
           "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.CounterAttribute<T>.Name { get; set; }",
           "Stage": "Stable"
         },
@@ -126,6 +138,10 @@
         {
           "Member": "System.Type? Microsoft.Extensions.Diagnostics.Metrics.CounterAttribute<T>.Type { get; }",
           "Stage": "Stable"
+        },
+        {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.CounterAttribute<T>.Unit { get; set; }",
+          "Stage": "Experimental"
         }
       ]
     },
@@ -166,6 +182,10 @@
       ],
       "Properties": [
         {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute.Description { get; set; }",
+          "Stage": "Experimental"
+        },
+        {
           "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute.Name { get; set; }",
           "Stage": "Stable"
         },
@@ -176,6 +196,46 @@
         {
           "Member": "System.Type? Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute.Type { get; }",
           "Stage": "Stable"
+        },
+        {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute.Unit { get; set; }",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute<T> : System.Attribute where T : struct",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute<T>.GaugeAttribute(params string[] tagNames);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute<T>.GaugeAttribute(System.Type type);",
+          "Stage": "Experimental"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute<T>.Description { get; set; }",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute<T>.Name { get; set; }",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "string[]? Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute<T>.TagNames { get; }",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "System.Type? Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute<T>.Type { get; }",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.GaugeAttribute<T>.Unit { get; set; }",
+          "Stage": "Experimental"
         }
       ]
     },
@@ -204,6 +264,10 @@
       ],
       "Properties": [
         {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.HistogramAttribute.Description { get; set; }",
+          "Stage": "Experimental"
+        },
+        {
           "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.HistogramAttribute.Name { get; set; }",
           "Stage": "Stable"
         },
@@ -214,6 +278,10 @@
         {
           "Member": "System.Type? Microsoft.Extensions.Diagnostics.Metrics.HistogramAttribute.Type { get; }",
           "Stage": "Stable"
+        },
+        {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.HistogramAttribute.Unit { get; set; }",
+          "Stage": "Experimental"
         }
       ]
     },
@@ -232,6 +300,10 @@
       ],
       "Properties": [
         {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.HistogramAttribute<T>.Description { get; set; }",
+          "Stage": "Experimental"
+        },
+        {
           "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.HistogramAttribute<T>.Name { get; set; }",
           "Stage": "Stable"
         },
@@ -242,6 +314,10 @@
         {
           "Member": "System.Type? Microsoft.Extensions.Diagnostics.Metrics.HistogramAttribute<T>.Type { get; }",
           "Stage": "Stable"
+        },
+        {
+          "Member": "string? Microsoft.Extensions.Diagnostics.Metrics.HistogramAttribute<T>.Unit { get; set; }",
+          "Stage": "Experimental"
         }
       ]
     },

@@ -4,7 +4,7 @@ The `dotnet/extensions` repository makes heavy use of the `[Experimental]` attri
 
 ## Diagnostic ID conventions
 
-Experimental APIs in this repository use diagnostic IDs documented in [`docs/list-of-diagnostics.md`](../../../docs/list-of-diagnostics.md) under the "Experiments" section. Consult that file for the current list of experimental diagnostic IDs and their descriptions. New diagnostic IDs may be added as new experimental features are introduced.
+Experimental APIs in this repository use diagnostic IDs documented in [`docs/list-of-diagnostics.md`](../../../../../docs/list-of-diagnostics.md) under the "Experiments" section. Consult that file for the current list of experimental diagnostic IDs and their descriptions. New diagnostic IDs may be added as new experimental features are introduced.
 
 ## Types of experimental changes
 
@@ -14,7 +14,7 @@ An experimental API has its `[Experimental]` attribute removed, making it a stab
 
 **How to detect:**
 - PR removes `[Experimental("...")]` attribute from types or members
-- PR updates the project's experimental diagnostic staging properties (for example, removing the ID from `StageDevDiagnosticId` or related MSBuild properties) in line with [`docs/list-of-diagnostics.md`](../../../docs/list-of-diagnostics.md)
+- PR updates the project's experimental diagnostic staging properties (for example, removing the ID from `StageDevDiagnosticId` or related MSBuild properties) in line with [`docs/list-of-diagnostics.md`](../../../../../docs/list-of-diagnostics.md)
 - PR description or title mentions "promote", "graduate", "stabilize", or "remove experimental"
 - The corresponding `.json` API baseline file changes a type's `"Stage"` from `"Experimental"` to `"Stable"`
 
@@ -89,6 +89,8 @@ For each candidate PR, detect experimental API changes using the **PR diff** and
 5. **Cross-reference `docs/list-of-diagnostics.md`** — check if the PR modifies the diagnostics list, which signals addition or removal of experimental diagnostic IDs.
 
 Store detected changes in the `experimental_changes` SQL table (see [sql-storage.md](sql-storage.md)). The `description` column must reflect the actual types/members found in the diff, not a summary derived from the PR title.
+
+Use the **final merged diff and shipped/published API**, not an initial description claiming an API graduated. Check member-level diagnostic IDs as well as enclosing type stages. If ApiChief delta/check fails on an existing enum-deserialization or FindAdditions defect, bound retries and use emitted baselines plus an in-memory signature/stage comparison. Record fallback limitations; do not repair unrelated tools during a release or assert unsupported graduation.
 
 ## Presentation in release notes
 

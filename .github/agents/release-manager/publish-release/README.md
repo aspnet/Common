@@ -7,6 +7,8 @@ Publishes a prepared `dotnet/extensions` release. This playbook supports both tr
 
 Run this playbook after **prepare-release** is complete. Both stages are **operational** -- they push, queue pipelines, publish, and promote rather than producing ordinary commits -- and every push, publish, and promotion is **irreversible**. Run each stage only on explicit user instruction, and pause for confirmation before every irreversible action.
 
+Load/present [the canonical workflow](../references/workflow.md) and the current checkpoint. Load [candidate/build/artifact gates](../references/candidate-validation.md) before Stage 3.
+
 ## Stage 3 - Build
 
 Stage 3 has two variants:
@@ -18,7 +20,7 @@ Stage 3 has two variants:
 
 ## Stage 4 - Publish and Promote
 
-Publish the packages to nuget.org (the user runs `dotnet nuget push`; the agent never handles API keys), then ensure the official release build is on the public `.NET <major>` channel so symbols reach msdl.
+First freeze the artifact manifest and validate dependencies plus **original Portable PDB identity and usable Source Link metadata** (Stage 4a). Then obtain publication approval for that immutable candidate (Stage 4b). The user uploads packages; the agent never handles API keys. Verify/promote the official build's public channel assignment so symbols reach msdl.
 
 For servicing releases, use the merged servicing-prep PR description as the source of truth for package scope (what to publish and what to exclude) unless the user explicitly changes it.
 

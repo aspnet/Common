@@ -58,6 +58,7 @@ public sealed class WindowsCountersTests
         samples.Count.Should().Be(24);
         samples.Should().AllSatisfy(x => x.instrument.Name.Should().Be("system.network.connections"));
         samples.Should().AllSatisfy(x => x.value.Should().Be(1));
+        samples.Should().AllSatisfy(x => x.instrument.Description.Should().NotBeNullOrWhiteSpace());
     }
 
     [Fact]

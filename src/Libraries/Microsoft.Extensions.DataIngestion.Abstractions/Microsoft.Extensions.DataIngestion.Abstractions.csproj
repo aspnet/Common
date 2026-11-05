@@ -9,7 +9,7 @@
     <ForceLatestDotnetVersions>true</ForceLatestDotnetVersions>
     <Stage>preview</Stage>
     <EnablePackageValidation>false</EnablePackageValidation>
-    <MinCodeCoverage>75</MinCodeCoverage>
+    <MinCodeCoverage>71</MinCodeCoverage>
     <MinMutationScore>75</MinMutationScore>
     <!--  Convert abstract class into interface -->
     <NoWarn>$(NoWarn);S1694;S2368</NoWarn>

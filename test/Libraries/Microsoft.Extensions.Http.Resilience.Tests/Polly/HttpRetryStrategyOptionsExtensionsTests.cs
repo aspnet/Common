@@ -111,6 +111,32 @@ public class HttpRetryStrategyOptionsExtensionsTests
         Assert.Equal(shouldHandle, await options.ShouldHandle(CreatePredicateArguments(response)));
     }
 
+    [Fact]
+    public void UseBudgetedRetries_RetryOptionsIsNull_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => ((HttpRetryStrategyOptions)null!).UseBudgetedRetries());
+    }
+
+    [Fact]
+    public void UseBudgetedRetries_OverwritesBudget_PreservesOtherOptions()
+    {
+        var options = new HttpRetryStrategyOptions
+        {
+            MaxRetryAttempts = 5,
+            Delay = TimeSpan.FromSeconds(1),
+            RetryBudget = new HttpRetryBudgetOptions { RetryRatio = 0.5 },
+        };
+        options.DisableForUnsafeHttpMethods();
+        var shouldHandle = options.ShouldHandle;
+
+        options.UseBudgetedRetries();
+
+        Assert.Equal(5, options.MaxRetryAttempts);
+        Assert.Equal(new HttpRetryBudgetOptions().RetryRatio, options.RetryBudget!.RetryRatio);
+        Assert.Equal(TimeSpan.FromSeconds(1), options.Delay);
+        Assert.Same(shouldHandle, options.ShouldHandle);
+    }
+
     private static RetryPredicateArguments<HttpResponseMessage> CreatePredicateArguments(HttpResponseMessage? response, ResilienceContext? context = null)
     {
         return new RetryPredicateArguments<HttpResponseMessage>(

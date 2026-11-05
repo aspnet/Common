@@ -168,8 +168,14 @@ public class HostedFileClientExtensionsTests
         }
     }
 
-    [Fact]
-    public async Task DownloadToAsync_DirectoryPath_NoFileName_UsesFileId()
+    [Theory]
+    [InlineData(null, "")]
+    [InlineData("", "")]
+    [InlineData("application/unknown", "")]
+    [InlineData("text/plain", ".txt")]
+    [InlineData("text/plain; charset=utf-8", ".txt")]
+    [InlineData("TEXT/PLAIN", ".txt")]
+    public async Task DownloadToAsync_DirectoryPath_NoFileName_UsesFileId(string? mediaType, string extension)
     {
         var data = new byte[] { 99 };
         var tempDir = Path.Combine(Path.GetTempPath(), $"dldir2-{Guid.NewGuid()}");
@@ -178,13 +184,13 @@ public class HostedFileClientExtensionsTests
         using var client = new TestHostedFileClient
         {
             DownloadAsyncCallback = (fileId, options, ct) =>
-                Task.FromResult<HostedFileDownloadStream>(new TestHostedFileDownloadStream(data))
+                Task.FromResult<HostedFileDownloadStream>(new TestHostedFileDownloadStream(data, mediaType: mediaType))
         };
 
         try
         {
             var savedPath = await client.DownloadToAsync("file-id-fallback", tempDir);
-            Assert.Equal(Path.Combine(tempDir, "file-id-fallback"), savedPath);
+            Assert.Equal(Path.Combine(tempDir, $"file-id-fallback{extension}"), savedPath);
             Assert.Equal(data, await File.ReadAllBytesAsync(savedPath));
         }
         finally

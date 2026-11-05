@@ -7,9 +7,36 @@ namespace Microsoft.Extensions.Logging;
 
 internal sealed partial class ExtendedLogger : ILogger
 {
-    [field: ThreadStatic]
-    private static ModernTagJoiner ModernJoiner => field ??= new();
+    // A joiner is removed from its slot while in use, so a nested logging call on the same thread doesn't reuse it.
+    [ThreadStatic]
+    private static ModernTagJoiner? _modernJoiner;
 
-    [field: ThreadStatic]
-    private static LegacyTagJoiner LegacyJoiner => field ??= new();
+    [ThreadStatic]
+    private static LegacyTagJoiner? _legacyJoiner;
+
+    private static ModernTagJoiner RentModernJoiner()
+    {
+        var joiner = _modernJoiner ?? new();
+        _modernJoiner = null;
+        return joiner;
+    }
+
+    private static void ReturnModernJoiner(ModernTagJoiner joiner)
+    {
+        joiner.Clear();
+        _modernJoiner = joiner;
+    }
+
+    private static LegacyTagJoiner RentLegacyJoiner()
+    {
+        var joiner = _legacyJoiner ?? new();
+        _legacyJoiner = null;
+        return joiner;
+    }
+
+    private static void ReturnLegacyJoiner(LegacyTagJoiner joiner)
+    {
+        joiner.Clear();
+        _legacyJoiner = joiner;
+    }
 }

@@ -37,7 +37,9 @@ internal sealed partial class ExtendedLogger
         {
             _extraTags.Clear();
             _incomingTags = null;
+            _incomingTagsCount = 0;
             _redactedTags = null;
+            _redactedTagsCount = 0;
             State = null;
             Formatter = null;
         }

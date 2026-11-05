@@ -105,7 +105,11 @@ internal sealed class LatencyConsoleExporter : ILatencyDataExporter
             }
 
             // the whole sample is output in a single shot so it won't be interrupted with conflicting output
+#if NET11_0_OR_GREATER
+            return Console.Out.WriteAsync(sb.ToString(), cancellationToken);
+#else
             return Console.Out.WriteAsync(sb.ToString());
+#endif
         }
         finally
         {

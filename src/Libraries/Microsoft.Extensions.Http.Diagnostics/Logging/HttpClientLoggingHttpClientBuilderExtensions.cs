@@ -157,6 +157,7 @@ public static class HttpClientLoggingHttpClientBuilderExtensions
         configureOptionsBuilder?.Invoke(optionsBuilder);
 
         _ = builder.Services
+            .AddRedaction()
             .AddHttpRouteProcessor()
             .AddHttpHeadersRedactor()
             .AddOutgoingRequestContext();

@@ -12,7 +12,7 @@ public static class TemplateTestUtilities
 {
     /// <summary>Create a sanitized and standardized project name from the supplied args</summary>
     /// <remarks>
-    /// Framework name is shortened from "net10.0" to "net10", e.g.
+    /// Framework name is shortened from "net11.0" to "net11", e.g.
     /// Boolean options explicitly set to "true" use the option name followed by '_T'.
     /// Boolean options explicitly set to "false" use the option name followed by '_F'.
     /// Options with names and values use only the option value.

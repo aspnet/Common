@@ -93,11 +93,8 @@ preserve primary errors if cleanup also fails.
 
 The packages do not include provider clients, provider SDK dependencies,
 MEDI integration, source fetching or package publication.
-Production targets are net10.0, net9.0, net8.0, net462 and netstandard2.0.
+Production targets are net11.0, net10.0, net9.0, net8.0, net462 and netstandard2.0.
 Public APIs use experimental diagnostic `MEDE0001`; Documents uses `EXTEXP0019`.
 
-PR #7588 temporarily includes the Documents prerequisite from PR #7835.
-After that prerequisite merges, reconcile with main while preserving this PR's
-history and incorporating reviewed Documents changes. Local candidates are
-provisional, not API-approved or published packages. In-memory validation is not
+Local candidates are provisional, not API-approved or published packages. In-memory validation is not
 live-provider, full-application or MEDI end-to-end acceptance.

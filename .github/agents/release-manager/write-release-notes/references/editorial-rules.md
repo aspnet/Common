@@ -54,8 +54,8 @@ For Copilot-authored PRs, check the `copilot_work_started` timeline event to ide
 - **Copilot-authored PRs**: If the PR author is `Copilot`, `copilot-swe-agent[bot]`, or the PR body mentions "Created from Copilot CLI" / "copilot delegate":
   1. Check the `copilot_work_started` timeline event to identify the triggering user
   2. If found, the triggering user becomes the primary author and `@Copilot` becomes a co-author
-  3. If the timeline event is missing, check assignees and the merger — the human who delegated and merged the work is the primary author
-  4. As a last resort, attribute to the merger
+  3. If the event is missing, inspect assignees/comments/commit trailers for explicit delegation evidence. Being an assignee or merger alone does not establish authorship/delegation.
+  4. If unresolved, retain the verified author and flag attribution uncertainty for review; never invent a human delegator. Use only verified handles for co-authors, reviewers and reporters.
 - **Bots to exclude**: `dependabot[bot]`, `dotnet-maestro[bot]`, `github-actions[bot]`, `copilot-swe-agent[bot]`, and any account ending with `[bot]`
 
 ## Sorting

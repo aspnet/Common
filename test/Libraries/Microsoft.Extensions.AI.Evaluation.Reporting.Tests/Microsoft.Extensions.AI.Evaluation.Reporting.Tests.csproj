@@ -3,6 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Microsoft.Extensions.AI.Evaluation.Reporting.Tests</RootNamespace>
     <Description>Unit tests for Microsoft.Extensions.AI.Evaluation.Reporting.</Description>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>

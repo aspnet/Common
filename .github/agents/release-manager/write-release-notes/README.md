@@ -4,6 +4,8 @@ Draft release notes for a `dotnet/extensions` release. This playbook gathers mer
 
 > **User confirmation required: This playbook NEVER publishes a GitHub release without explicit user confirmation.** The user must review and approve the draft before any release is created.
 
+Load/present [the canonical workflow/checkpoint](../references/workflow.md). Drafting can proceed while independent release checks are pending, but state those checks and any explicit exceptions.
+
 ## Context
 
 The `dotnet/extensions` repository ships NuGet packages across many functional areas (AI, HTTP Resilience, Diagnostics, Compliance, Telemetry, etc.). Releases come in two forms:
@@ -15,7 +17,7 @@ The repository does not follow Semantic Versioning. Major versions align with an
 
 The repository makes heavy use of `[Experimental]` attributes. Experimental diagnostic IDs are documented in [`docs/list-of-diagnostics.md`](../../../../docs/list-of-diagnostics.md). Breaking changes to experimental APIs are expected and acceptable. Graduation of experimental APIs to stable is a noteworthy positive event.
 
-The repository uses `release/` branches (e.g. `release/10.4`) where release tags are associated with commits on those branches. When determining the commit range for a release, ensure the previous and target tags are resolved against the appropriate release branch history.
+The release tag targets the **official build source SHA**, equal to every selected nuspec repository commit, made publicly reachable by reconciliation when necessary. The cleaned public reconciliation merge has a different purpose and must not replace that target.
 
 ## Execution Guidelines
 
@@ -23,12 +25,12 @@ The repository uses `release/` branches (e.g. `release/10.4`) where release tags
 - **Do not run linters, formatters, or validators** on the output.
 - **Maximize parallel tool calls.** Fetch multiple PR and issue details in a single response.
 - **Package assignment is file-path-driven.** Determine which packages a PR affects by examining which `src/Libraries/{PackageName}/` paths it touches. See [references/package-areas.md](references/package-areas.md) for the mapping. Use `area-*` labels only as a fallback.
-- **For servicing releases, use the servicing-prep PR description as scope input.** If a merged PR titled `Prepare <major>.<minor>.<patch> Servicing Release` exists, treat its package list and commit list as the default source of truth for publish/validate/release-notes scope unless the user explicitly overrides it.
+- **Scope authority.** The approved final artifact/published manifest supersedes the servicing-prep PR's provisional list. Preserve selected vs closure roles and exact versions.
 - **For servicing backports, prefer source PR entries.** When a servicing `release/*` PR backports a `main` PR, use the source `main` PR as the release-notes entry and attribution source unless the backport PR adds distinct release-only user-facing changes.
 
 ## Process
 
-Work through each step sequentially. Present findings at each step and get user confirmation before proceeding.
+Work through evidence gathering proactively within approved scope. Present meaningful checkpoints, not repeated generic "proceed" prompts; gate scope changes, draft creation and publication explicitly.
 
 ### Step 1: Determine Release Scope
 
@@ -40,7 +42,7 @@ The user may provide:
 Once the range is established:
 
 1. Determine if this is a **full release** (minor version bump) or **patch release** (patch version bump) based on the version numbers.
-2. For patch releases, ask the user which packages are included (or infer from the PRs). If a servicing-prep PR exists, start from its package list and confirm any overrides.
+2. Use the final artifact/published manifest for exact scope. If only a servicing-prep PR exists, mark its scope provisional; do not reask unchanged approvals or infer final scope from PR titles.
 3. Get the merge date range for PR collection.
 
 ### Step 2: Collect and Enrich PRs
@@ -78,8 +80,8 @@ Follow [references/experimental-features.md](references/experimental-features.md
 
 Build the package version information:
 
-1. For **full releases**: all packages ship at the same version. Note the version number but do not generate a per-package table — it would be repetitive with no value.
-2. For **patch releases**: build a table of only the affected packages and their version numbers. If a servicing-prep PR exists, seed this table from that PR's package list before applying user overrides.
+1. For **full releases**: use exact final manifest versions; stable, preview and templates may differ. Omit a repetitive uniform table only when it really is uniform; otherwise agree a concise exceptions/table presentation with the user.
+2. For **patch releases**: use all selected and closure packages from the final published manifest.
 3. Present the version information to the user for confirmation. The user may adjust which packages are included in a patch release.
 
 ### Step 6: Draft Release Notes
@@ -87,7 +89,7 @@ Build the package version information:
 Compose the release notes following [references/format-template.md](references/format-template.md) and [references/editorial-rules.md](references/editorial-rules.md):
 
 1. **Preamble** — Optionally draft 2–3 sentences summarizing the release theme. Present the preamble options to the user using the `ask_user` tool, offering them the choice of: (a) one of the suggested preambles, (b) writing their own, or (c) skipping the preamble entirely.
-2. **Packages in this release** — for patch releases, the table of affected packages and versions from Step 5. For full releases, omit this table (all packages ship at the same version and listing them all adds no value).
+2. **Packages in this release** — use Step 5's verified version presentation; never assert uniform monthly versions when preview/template exceptions exist.
 3. **Breaking Changes** — stable API breaks only (should be very rare). Include migration guidance.
 4. **Experimental API Changes** — from Step 4 results. Group by change type. Omit empty subsections.
 5. **What's Changed** — area-grouped entries from Step 3. Omit empty areas.
@@ -112,18 +114,20 @@ After the user has reviewed and approved the draft, present the finalization opt
 - **Save to private gist** — save the draft notes to a private GitHub gist for later use
 - **Cancel** — discard the draft without creating anything
 
-Before creating a draft release, run a required tag preflight:
+Before draft creation/update or publication, perform the provenance/tag preflight:
 
-1. Check whether the expected `v<version>` tag already exists.
-2. If missing, ask for explicit confirmation to create the tag at the selected release commit.
-3. Only then create the draft release.
+1. Require **TAG TARGET = official BUILD SOURCE SHA = ALL selected NUSPEC repository COMMITS**. Verify exact source/build/BAR/manifest identities and public commit reachability. Never default to `main`, HEAD or the cleaned reconciliation merge.
+2. Inspect the expected `v<version>` tag and draft state. An existing tag must resolve to the approved SHA. Never move/delete a published tag without explicit user direction.
+3. If absent, offer **draft without precreating tag** (create the tag on later approved publication) or separately approved tag creation now. Draft approval does not authorize tag publication.
+4. For a draft create/update, explicitly send **both** `tag_name: "v<version>"` and `target_commitish: "<official-build-source-sha>"`, plus the intended draft/body state. A target-only PATCH can change `tag_name` to `untagged-*`. Read back tag_name, target, draft, full body and remote tag existence/absence after every update. Retarget an incorrect **draft** safely before publication and reverify; preserve user edits to its body/preamble.
+5. Obtain separate publication approval for those exact identities/notes and the pending tag. Validate the resulting tag SHA/release state afterward. Deferred/waived validation remains visible; do not claim full release validation.
 
 ## Edge Cases
 
 - **PR spans categories**: Categorize by primary intent; read the title and description.
 - **PR spans multiple areas**: Place under the most central area; mention cross-cutting nature in the description.
 - **Servicing backport pair appears in range**: keep the source `main` PR and exclude the `release/*` wrapper PR unless the wrapper carries distinct release-only user-facing changes.
-- **Copilot-authored PRs**: If the PR author is Copilot or a bot, check the `copilot_work_started` timeline event for the triggering user, then assignees, then the merger. See [references/editorial-rules.md](references/editorial-rules.md) for the full fallback chain. Never fabricate an attribution — always derive it from the PR data.
+- **Copilot-authored PRs**: Verify the delegator from `copilot_work_started` or explicit delegation evidence. Assignee/merger status alone is insufficient. Follow [references/editorial-rules.md](references/editorial-rules.md); retain uncertainty instead of inventing attribution.
 - **No breaking changes**: Omit the Breaking Changes section entirely.
 - **No experimental changes**: Omit the Experimental API Changes section entirely.
 - **No user-facing changes**: If all PRs are documentation, tests, or infrastructure, note this in the release notes. The release still proceeds — this repository ships monthly regardless.

@@ -2,7 +2,7 @@
 
 ## Monthly release
 
-Use this template when all packages ship together (e.g. v10.3.0 → v10.4.0).
+Use this template for monthly releases (e.g. v10.3.0 → v10.4.0). Confirm version exceptions from the final manifest; "together" does not mean all artifacts use the same version.
 
 ```markdown
 [Optional preamble — 2–3 sentences summarizing the release theme. May be omitted.]

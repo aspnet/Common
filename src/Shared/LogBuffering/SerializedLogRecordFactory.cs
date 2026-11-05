@@ -1,9 +1,10 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
+#if NET9_0_OR_GREATER
 
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.Shared.Pools;
@@ -14,10 +15,11 @@ internal static class SerializedLogRecordFactory
 {
     private const string OriginalFormat = "{OriginalFormat}";
 
-    private static readonly ObjectPool<List<KeyValuePair<string, object?>>> _attributesPool =
-        PoolFactory.CreateListPool<KeyValuePair<string, object?>>();
+    // The approximate size of a SerializedLogRecord instance (112 bytes) and of its slot in the buffer (16 bytes).
+    private const int SerializedLogRecordSize = 128;
 
-    private static readonly int _serializedLogRecordSize = Unsafe.SizeOf<SerializedLogRecord>();
+    private static readonly ObjectPool<SerializedLogRecord> _recordPool =
+        PoolFactory.CreateResettingPool<SerializedLogRecord>();
 
     public static SerializedLogRecord Create(
         LogLevel logLevel,
@@ -28,17 +30,26 @@ internal static class SerializedLogRecordFactory
         string formattedMessage,
         IExternalScopeProvider? scopeProvider)
     {
-        int sizeInBytes = _serializedLogRecordSize;
-        List<KeyValuePair<string, object?>> serializedAttributes = _attributesPool.Get();
+        SerializedLogRecord record = _recordPool.Get();
+        int sizeInBytes = SerializedLogRecordSize;
+        string? messageTemplate = null;
+        List<KeyValuePair<string, object?>> serializedAttributes = record.Attributes;
+        _ = serializedAttributes.EnsureCapacity(attributes.Count);
         for (int i = 0; i < attributes.Count; i++)
         {
-            string key = attributes[i].Key;
-            string value = attributes[i].Value?.ToString() ?? string.Empty;
+            KeyValuePair<string, object?> attribute = attributes[i];
+            string key = attribute.Key;
+            string value = attribute.Value?.ToString() ?? string.Empty;
 
             // deliberately not counting the size of the key,
             // as it is constant strings in the vast majority of cases
 
             sizeInBytes += CalculateStringSize(value);
+
+            if (key == OriginalFormat && attribute.Value is string template)
+            {
+                messageTemplate = template;
+            }
 
             serializedAttributes.Add(new KeyValuePair<string, object?>(key, value));
         }
@@ -48,7 +59,7 @@ internal static class SerializedLogRecordFactory
             sizeInBytes += AddScopes(serializedAttributes, scopeProvider);
         }
 
-        string exceptionMessage = string.Empty;
+        string? exceptionMessage = null;
         if (exception is not null)
         {
             exceptionMessage = exception.Message;
@@ -57,19 +68,41 @@ internal static class SerializedLogRecordFactory
 
         sizeInBytes += CalculateStringSize(formattedMessage);
 
-        return new SerializedLogRecord(
+        // Capturing the state of the thread that creates the record, as it's no longer available when the record is flushed.
+        // Trace and span IDs are not counted towards the size, because they wrap strings cached by the activity.
+        ActivityTraceId activityTraceId = default;
+        ActivitySpanId activitySpanId = default;
+        Activity? activity = Activity.Current;
+        if (activity is not null && activity.IdFormat == ActivityIdFormat.W3C)
+        {
+            activityTraceId = activity.TraceId;
+            activitySpanId = activity.SpanId;
+        }
+
+        record.Set(
             logLevel,
             eventId,
             timestamp,
-            serializedAttributes,
             exceptionMessage,
             formattedMessage,
+            messageTemplate,
+            activityTraceId,
+            activitySpanId,
+            Environment.CurrentManagedThreadId,
             sizeInBytes);
+
+        return record;
     }
 
+    /// <summary>
+    /// Returns a record to the pool, so that the record can be reused.
+    /// </summary>
+    /// <remarks>
+    /// Must only be called for records which have not been emitted, as loggers can still hold on to emitted records' attributes.
+    /// </remarks>
     public static void Return(SerializedLogRecord bufferedRecord)
     {
-        _attributesPool.Return(bufferedRecord.Attributes);
+        _recordPool.Return(bufferedRecord);
     }
 
     /// <summary>
@@ -140,3 +173,4 @@ internal static class SerializedLogRecordFactory
         return (BaseSize + charSize + Alignment) & ~Alignment;
     }
 }
+#endif

@@ -9,6 +9,10 @@ using Microsoft.Extensions.Diagnostics.Latency;
 using Microsoft.Extensions.Diagnostics.Latency.Internal;
 using Xunit;
 
+#if NET11_0_OR_GREATER
+using System.Threading;
+#endif
+
 namespace Microsoft.Extensions.Diagnostics.Latency.Test.Internal;
 
 [Collection("StdoutUsage")]
@@ -151,6 +155,21 @@ public class LatencyConsoleExporterTests
         var result = a.ToString();
         Assert.Equal(_emptyResult, result);
     }
+
+#if NET11_0_OR_GREATER
+    [Fact]
+    public async Task ConsoleExporter_Export_RespectsCancellation()
+    {
+        using var accumulator = new Accumulator();
+        System.Console.SetOut(accumulator);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exporter = new LatencyConsoleExporter(Options.Options.Create(new LatencyConsoleOptions()));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => exporter.ExportAsync(GetLatencyData(), cancellation.Token));
+        Assert.Empty(accumulator.ToString());
+    }
+#endif
 
     private static string NormalizeLineEndings(string value) => value.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", Environment.NewLine);
 
