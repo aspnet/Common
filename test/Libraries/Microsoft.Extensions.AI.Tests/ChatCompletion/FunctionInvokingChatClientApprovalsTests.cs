@@ -1186,8 +1186,12 @@ public class FunctionInvokingChatClientApprovalsTests
         await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
     }
 
-    [Fact]
-    public async Task ApprovedResponsesStayAdjacentToToolCallWhenTrailingMessagesPresentWithServiceThreadsAsync()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task ApprovedResponsesStayAdjacentToToolCallWhenTrailingMessagesPresentWithServiceThreadsAsync(
+        int trailingEmptyMessageCount)
     {
         // Service-managed history: only the new messages are passed and a ConversationId is set. The service
         // holds the assistant tool-call, so the reconstructed tool result must be positioned ahead of any
@@ -1209,6 +1213,11 @@ public class FunctionInvokingChatClientApprovalsTests
             // A caller-supplied message after the approval response.
             new ChatMessage(ChatRole.User, "By the way, please keep the answer concise."),
         ];
+
+        for (int i = 0; i < trailingEmptyMessageCount; i++)
+        {
+            input.Add(new ChatMessage(ChatRole.User, []));
+        }
 
         // The tool result must come before the trailing caller message, and the assistant tool-call is not
         // re-sent because the service already holds it.
@@ -1235,8 +1244,12 @@ public class FunctionInvokingChatClientApprovalsTests
         await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
     }
 
-    [Fact]
-    public async Task ApprovedResponseStaysAdjacentToToolCallWhenApprovalMessageHasOtherContentWithServiceThreadsAsync()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task ApprovedResponseStaysAdjacentToToolCallWhenApprovalMessageHasOtherContentWithServiceThreadsAsync(
+        int trailingEmptyMessageCount)
     {
         // Regression: the approval response shares a message with other caller content. Extraction removes the
         // approval response but leaves the other content ("please proceed") in place. In service-managed mode the
@@ -1257,6 +1270,11 @@ public class FunctionInvokingChatClientApprovalsTests
                 new TextContent("please proceed"),
             ]),
         ];
+
+        for (int i = 0; i < trailingEmptyMessageCount; i++)
+        {
+            input.Add(new ChatMessage(ChatRole.User, []));
+        }
 
         // The tool result is positioned at the front, ahead of the residual "please proceed" content that was left
         // behind in the approval message after the approval response was extracted.
@@ -1283,8 +1301,12 @@ public class FunctionInvokingChatClientApprovalsTests
         await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
     }
 
-    [Fact]
-    public async Task ApprovedResponsesStayAdjacentToToolCallWhenTrailingMessagesPresentWithClientHistoryAsync()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task ApprovedResponsesStayAdjacentToToolCallWhenTrailingMessagesPresentWithClientHistoryAsync(
+        int trailingEmptyMessageCount)
     {
         // Client-managed history: the full history is passed and there is no ConversationId. The reconstructed
         // assistant tool-call and tool result are inserted at the approval anchor, so trailing caller-supplied
@@ -1309,6 +1331,11 @@ public class FunctionInvokingChatClientApprovalsTests
             // A caller-supplied message after the approval response.
             new ChatMessage(ChatRole.User, "By the way, please keep the answer concise."),
         ];
+
+        for (int i = 0; i < trailingEmptyMessageCount; i++)
+        {
+            input.Add(new ChatMessage(ChatRole.User, []));
+        }
 
         // The reconstructed assistant tool-call and tool result are inserted at the approval anchor, so they
         // remain adjacent and the trailing caller message follows the tool result.
@@ -1337,8 +1364,12 @@ public class FunctionInvokingChatClientApprovalsTests
         await InvokeAndAssertStreamingAsync(options, input, downstreamClientOutput, output, expectedDownstreamClientInput);
     }
 
-    [Fact]
-    public async Task ApprovedResponseStaysAdjacentToToolCallWhenApprovalMessageHasOtherContentWithClientHistoryAsync()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task ApprovedResponseStaysAdjacentToToolCallWhenApprovalMessageHasOtherContentWithClientHistoryAsync(
+        int trailingEmptyMessageCount)
     {
         // Client-managed history where the approval response shares a message with other caller content. The
         // reconstructed tool-call/result block is inserted just before that approval message, so the residual
@@ -1362,6 +1393,11 @@ public class FunctionInvokingChatClientApprovalsTests
                 new TextContent("please proceed"),
             ]),
         ];
+
+        for (int i = 0; i < trailingEmptyMessageCount; i++)
+        {
+            input.Add(new ChatMessage(ChatRole.User, []));
+        }
 
         List<ChatMessage> expectedDownstreamClientInput =
         [

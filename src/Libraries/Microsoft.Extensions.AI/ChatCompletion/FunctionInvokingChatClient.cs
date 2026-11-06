@@ -1343,12 +1343,10 @@ public class FunctionInvokingChatClient : DelegatingChatClient
         // (whether that tool-call is reconstructed by us in client-managed conversation mode, or held by the service
         // in service-managed conversation mode) and ahead of any trailing or residual caller-supplied content.
         //
-        // The count is computed before extraction. Any message positioned after lastApprovalIndex carries no
-        // extracted function approval content - lastApprovalIndex is the last one that does - so extraction never
-        // removes those messages. The last approval message itself survives when it also carries other content that
-        // is not a function approval (genuine caller content, or approval content the FICC does not process itself
-        // such as MCP or informational-only approvals). That makes the trailing count stable across extraction, so
-        // the resulting insert index is always in range.
+        // The count is computed before extraction. Messages after lastApprovalIndex carry no function approval
+        // content, but empty messages are removed during extraction, so only count non-empty messages. The last
+        // approval message itself survives when it also carries content that the FICC does not process. This keeps
+        // the trailing count stable across extraction and the resulting insert index in range.
         //
         // Known limitation: content interleaved between multiple approval responses, or placed before an approval
         // response, remains before the block (only the last approval position is used as the anchor). In
@@ -1359,7 +1357,14 @@ public class FunctionInvokingChatClient : DelegatingChatClient
         int trailingMessageCount = 0;
         if (lastApprovalIndex >= 0)
         {
-            trailingMessageCount = originalMessages.Count - (lastApprovalIndex + 1);
+            for (int i = lastApprovalIndex + 1; i < originalMessages.Count; i++)
+            {
+                if (originalMessages[i].Contents.Count > 0)
+                {
+                    trailingMessageCount++;
+                }
+            }
+
             if (!MessageContainsOnlyFunctionApprovals(originalMessages[lastApprovalIndex]))
             {
                 trailingMessageCount++;
