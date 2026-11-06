@@ -63,3 +63,7 @@ foreach (ExtractionDocumentElement element in document.EnumerateContent())
     }
 }
 ```
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

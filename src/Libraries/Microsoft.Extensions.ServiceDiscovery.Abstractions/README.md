@@ -5,3 +5,7 @@ The `Microsoft.Extensions.ServiceDiscovery.Abstractions` library provides abstra
 ## Feedback & contributing
 
 https://github.com/dotnet/aspire
+
+## Supported Platforms
+
+This package is supported on .NET Framework 4.6.2 and later.

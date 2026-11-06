@@ -298,3 +298,7 @@ Learn how to create a conversational .NET console chat app using an OpenAI or Az
 ## Feedback & Contributing
 
 We welcome feedback and contributions in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is supported on .NET Framework 4.6.2 and later.

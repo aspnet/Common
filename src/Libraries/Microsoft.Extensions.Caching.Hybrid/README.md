@@ -79,3 +79,7 @@ public class SomeService(HybridCache cache)
 Additional usage guidance - including expiration, custom serialization support, and alternate usage
 to reduce delegate allocation - is available
 on [learn.microsoft.com](https://learn.microsoft.com/aspnet/core/performance/caching/hybrid).
+
+## Supported Platforms
+
+This package is supported on .NET Framework 4.6.2 and later.

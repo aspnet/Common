@@ -49,31 +49,11 @@
           PackagePath="buildTransitive\$(MinimumSupportedTfmForPackaging)\"
           Condition="'$(MinimumSupportedTfmForPackaging)' != '' and $(TargetFrameworks.Contains('$(MinimumSupportedTfmForPackaging)'))" />
 
-    <!-- For net462 we copy all buildTransitive files except the .targets file. We have to rename the .targets file
-         when copying it because our build process automatically adds a .targets file with the same name as the project
-         file. Then we'll import the renamed .targets file in the automatically added .targets file. For that we need
-         to set the _AdditionalNETStandardCompatErrorFileContents variable. -->
+    <!-- Copy buildTransitive files to net462 so they are imported by consumers targeting that framework. -->
     <None Include="buildTransitive\**\*"
-          Exclude="buildTransitive\$(MSBuildProjectName).targets"
           CopyToOutputDirectory="PreserveNewest"
           Pack="true"
           PackagePath="buildTransitive\net462\"
           Condition="'$(IsPackNet462)' == 'true'" />
-    
-    <None Include="buildTransitive\$(MSBuildProjectName).targets"
-          CopyToOutputDirectory="PreserveNewest"
-          Pack="true"
-          PackagePath="buildTransitive\net462\$(MSBuildProjectName).net462.targets"
-          Condition="'$(IsPackNet462)' == 'true'" />
   </ItemGroup>
-
-  <!-- For net462 we automatically add the .targets file, and to include the code that checks the version of the
-       Grpc.Net.ClientFactory package we need to set the _AdditionalNETStandardCompatErrorFileContents variable. -->
-  <PropertyGroup>
-    <_AdditionalNETStandardCompatErrorFileContents>
-      <![CDATA[
-  <Import Project="%24(MSBuildThisFileDirectory)\$(MSBuildProjectName).net462.targets" />
-]]>
-    </_AdditionalNETStandardCompatErrorFileContents>
-  </PropertyGroup>
 </Project>

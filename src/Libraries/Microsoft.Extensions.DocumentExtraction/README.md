@@ -183,3 +183,7 @@ Acknowledge these diagnostics only if you accept experimental APIs.
 Report composition issues through
 [dotnet/extensions issues](https://github.com/dotnet/extensions/issues);
 report provider-specific behavior to the provider's issue tracker.
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

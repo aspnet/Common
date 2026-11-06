@@ -185,3 +185,7 @@ Report contract issues through
 [dotnet/extensions issues](https://github.com/dotnet/extensions/issues).
 For supported formats, credentials and provider-specific errors, consult the
 provider's documentation and issue tracker.
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
