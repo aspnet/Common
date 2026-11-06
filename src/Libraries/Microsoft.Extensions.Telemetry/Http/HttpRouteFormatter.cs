@@ -92,7 +92,7 @@ internal sealed class HttpRouteFormatter : IHttpRouteFormatter
                         length = httpPathAsSpan.Slice(startIndex).IndexOf(ForwardSlash);
                     }
 
-                    if (length == -1)
+                    if (segment.IsCatchAll || length == -1)
                     {
                         length = httpPathAsSpan.Slice(startIndex).Length;
                     }

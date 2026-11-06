@@ -510,6 +510,47 @@ public class HttpRouteFormatterTests
         Assert.Equal(expectedPath, httpFormatter.Format(httpRoute, httpPath, HttpRouteParameterRedactionMode.Loose, parametersToRedact));
     }
 
+    [Theory]
+    [InlineData("api/files/{*path}", "api/files/a/b/c", "api/files/Redacted:a/b/c")]
+    [InlineData("api/files/{**path}", "api/files/a/b/c", "api/files/Redacted:a/b/c")]
+    [InlineData("api/files/{*path}/", "api/files/a/b/c", "api/files/Redacted:a/b/c")]
+    [InlineData("api/{userId}/files/{*path}", "api/user1/files/a/b/c", "api/Redacted:user1/files/Redacted:a/b/c")]
+    public void Format_RouteHasCatchAllParameter_RedactsWholeValue(string httpRoute, string httpPath, string expectedPath)
+    {
+        HttpRouteFormatter httpFormatter = CreateHttpRouteFormatter();
+        Dictionary<string, DataClassification> parametersToRedact = new()
+        {
+            { "userId", FakeTaxonomy.PrivateData },
+            { "path", FakeTaxonomy.PrivateData },
+        };
+
+        Assert.Equal(expectedPath, httpFormatter.Format(httpRoute, httpPath, HttpRouteParameterRedactionMode.Strict, parametersToRedact));
+        Assert.Equal(expectedPath, httpFormatter.Format(httpRoute, httpPath, HttpRouteParameterRedactionMode.Loose, parametersToRedact));
+    }
+
+    [Theory]
+    [CombinatorialData]
+    public void Format_RouteHasCatchAllParameter_KeepsWholeValue(HttpRouteParameterRedactionMode redactionMode)
+    {
+        HttpRouteFormatter httpFormatter = CreateHttpRouteFormatter("[REDACTED]");
+        Dictionary<string, DataClassification> parametersToRedact = new()
+        {
+            { "userId", FakeTaxonomy.PrivateData },
+            { "path", DataClassification.None },
+        };
+
+        string formattedPath = httpFormatter.Format("api/{userId}/files/{*path}", "api/user1/files/a/b/c", redactionMode, parametersToRedact);
+
+        if (redactionMode == HttpRouteParameterRedactionMode.None)
+        {
+            Assert.Equal("api/user1/files/a/b/c", formattedPath);
+        }
+        else
+        {
+            Assert.Equal("api/[REDACTED]/files/a/b/c", formattedPath);
+        }
+    }
+
     private static HttpRouteFormatter CreateHttpRouteFormatter(string redactionFormat = "Redacted:{0}")
     {
         var redactorProvider = new FakeRedactorProvider(
