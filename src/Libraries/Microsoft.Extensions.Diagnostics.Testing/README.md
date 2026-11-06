@@ -1,5 +1,7 @@
 # Microsoft.Extensions.Diagnostics.Testing
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 Hand-crafted fakes to make telemetry-related testing easier.
 
 ## Install the package

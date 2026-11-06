@@ -1,5 +1,7 @@
 # Microsoft.Extensions.Diagnostics.ResourceMonitoring
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 Measures and reports processor and memory usage. To monitor system resources, this library:
 
 - Utilizes control groups (cgroups) in Linux. Both cgroups v1 and v2 are supported.

@@ -1,4 +1,5 @@
 <Project>
+  <!-- This package replaces the Microsoft.Extensions.Logging.Abstractions source generator. -->
   <PropertyGroup>
     <DisableMicrosoftExtensionsLoggingSourceGenerator>true</DisableMicrosoftExtensionsLoggingSourceGenerator>
   </PropertyGroup>

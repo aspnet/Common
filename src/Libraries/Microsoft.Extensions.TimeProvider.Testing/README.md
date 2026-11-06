@@ -1,5 +1,7 @@
 # Microsoft.Extensions.TimeProvider.Testing
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 Provides a `FakeTimeProvider` for testing components that depend on `System.TimeProvider`.
 
 ## Install the package

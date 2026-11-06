@@ -1,5 +1,7 @@
 # Microsoft.Extensions.Options.Contextual
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 APIs for dynamically configuring options based on a given context.
 
 ## Install the package

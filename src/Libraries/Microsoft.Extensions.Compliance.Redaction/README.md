@@ -1,5 +1,7 @@
 # Microsoft.Extensions.Compliance.Redaction
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 A redaction engine and canonical redactors.
 
 ## Install the package

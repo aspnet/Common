@@ -1,5 +1,7 @@
 # Microsoft.Extensions.Compliance.Testing
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 This package provides test fakes for testing data classification and redaction.
 
 ## Install the package

@@ -1,5 +1,7 @@
 # Microsoft.Extensions.DataIngestion.Markdig
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 Provides an implementation of the `IngestionDocumentReader` class for the Markdown files using [MarkDig](https://github.com/xoofx/markdig) library.
 
 ## Install the package

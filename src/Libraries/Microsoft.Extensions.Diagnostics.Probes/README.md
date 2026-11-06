@@ -1,5 +1,7 @@
 # Microsoft.Extensions.Diagnostics.Probes
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 Answers Kubernetes liveness, startup, and readiness TCP probes based on the results from the [Health Checks service](https://learn.microsoft.com/aspnet/core/host-and-deploy/health-checks).
 
 ## Install the package

@@ -1,5 +1,7 @@
 # Microsoft.Extensions.DataIngestion.MarkItDown
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 Provides an implementation of the `IngestionDocumentReader` class for the [MarkItDown](https://github.com/microsoft/markitdown/) utility.
 
 ## Install the package

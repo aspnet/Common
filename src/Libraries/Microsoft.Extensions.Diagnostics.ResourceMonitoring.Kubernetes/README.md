@@ -1,5 +1,7 @@
 # Microsoft.Extensions.Diagnostics.ResourceMonitoring.Kubernetes
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 Registers `ResourceQuota` implementation specific to Kubernetes.
 
 ## Install the package

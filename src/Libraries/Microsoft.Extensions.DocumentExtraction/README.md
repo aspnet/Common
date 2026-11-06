@@ -1,5 +1,7 @@
 # Microsoft.Extensions.DocumentExtraction
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 Add middleware, lifecycle logging and dependency-injection registration around a
 configured `DocumentExtractionClient`. Your provider still performs extraction;
 **this package is not an OCR engine or a provider SDK**.

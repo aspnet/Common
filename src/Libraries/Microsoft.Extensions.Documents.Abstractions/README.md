@@ -1,5 +1,7 @@
 # Microsoft.Extensions.Documents.Abstractions
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 `Microsoft.Extensions.Documents.Abstractions` is an **experimental**, provider-neutral in-memory model for structured documents. It provides a shared handoff so independently implemented producers and consumers can compose without depending on each other's SDKs or an ingestion framework. It is not an extraction engine or a durable interchange format.
 
 Extraction adapters, application-created content, source viewers and ingestion integrations are examples of components that can use this boundary. Payloads use the standard `AIContent` types from `Microsoft.Extensions.AI.Abstractions`. The model does not depend on DataIngestion, Markdig, provider SDKs, credentials or network calls.

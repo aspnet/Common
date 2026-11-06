@@ -1,5 +1,7 @@
 # Microsoft.Extensions.Resilience
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 Extensions to the Polly libraries to enrich telemetry with metadata and exception summaries.
 
 ## Install the package

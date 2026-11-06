@@ -1,5 +1,7 @@
 # Microsoft.Extensions.ServiceDiscovery
 
+This package is supported on .NET Framework 4.6.2 and later.
+
 The `Microsoft.Extensions.ServiceDiscovery` library is designed to simplify the integration of service discovery patterns in .NET applications. Service discovery is a key component of most distributed systems and microservices architectures. This library provides a straightforward way to resolve service names to endpoint addresses.
 
 In typical systems, service configuration changes over time. Service discovery accounts for by monitoring endpoint configuration using push-based notifications where supported, falling back to polling in other cases. When endpoints are refreshed, callers are notified so that they can observe the refreshed results.

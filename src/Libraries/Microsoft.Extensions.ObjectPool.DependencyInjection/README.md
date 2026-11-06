@@ -1,5 +1,7 @@
 # Microsoft.Extensions.ObjectPool.DependencyInjection
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 This provides the ability to retrieve pooled instances that can be initialized using dependency injection.
 
 ## Install the package

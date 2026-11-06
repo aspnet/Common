@@ -1,5 +1,7 @@
 # Microsoft.Extensions.DataIngestion.Abstractions
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 .NET developers need to efficiently process, chunk, and retrieve information from diverse document formats while preserving semantic meaning and structural context. The `Microsoft.Extensions.DataIngestion` libraries provide a unified approach for representing document ingestion components.
 
 ## The packages

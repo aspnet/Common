@@ -1,5 +1,7 @@
 # Microsoft.Extensions.VectorData.Abstractions
 
+This package is supported on .NET Framework 4.6.2 and later.
+
 This package contains abstract classes and utilities for accessing vector databases. Actual implementations are provided separately in other packages; see <https://learn.microsoft.com/dotnet/ai/vector-stores/overview> for more information.
 
 The abstractions in this package expose functionality for:

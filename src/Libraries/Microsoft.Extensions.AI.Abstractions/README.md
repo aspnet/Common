@@ -1,5 +1,7 @@
 # Microsoft.Extensions.AI.Abstractions
 
+This package is supported on .NET Framework 4.6.2 and later.
+
 .NET developers need to integrate and interact with a growing variety of artificial intelligence (AI) services in their apps. The `Microsoft.Extensions.AI` libraries provide a unified approach for representing generative AI components, and enable seamless integration and interoperability with various AI services.
 
 ## The packages

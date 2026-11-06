@@ -1,5 +1,7 @@
 # Microsoft.Extensions.AI.OpenAI
 
+This package is supported on .NET Framework 4.6.2 and later.
+
 Provides an implementation of the `IChatClient` interface for the `OpenAI` package and OpenAI-compatible endpoints.
 
 ## Install the package

@@ -1,5 +1,7 @@
 # Microsoft.Extensions.AmbientMetadata.Application
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 This flows runtime information for application-level ambient metadata such as the version, deployment ring, environment, and name. This information can be useful to enrich telemetry.
 
 ## Install the package

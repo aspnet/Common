@@ -1,5 +1,7 @@
 # Microsoft.Extensions.DocumentExtraction.Abstractions
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 Extract structured content through a common .NET client contract, without tying
 your application to a particular provider SDK. `DocumentExtractionClient` accepts
 a document `Stream` and returns a completed `ExtractionDocument` containing text,

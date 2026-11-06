@@ -1,5 +1,7 @@
 ﻿# Microsoft.Extensions.Caching.Hybrid
 
+This package is supported on .NET Framework 4.6.2 and later.
+
 This package contains a concrete implementation of [the `HybridCache` API](https://learn.microsoft.com/dotnet/api/microsoft.extensions.caching.hybrid),
 simplifying and enhancing cache usage that might previously have been built on top of [`IDistributedCache`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.caching.distributed.idistributedcache).
 

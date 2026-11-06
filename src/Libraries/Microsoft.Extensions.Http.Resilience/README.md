@@ -1,5 +1,7 @@
 # Microsoft.Extensions.Http.Resilience
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 Resilience mechanisms for `HttpClient` built on the [Polly framework](https://www.pollydocs.org/).
 
 ## Install the package

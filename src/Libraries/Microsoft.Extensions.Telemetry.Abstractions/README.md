@@ -1,5 +1,7 @@
 # Microsoft.Extensions.Telemetry.Abstractions
 
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
+
 This package contains common abstractions for high-level telemetry primitives. Here are the main features it provides:
 
 - Enhanced Logging Capabilities
