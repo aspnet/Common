@@ -6,14 +6,9 @@ using Microsoft.Extensions.Options;
 namespace Microsoft.Extensions.ServiceDiscovery.Http;
 
 internal sealed class ServiceDiscoveryHttpMessageHandlerFactory(
-    TimeProvider timeProvider,
-    IServiceProvider serviceProvider,
-    ServiceEndpointWatcherFactory factory,
+    HttpServiceEndpointResolver resolver,
     IOptions<ServiceDiscoveryOptions> options) : IServiceDiscoveryHttpMessageHandlerFactory
 {
     public HttpMessageHandler CreateHandler(HttpMessageHandler handler)
-    {
-        var registry = new HttpServiceEndpointResolver(factory, serviceProvider, timeProvider);
-        return new ResolvingHttpDelegatingHandler(registry, options, handler);
-    }
+        => new ResolvingHttpDelegatingHandler(resolver, options, handler);
 }

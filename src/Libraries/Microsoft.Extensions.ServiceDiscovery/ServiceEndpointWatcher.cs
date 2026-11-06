@@ -18,7 +18,7 @@ internal sealed partial class ServiceEndpointWatcher(
     ILogger logger,
     string serviceName,
     TimeProvider timeProvider,
-    IOptions<ServiceDiscoveryOptions> options) : IAsyncDisposable
+    IOptions<ServiceDiscoveryOptions> options) : IDisposable, IAsyncDisposable
 {
     private static readonly TimerCallback s_pollingAction = static state => _ = ((ServiceEndpointWatcher)state!).RefreshAsync(force: true);
 
@@ -267,7 +267,25 @@ internal sealed partial class ServiceEndpointWatcher(
     }
 
     /// <inheritdoc/>
+    public void Dispose() => DisposeCore();
+
+    /// <inheritdoc/>
     public async ValueTask DisposeAsync()
+    {
+        DisposeCore();
+
+        if (_refreshTask is { } task)
+        {
+            await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
+
+        foreach (var provider in _providers)
+        {
+            await provider.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private void DisposeCore()
     {
         try
         {
@@ -294,16 +312,6 @@ internal sealed partial class ServiceEndpointWatcher(
 
         changeTokenRegistration?.Dispose();
         pollingTimer?.Dispose();
-
-        if (_refreshTask is { } task)
-        {
-            await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-        }
-
-        foreach (var provider in _providers)
-        {
-            await provider.DisposeAsync().ConfigureAwait(false);
-        }
     }
 
     private enum CacheStatus

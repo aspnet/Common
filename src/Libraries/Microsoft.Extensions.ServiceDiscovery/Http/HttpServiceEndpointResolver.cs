@@ -11,7 +11,7 @@ namespace Microsoft.Extensions.ServiceDiscovery.Http;
 /// <summary>
 /// Resolves endpoints for HTTP requests.
 /// </summary>
-internal sealed class HttpServiceEndpointResolver(ServiceEndpointWatcherFactory watcherFactory, IServiceProvider serviceProvider, TimeProvider timeProvider) : IAsyncDisposable
+internal sealed class HttpServiceEndpointResolver(ServiceEndpointWatcherFactory watcherFactory, IServiceProvider serviceProvider, TimeProvider timeProvider) : IDisposable, IAsyncDisposable
 {
     private static readonly TimerCallback s_cleanupCallback = s => ((HttpServiceEndpointResolver)s!).CleanupResolvers();
     private static readonly TimeSpan s_cleanupPeriod = TimeSpan.FromSeconds(10);
@@ -102,6 +102,23 @@ internal sealed class HttpServiceEndpointResolver(ServiceEndpointWatcherFactory 
     }
 
     /// <inheritdoc/>
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            _cleanupTimer?.Dispose();
+            _cleanupTimer = null;
+        }
+
+        foreach (var resolver in _resolvers)
+        {
+            resolver.Value.Dispose();
+        }
+
+        _resolvers.Clear();
+    }
+
+    /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
         lock (_lock)
@@ -160,7 +177,7 @@ internal sealed class HttpServiceEndpointResolver(ServiceEndpointWatcherFactory 
         return result;
     }
 
-    private sealed class ResolverEntry : IAsyncDisposable
+    private sealed class ResolverEntry : IDisposable, IAsyncDisposable
     {
         private readonly ServiceEndpointWatcher _watcher;
         private readonly IServiceEndpointSelector _selector;
@@ -225,6 +242,13 @@ internal sealed class HttpServiceEndpointResolver(ServiceEndpointWatcherFactory 
                     await DisposeAsyncCore().ConfigureAwait(false);
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            // Mark the entry as disposing so new resolves are rejected, then release the watcher.
+            Interlocked.Or(ref _status, DisposingFlag);
+            _watcher.Dispose();
         }
 
         public async ValueTask DisposeAsync()

@@ -162,7 +162,10 @@ public sealed class ServiceEndpointResolver : IAsyncDisposable
 
     private ResolverEntry CreateResolver(string serviceName)
     {
+        // The watcher's lifetime is owned by the returned ResolverEntry, which disposes it.
+#pragma warning disable CA2000 // Dispose objects before losing scope
         var resolver = _watcherFactory.CreateWatcher(serviceName);
+#pragma warning restore CA2000
         resolver.Start();
         return new ResolverEntry(resolver);
     }

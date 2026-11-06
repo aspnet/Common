@@ -65,6 +65,11 @@ public static class ServiceDiscoveryServiceCollectionExtensions
         services.TryAddSingleton<ServiceEndpointWatcherFactory>();
         services.TryAddSingleton<IServiceDiscoveryHttpMessageHandlerFactory, ServiceDiscoveryHttpMessageHandlerFactory>();
         services.TryAddSingleton(sp => new ServiceEndpointResolver(sp.GetRequiredService<ServiceEndpointWatcherFactory>(), sp.GetRequiredService<TimeProvider>()));
+
+        // Registered as a singleton (rather than created per HTTP message handler) so its refresh
+        // timers and configuration change-token subscriptions are created once and disposed with the
+        // container.
+        services.TryAddSingleton(sp => new HttpServiceEndpointResolver(sp.GetRequiredService<ServiceEndpointWatcherFactory>(), sp, sp.GetRequiredService<TimeProvider>()));
         if (configureOptions is not null)
         {
             services.Configure(configureOptions);

@@ -30,11 +30,9 @@ public static class ServiceDiscoveryHttpClientBuilderExtensions
         services.AddServiceDiscoveryCore();
         httpClientBuilder.AddHttpMessageHandler(services =>
         {
-            var timeProvider = services.GetService<TimeProvider>() ?? TimeProvider.System;
-            var watcherFactory = services.GetRequiredService<ServiceEndpointWatcherFactory>();
-            var registry = new HttpServiceEndpointResolver(watcherFactory, services, timeProvider);
+            var resolver = services.GetRequiredService<HttpServiceEndpointResolver>();
             var options = services.GetRequiredService<IOptions<ServiceDiscoveryOptions>>();
-            return new ResolvingHttpDelegatingHandler(registry, options);
+            return new ResolvingHttpDelegatingHandler(resolver, options);
         });
 
 #if NET
