@@ -28,7 +28,15 @@ their dependency bands intact when adding the next one.
    update `General-LTS.props`, older bands, and `Tests.props` so no TFM silently
    falls back to another band's versions. `ForceLatestDotnetVersions` should
    select the latest *compatible* band for each TFM, not dependencies that
-   require a newer framework. Verify *every* package
+   require a newer framework. Compatibility depends on the assets in each
+   dependency package, not just its major version. Opted-in .NET Framework
+   and .NET Standard targets use the latest band's compatible legacy assets.
+   Opted-in TFMs for .NET versions going out of support retain the
+   framework-specific assets from the highest dependency band in place before
+   advancing to the newly available version, rather than falling back to that
+   new band's legacy assets. New dependency APIs are available only where the selected
+   assets expose them; do not add complicated down-level implementations
+   solely to make API surfaces identical. Verify *every* package
    exists at the chosen version on a trusted feed, including `System.*` and
    ASP.NET Core test dependencies. Check the internal API-docs transport
    package for transitive assembly-version conflicts. Keep the coherent,

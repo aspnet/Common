@@ -1,7 +1,10 @@
 <Project>
 
-  <!-- Use the .NET 11 band for net11 or opted-in net10 targets; older targets retain the .NET 10 band's framework-specific assets. -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net11.0' Or ('$(TargetFramework)' == 'net10.0' And '$(ForceLatestDotnetVersions)' == 'true')">
+  <!-- Opted-in targets use the .NET 11 band, except net8 and net9, which retain the .NET 10 band's framework-specific assets. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net11.0'
+      Or ('$(ForceLatestDotnetVersions)' == 'true'
+          And '$(TargetFramework)' != 'net8.0'
+          And '$(TargetFramework)' != 'net9.0')">
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="$(MicrosoftBclAsyncInterfacesNet11Version)" />
     <PackageVersion Include="Microsoft.Bcl.Memory" Version="$(MicrosoftBclMemoryNet11Version)" />
     <PackageVersion Include="Microsoft.Bcl.TimeProvider" Version="$(MicrosoftBclTimeProviderNet11Version)" />
