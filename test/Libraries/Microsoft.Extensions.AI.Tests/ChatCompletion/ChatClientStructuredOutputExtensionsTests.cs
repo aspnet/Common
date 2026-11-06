@@ -353,6 +353,92 @@ public partial class ChatClientStructuredOutputExtensionsTests
     }
 
     [Fact]
+    public async Task WrappedSchemaKeepsRefPointersResolvable()
+    {
+        var payload = new Envelope<TreeNode[]> { data = [new TreeNode { Name = "root", Children = [new TreeNode { Name = "leaf" }] }] };
+        var expectedResponse = new ChatResponse(new ChatMessage(ChatRole.Assistant, JsonSerializer.Serialize(payload, JsonContext2.Default.Options)));
+
+        JsonElement? schema = null;
+        using var client = new TestChatClient
+        {
+            GetResponseAsyncCallback = (messages, options, cancellationToken) =>
+            {
+                schema = Assert.IsType<ChatResponseFormatJson>(options!.ResponseFormat).Schema;
+                return Task.FromResult(expectedResponse);
+            }
+        };
+
+        var response = await client.GetResponseAsync<TreeNode[]>("Hello", serializerOptions: JsonContext2.Default.Options);
+        Assert.Equal("leaf", Assert.Single(Assert.Single(response.Result!).Children!).Name);
+
+        Assert.NotNull(schema);
+        List<string> refs = [];
+        CollectRefs(schema.Value, refs);
+        Assert.NotEmpty(refs);
+        foreach (string pointer in refs)
+        {
+            Assert.True(TryResolvePointer(schema.Value, pointer, out _), $"$ref '{pointer}' does not resolve in schema:{Environment.NewLine}{schema.Value}");
+        }
+
+        static void CollectRefs(JsonElement element, List<string> refs)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    foreach (var property in element.EnumerateObject())
+                    {
+                        if (property.NameEquals("$ref") && property.Value.ValueKind == JsonValueKind.String)
+                        {
+                            refs.Add(property.Value.GetString()!);
+                        }
+                        else
+                        {
+                            CollectRefs(property.Value, refs);
+                        }
+                    }
+
+                    break;
+
+                case JsonValueKind.Array:
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        CollectRefs(item, refs);
+                    }
+
+                    break;
+            }
+        }
+
+        static bool TryResolvePointer(JsonElement root, string pointer, out JsonElement target)
+        {
+            target = root;
+            if (pointer == "#")
+            {
+                return true;
+            }
+
+            foreach (string segment in pointer.Substring(2).Split('/'))
+            {
+                string name = segment.Replace("~1", "/").Replace("~0", "~");
+                if (target.ValueKind == JsonValueKind.Object && target.TryGetProperty(name, out JsonElement next))
+                {
+                    target = next;
+                }
+                else if (target.ValueKind == JsonValueKind.Array && int.TryParse(name, out int index) && index < target.GetArrayLength())
+                {
+                    target = target[index];
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+
+    [Fact]
     public async Task CanSpecifyCustomJsonSerializationOptions()
     {
         var jso = new JsonSerializerOptions(JsonContext2.Default.Options)
@@ -460,10 +546,17 @@ public partial class ChatClientStructuredOutputExtensionsTests
         public T? data { get; set; }
     }
 
+    private class TreeNode
+    {
+        public string? Name { get; set; }
+        public TreeNode[]? Children { get; set; }
+    }
+
     [JsonSourceGenerationOptions(UseStringEnumConverter = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
     [JsonSerializable(typeof(Animal))]
     [JsonSerializable(typeof(Envelope<int>))]
     [JsonSerializable(typeof(Envelope<Animal[]>))]
+    [JsonSerializable(typeof(Envelope<TreeNode[]>))]
     [JsonSerializable(typeof(Data<Animal>))]
     private partial class JsonContext2 : JsonSerializerContext;
 

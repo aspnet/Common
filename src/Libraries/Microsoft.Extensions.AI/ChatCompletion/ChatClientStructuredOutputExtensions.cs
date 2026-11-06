@@ -159,11 +159,13 @@ public static partial class ChatClientStructuredOutputExtensions
             // the real LLM providers today require an object schema as the root. This is currently
             // true even for providers that support native structured output.
             isWrappedInObject = true;
+            JsonNode? dataSchema = JsonElementToJsonNode(schema);
+            RebaseRefs(dataSchema);
             schema = JsonSerializer.SerializeToElement(new JsonObject
             {
                 { "$schema", "https://json-schema.org/draft/2020-12/schema" },
                 { "type", "object" },
-                { "properties", new JsonObject { { "data", JsonElementToJsonNode(schema) } } },
+                { "properties", new JsonObject { { "data", dataSchema } } },
                 { "additionalProperties", false },
                 { "required", new JsonArray("data") },
             }, AIJsonUtilities.DefaultOptions.GetTypeInfo(typeof(JsonObject)));
@@ -215,6 +217,38 @@ public static partial class ChatClientStructuredOutputExtensions
             }
 
             return false;
+        }
+
+        static void RebaseRefs(JsonNode? node)
+        {
+            switch (node)
+            {
+                case JsonObject obj:
+                    if (obj.TryGetPropertyValue("$ref", out JsonNode? refNode) &&
+                        refNode is JsonValue refValue &&
+                        refValue.TryGetValue(out string? refUri) &&
+                        (refUri == "#" || refUri.StartsWith("#/", StringComparison.Ordinal)))
+                    {
+                        obj["$ref"] = refUri == "#"
+                            ? "#/properties/data"
+                            : $"#/properties/data/{refUri.AsMemory("#/".Length)}";
+                    }
+
+                    foreach (var property in obj)
+                    {
+                        RebaseRefs(property.Value);
+                    }
+
+                    break;
+
+                case JsonArray array:
+                    foreach (var item in array)
+                    {
+                        RebaseRefs(item);
+                    }
+
+                    break;
+            }
         }
 
         static JsonNode? JsonElementToJsonNode(JsonElement element) =>
