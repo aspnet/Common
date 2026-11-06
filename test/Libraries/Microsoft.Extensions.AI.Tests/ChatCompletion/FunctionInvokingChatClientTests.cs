@@ -1032,6 +1032,53 @@ public class FunctionInvokingChatClientTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FunctionCallContent_WithRecordedException_FailsInvocationWithoutCallingFunction(bool detailedErrors)
+    {
+        bool functionInvoked = false;
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                AIFunctionFactory.Create((string opt = "default") =>
+                {
+                    functionInvoked = true;
+                    return "unexpectedly invoked";
+                }, "Func1"),
+            ]
+        };
+
+        var parseException = new FormatException("Malformed argument payload");
+
+        List<ChatMessage> plan =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1") { Exception = parseException }]),
+            new ChatMessage(ChatRole.Tool, [
+                new FunctionResultContent(
+                    "callId1",
+                    result: detailedErrors ? "Error: Function failed. Exception: Malformed argument payload" : "Error: Function failed.")
+            ]),
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        Func<ChatClientBuilder, ChatClientBuilder> configure = b => b.Use(
+            s => new FunctionInvokingChatClient(s) { IncludeDetailedErrors = detailedErrors });
+
+        var chat = await InvokeAndAssertAsync(options, plan, configurePipeline: configure);
+        Assert.False(functionInvoked);
+        var frc = chat.SelectMany(m => m.Contents).OfType<FunctionResultContent>().Single();
+        Assert.Same(parseException, frc.Exception);
+
+        functionInvoked = false;
+        chat = await InvokeAndAssertStreamingAsync(options, plan, configurePipeline: configure);
+        Assert.False(functionInvoked);
+        frc = chat.SelectMany(m => m.Contents).OfType<FunctionResultContent>().Single();
+        Assert.Same(parseException, frc.Exception);
+    }
+
+    [Theory]
     [InlineData(LogLevel.Trace)]
     [InlineData(LogLevel.Debug)]
     [InlineData(LogLevel.Information)]
