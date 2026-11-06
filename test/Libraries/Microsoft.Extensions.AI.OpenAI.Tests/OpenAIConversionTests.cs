@@ -1960,9 +1960,7 @@ public class OpenAIConversionTests
 
         Assert.Equal("response-123", result[0].CompletionId);
         Assert.Equal("Hello, ", Assert.Single(result[0].ContentUpdate).Text);
-
-        // The ToChatFinishReason method defaults null to Stop
-        Assert.Equal(OpenAI.Chat.ChatFinishReason.Stop, result[0].FinishReason);
+        Assert.Null(result[0].FinishReason);
 
         Assert.Equal("response-123", result[1].CompletionId);
         Assert.Equal("world!", Assert.Single(result[1].ContentUpdate).Text);

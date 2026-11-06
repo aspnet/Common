@@ -165,7 +165,7 @@ public static class MicrosoftExtensionsAIChatExtensions
                 new(OpenAIChatClient.ToOpenAIChatContent(update.Contents)),
                 toolCallUpdates: toolCallUpdates,
                 role: ToChatMessageRole(update.Role),
-                finishReason: ToChatFinishReason(update.FinishReason),
+                finishReason: update.FinishReason is null ? null : ToChatFinishReason(update.FinishReason),
                 createdAt: update.CreatedAt ?? default,
                 model: update.ModelId,
                 usage: usage);
