@@ -2,7 +2,9 @@
   
   <!-- The items in this ItemGroup are packages coming from aspnetcore and runtime repos. When an asset is targeting net10.0 version
   of the framework, the following versions should be used. -->
-  <ItemGroup Condition="('$(TargetFramework)' == 'net10.0' And '$(ForceLatestDotnetVersions)' != 'true') Or ('$(ForceLatestDotnetVersions)' == 'true' And '$(TargetFramework)' != 'net10.0' And '$(TargetFramework)' != 'net11.0')">
+  <ItemGroup Condition="('$(TargetFramework)' == 'net10.0' And '$(ForceLatestDotnetVersions)' != 'true')
+      Or ('$(ForceLatestDotnetVersions)' == 'true'
+          And ('$(TargetFramework)' == 'net8.0' Or '$(TargetFramework)' == 'net9.0'))">
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="$(MicrosoftBclAsyncInterfacesNet10Version)" />
     <PackageVersion Include="Microsoft.Bcl.Memory" Version="$(MicrosoftBclMemoryNet10Version)" />
     <PackageVersion Include="Microsoft.Bcl.TimeProvider" Version="$(MicrosoftBclTimeProviderNet10Version)" />
