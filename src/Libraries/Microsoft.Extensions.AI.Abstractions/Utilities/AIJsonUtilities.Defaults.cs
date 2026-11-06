@@ -143,6 +143,23 @@ public static partial class AIJsonUtilities
     [JsonSerializable(typeof(HostedFileClientOptions))]
     [JsonSerializable(typeof(HostedFileClientMetadata))]
 
+    // Decisions
+    [JsonSerializable(typeof(DecisionOptions))]
+    [JsonSerializable(typeof(DecisionClientMetadata))]
+    [JsonSerializable(typeof(DecisionRequest))]
+    [JsonSerializable(typeof(DecisionQuestion))]
+    [JsonSerializable(typeof(BinaryDecisionQuestion))]
+    [JsonSerializable(typeof(ChoiceDecisionQuestion))]
+    [JsonSerializable(typeof(ScoreDecisionQuestion))]
+    [JsonSerializable(typeof(DecisionCandidate))]
+    [JsonSerializable(typeof(DecisionScoreLevel))]
+    [JsonSerializable(typeof(DecisionResponse))]
+    [JsonSerializable(typeof(DecisionAnswer))]
+    [JsonSerializable(typeof(BinaryDecisionAnswer))]
+    [JsonSerializable(typeof(ChoiceDecisionAnswer))]
+    [JsonSerializable(typeof(ScoreDecisionAnswer))]
+    [JsonSerializable(typeof(DecisionProbability))]
+
     [EditorBrowsable(EditorBrowsableState.Never)] // Never use JsonContext directly, use DefaultOptions instead.
     private sealed partial class JsonContext : JsonSerializerContext;
 
