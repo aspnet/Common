@@ -232,6 +232,14 @@ internal static class MarkdownParser
             {
                 content.Append(htmlInline.Tag);
             }
+            else if (inline is AutolinkInline autolinkInline)
+            {
+                content.Append(autolinkInline.Url);
+            }
+            else if (inline is HtmlEntityInline htmlEntityInline)
+            {
+                content.Append(htmlEntityInline.Transcoded);
+            }
             else
             {
                 throw new NotSupportedException($"Inline type '{inline.GetType().Name}' is not supported.");

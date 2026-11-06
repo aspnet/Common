@@ -199,6 +199,51 @@ public class MarkdownReaderTests : DocumentReaderConformanceTests
         Assert.Equal(markdownContent, paragraph.GetMarkdown());
     }
 
+    [Fact]
+    public async Task SupportsAutolinks()
+    {
+        string markdownContent = "See <https://example.com> or write to <user@example.com>.";
+
+        IngestionDocument document = await ReadAsync(markdownContent);
+
+        var paragraph = Assert.Single(document.EnumerateContent().OfType<IngestionDocumentParagraph>());
+        Assert.Equal("See https://example.com or write to user@example.com.", paragraph.Text);
+        Assert.Equal(markdownContent, paragraph.GetMarkdown());
+    }
+
+    [Fact]
+    public async Task SupportsTablesWithAutolinks()
+    {
+        string markdownContent = """
+        | Name | Link |
+        | --- | --- |
+        | Docs | See <https://example.com> |
+        """;
+
+        IngestionDocument document = await ReadAsync(markdownContent);
+
+        IngestionDocumentTable documentTable = Assert.Single(document.EnumerateContent().OfType<IngestionDocumentTable>());
+        var cell = Assert.IsType<IngestionDocumentParagraph>(documentTable.Cells[1, 1]);
+        Assert.Equal("See https://example.com", cell.Text);
+    }
+
+    [Fact]
+    public async Task SupportsHtmlEntities()
+    {
+        string markdownContent = """
+        # Q&amp;A
+
+        Fish &amp; chips cost &#8364;5.
+        """;
+
+        IngestionDocument document = await ReadAsync(markdownContent);
+
+        var header = Assert.Single(document.EnumerateContent().OfType<IngestionDocumentHeader>());
+        Assert.Equal("Q&A", header.Text);
+        var paragraph = Assert.Single(document.EnumerateContent().OfType<IngestionDocumentParagraph>());
+        Assert.Equal("Fish & chips cost €5.", paragraph.Text);
+    }
+
     private async Task<IngestionDocument> ReadAsync(string content)
     {
         using MemoryStream stream = new(System.Text.Encoding.UTF8.GetBytes(content));
