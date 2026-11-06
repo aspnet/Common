@@ -37,6 +37,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
     // chat history, so the id is available when reconstructing the reasoning item for a subsequent request.
     // Stateless (store=false) resume of encrypted reasoning requires this id or the service rejects the item.
     private const string ReasoningItemIdKey = "reasoningItemId";
+    private const string FunctionCallNamespaceKey = "openai.functionCallNamespace";
 
     // These delegate instances are used to call the internal overloads of CreateResponseAsync and CreateResponseStreamingAsync that accept
     // a RequestOptions. These should be replaced once a better way to pass RequestOptions is available.
@@ -208,7 +209,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                     break;
 
                 case FunctionCallResponseItem functionCall:
-                    var fcc = OpenAIClientExtensions.ParseCallContent(functionCall.FunctionArguments, functionCall.CallId, functionCall.FunctionName);
+                    var fcc = CreateFunctionCallContent(functionCall);
                     fcc.RawRepresentation = outputItem;
                     message.Contents.Add(fcc);
                     break;
@@ -515,7 +516,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                     {
                         // Translate completed ResponseItems into their corresponding abstraction representations.
                         case FunctionCallResponseItem fcri:
-                            yield return CreateUpdate(OpenAIClientExtensions.ParseCallContent(fcri.FunctionArguments.ToString(), fcri.CallId, fcri.FunctionName));
+                            yield return CreateUpdate(CreateFunctionCallContent(fcri));
                             break;
 
                         case McpToolCallItem mtci:
@@ -951,6 +952,46 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
 
         return content;
     }
+
+#pragma warning disable SCME0001 // JsonPatch is experimental
+    /// <summary>Creates a function call and retains the namespace needed to replay it.</summary>
+    private static FunctionCallContent CreateFunctionCallContent(FunctionCallResponseItem item)
+    {
+        var content = OpenAIClientExtensions.ParseCallContent(item.FunctionArguments, item.CallId, item.FunctionName);
+
+        // AdditionalProperties survives JSON-backed history, unlike RawRepresentation.
+        if (item.Patch.TryGetValue("$.namespace"u8, out string? functionNamespace) && !string.IsNullOrEmpty(functionNamespace))
+        {
+            (content.AdditionalProperties ??= [])[FunctionCallNamespaceKey] = functionNamespace;
+        }
+
+        return content;
+    }
+
+    /// <summary>Reconstructs a native function call from the typed content and its replay metadata.</summary>
+    private static FunctionCallResponseItem ToFunctionCallResponseItem(FunctionCallContent content)
+    {
+        var item = ResponseItem.CreateFunctionCallItem(
+            content.CallId,
+            content.Name,
+            BinaryData.FromBytes(JsonSerializer.SerializeToUtf8Bytes(
+                content.Arguments,
+                AIJsonUtilities.DefaultOptions.GetTypeInfo(typeof(IDictionary<string, object?>)))));
+
+        if (content.AdditionalProperties?.TryGetValue(FunctionCallNamespaceKey, out object? namespaceValue) is true)
+        {
+            string? functionNamespace = namespaceValue as string ??
+                (namespaceValue is JsonElement { ValueKind: JsonValueKind.String } jsonElement ? jsonElement.GetString() : null);
+
+            if (functionNamespace is { Length: > 0 })
+            {
+                item.Patch.Set("$.namespace"u8, functionNamespace);
+            }
+        }
+
+        return item;
+    }
+#pragma warning restore SCME0001
 
     /// <summary>Creates a <see cref="ChatFinishReason"/> from a <see cref="ResponseIncompleteStatusReason"/>.</summary>
     private static ChatFinishReason? AsFinishReason(ResponseIncompleteStatusReason? statusReason) =>
@@ -1588,12 +1629,7 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                             break;
 
                         case FunctionCallContent callContent:
-                            yield return ResponseItem.CreateFunctionCallItem(
-                                callContent.CallId,
-                                callContent.Name,
-                                BinaryData.FromBytes(JsonSerializer.SerializeToUtf8Bytes(
-                                    callContent.Arguments,
-                                    AIJsonUtilities.DefaultOptions.GetTypeInfo(typeof(IDictionary<string, object?>)))));
+                            yield return ToFunctionCallResponseItem(callContent);
                             break;
 
                         case ToolApprovalRequestContent toolReq when toolReq.ToolCall is McpServerToolCallContent mcpToolCall:
