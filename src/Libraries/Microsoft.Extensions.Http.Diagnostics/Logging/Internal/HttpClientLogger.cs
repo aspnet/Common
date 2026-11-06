@@ -31,6 +31,8 @@ internal sealed class HttpClientLogger : IHttpClientAsyncLogger
     private readonly bool _logResponseHeaders;
     private readonly bool _logRequestHeaders;
     private readonly bool _pathParametersRedactionSkipped;
+    private readonly IReadOnlyList<HttpStatusCodeLogLevelRule> _statusCodeLogLevelRules;
+    private readonly LogLevel _exceptionLogLevel;
     private ILogger<HttpClientLogger> _logger;
     private IHttpRequestReader _httpRequestReader;
     private IHttpClientLogEnricher[] _enrichers;
@@ -62,6 +64,10 @@ internal sealed class HttpClientLogger : IHttpClientAsyncLogger
         _logResponseHeaders = options.ResponseHeadersDataClasses.Count > 0;
         _logRequestHeaders = options.RequestHeadersDataClasses.Count > 0;
         _pathParametersRedactionSkipped = options.RequestPathParameterRedactionMode == HttpRouteParameterRedactionMode.None;
+        _statusCodeLogLevelRules = options.StatusCodeLogLevelRules is { } rules
+            ? rules as IReadOnlyList<HttpStatusCodeLogLevelRule> ?? rules.ToArray()
+            : [];
+        _exceptionLogLevel = options.ExceptionLogLevel;
     }
 
     public async ValueTask<object?> LogRequestStartAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
@@ -133,11 +139,23 @@ internal sealed class HttpClientLogger : IHttpClientAsyncLogger
     public void LogRequestFailed(object? context, HttpRequestMessage request, HttpResponseMessage? response, Exception exception, TimeSpan elapsed)
         => throw new NotSupportedException(SyncLoggingExceptionMessage);
 
-    private static LogLevel GetLogLevel(LogRecord logRecord)
+    private LogLevel GetLogLevel(LogRecord logRecord)
     {
+        int statusCode = logRecord.StatusCode!.Value;
+
+        for (int i = 0; i < _statusCodeLogLevelRules.Count; i++)
+        {
+            var rule = _statusCodeLogLevelRules[i];
+            int to = rule.ToStatusCode ?? rule.FromStatusCode;
+
+            if (statusCode >= rule.FromStatusCode && statusCode <= to)
+            {
+                return rule.LogLevel;
+            }
+        }
+
         const int HttpErrorsRangeStart = 400;
         const int HttpErrorsRangeEnd = 599;
-        int statusCode = logRecord.StatusCode!.Value;
 
         if (statusCode >= HttpErrorsRangeStart && statusCode <= HttpErrorsRangeEnd)
         {
@@ -188,7 +206,7 @@ internal sealed class HttpClientLogger : IHttpClientAsyncLogger
             }
             else
             {
-                Log.OutgoingRequestError(_logger, logRecord, exception);
+                Log.OutgoingRequestError(_logger, _exceptionLogLevel, logRecord, exception);
             }
         }
         catch (Exception ex)

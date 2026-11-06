@@ -7,6 +7,8 @@ using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Http.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Shared.Data.Validation;
 using Microsoft.Shared.DiagnosticIds;
 
@@ -163,4 +165,27 @@ public class LoggingOptions
     /// </remarks>
     [Experimental(diagnosticId: DiagnosticIds.Experiments.Telemetry, UrlFormat = DiagnosticIds.UrlFormat)]
     public bool LogContentHeaders { get; set; }
+
+    /// <summary>
+    /// Gets or sets a list of rules that map HTTP status codes or ranges to specific log levels.
+    /// </summary>
+    /// <value>
+    /// The default value is an empty list. When empty, the built-in behavior applies: 400-599 logs at <see cref="Microsoft.Extensions.Logging.LogLevel.Error"/>,
+    /// all other status codes log at <see cref="Microsoft.Extensions.Logging.LogLevel.Information"/>.
+    /// </value>
+    /// <remarks>
+    /// Rules are evaluated in order; the first matching rule wins. If no rule matches, the built-in default applies.
+    /// </remarks>
+    [Experimental(diagnosticId: DiagnosticIds.Experiments.Telemetry, UrlFormat = DiagnosticIds.UrlFormat)]
+    [ValidateEnumeratedItems]
+    public IList<HttpStatusCodeLogLevelRule> StatusCodeLogLevelRules { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the log level used when an HTTP request throws an exception.
+    /// </summary>
+    /// <value>
+    /// The default value is <see cref="Microsoft.Extensions.Logging.LogLevel.Error"/>.
+    /// </value>
+    [Experimental(diagnosticId: DiagnosticIds.Experiments.Telemetry, UrlFormat = DiagnosticIds.UrlFormat)]
+    public LogLevel ExceptionLogLevel { get; set; } = LogLevel.Error;
 }

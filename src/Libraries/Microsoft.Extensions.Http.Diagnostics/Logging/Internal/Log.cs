@@ -44,9 +44,9 @@ internal static partial class Log
         OutgoingRequest(logger, level, 1, nameof(OutgoingRequest), record);
     }
 
-    public static void OutgoingRequestError(ILogger logger, LogRecord record, Exception exception)
+    public static void OutgoingRequestError(ILogger logger, LogLevel level, LogRecord record, Exception exception)
     {
-        OutgoingRequest(logger, LogLevel.Error, 2, nameof(OutgoingRequestError), record, exception);
+        OutgoingRequest(logger, level, 2, nameof(OutgoingRequestError), record, exception);
     }
 
     [LoggerMessage(LogLevel.Error, RequestReadErrorMessage)]
