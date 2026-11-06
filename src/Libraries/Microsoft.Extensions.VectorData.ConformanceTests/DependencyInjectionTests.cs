@@ -182,6 +182,34 @@ public abstract class DependencyInjectionTests<TVectorStore, TCollection, TKey, 
         }
     }
 
+    [Theory]
+    [MemberData(nameof(LifetimesAndServiceKeys))]
+    public virtual void EmbeddingGeneratorIsResolvedForEachVectorStore(ServiceLifetime lifetime, object? serviceKey)
+    {
+        foreach (var registrationDelegate in StoreDelegates)
+        {
+            IServiceCollection services = CreateServices(serviceKey);
+
+            registrationDelegate(services, serviceKey, lifetime);
+
+            VerifyEmbeddingGeneratorIsResolvedForEachInstance<TVectorStore>(services, lifetime, serviceKey);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(LifetimesAndServiceKeys))]
+    public virtual void EmbeddingGeneratorIsResolvedForEachCollection(ServiceLifetime lifetime, object? serviceKey)
+    {
+        foreach (var registrationDelegate in CollectionDelegates)
+        {
+            IServiceCollection services = CreateServices(serviceKey);
+
+            registrationDelegate(services, serviceKey, CollectionName, lifetime);
+
+            VerifyEmbeddingGeneratorIsResolvedForEachInstance<TCollection>(services, lifetime, serviceKey);
+        }
+    }
+
 #pragma warning disable CA1000 // Do not declare static members on generic types
     public static TheoryData<ServiceLifetime, object?> LifetimesAndServiceKeys { get; } = GetLifetimesAndServiceKeys();
 #pragma warning restore CA1000 // Do not declare static members on generic types
@@ -253,6 +281,34 @@ public abstract class DependencyInjectionTests<TVectorStore, TCollection, TKey, 
         }
     }
 
+    private static void VerifyEmbeddingGeneratorIsResolvedForEachInstance<TService>(IServiceCollection services, ServiceLifetime lifetime, object? serviceKey)
+        where TService : class
+    {
+        // The generator is not null (otherwise there would be nothing to reuse) and it's scoped,
+        // so every new instance is expected to resolve it again, from its own scope.
+        int resolveCount = 0;
+        services.AddScoped<IEmbeddingGenerator>(sp =>
+        {
+            resolveCount++;
+            return new FakeEmbeddingGenerator();
+        });
+
+        using ServiceProvider serviceProvider = services.BuildServiceProvider();
+
+        using (IServiceScope scope1 = serviceProvider.CreateScope())
+        {
+            _ = Resolve<TService>(scope1.ServiceProvider, serviceKey);
+        }
+
+        using (IServiceScope scope2 = serviceProvider.CreateScope())
+        {
+            _ = Resolve<TService>(scope2.ServiceProvider, serviceKey);
+        }
+
+        // A singleton is created only once, while scoped and transient services are created again in the second scope.
+        Assert.Equal(lifetime == ServiceLifetime.Singleton ? 1 : 2, resolveCount);
+    }
+
     protected static string CreateConfigKey(string prefix, object? serviceKey, string suffix)
         => serviceKey is null ? $"{prefix}:{suffix}" : $"{prefix}:{serviceKey}:{suffix}";
 
@@ -310,6 +366,22 @@ public abstract class DependencyInjectionTests<TVectorStore, TCollection, TKey, 
             => throw new NotSupportedException();
         public override Task UpsertAsync(IEnumerable<TRecord> records, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+    }
+
+    private sealed class FakeEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
+    {
+        public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
+            IEnumerable<string> values,
+            EmbeddingGenerationOptions? options = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+            => null;
+
+        public void Dispose()
+        {
+        }
     }
 }
 
