@@ -15,7 +15,7 @@ The `dotnet/extensions` repository ships NuGet packages across many functional a
 
 The repository does not follow Semantic Versioning. Major versions align with annual .NET releases, minor versions increment monthly, and patch versions are for intra-month fixes.
 
-The repository makes heavy use of `[Experimental]` attributes. Experimental diagnostic IDs are documented in [`docs/list-of-diagnostics.md`](../../../../docs/list-of-diagnostics.md). Breaking changes to experimental APIs are expected and acceptable. Graduation of experimental APIs to stable is a noteworthy positive event.
+The repository makes heavy use of `[Experimental]` attributes. Experimental diagnostic IDs are documented in [`docs/list-of-diagnostics.md`](../../../../docs/list-of-diagnostics.md). Experimental APIs carry no compatibility guarantee, so they may change or be removed; still assess and report downstream impact, especially for highly adopted or transitive APIs, as described in [`CONTRIBUTING.md`](../../../../CONTRIBUTING.md#using-experimental). Graduation of experimental APIs to stable is a noteworthy positive event.
 
 The release tag targets the **official build source SHA**, equal to every selected nuspec repository commit, made publicly reachable by reconciliation when necessary. The cleaned public reconciliation merge has a different purpose and must not replace that target.
 
