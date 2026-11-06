@@ -105,6 +105,21 @@ public class LogSamplingRuleSelectorTests
     }
 
     [Fact]
+    public void LogLevelSpecificityRemainsAheadOfEventIdSpecificity()
+    {
+        var rules = new List<RandomProbabilisticSamplerFilterRule>
+        {
+            new(probability: 0.1, logLevel: LogLevel.Information),
+            new(probability: 1.0, eventId: 42),
+        };
+
+        RandomProbabilisticSamplerFilterRule? actualResult =
+            _ruleSelector.Select(rules, "AnyCategory", LogLevel.Information, 42);
+
+        Assert.Same(rules[0], actualResult);
+    }
+
+    [Fact]
     public void SelectsRuleBasedOnLogLevelAndEventId()
     {
         // Arrange

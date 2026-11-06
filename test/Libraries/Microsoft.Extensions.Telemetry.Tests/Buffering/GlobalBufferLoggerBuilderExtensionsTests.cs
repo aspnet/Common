@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Test;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -28,6 +29,22 @@ public class GlobalBufferLoggerBuilderExtensionsTests
 
         Assert.NotNull(bufferManager);
         Assert.IsAssignableFrom<GlobalLogBufferManager>(bufferManager);
+    }
+
+    [Fact]
+    public void AddGlobalBuffer_WhenCustomLogBufferIsRegistered_PreservesCustomBuffer()
+    {
+        var serviceCollection = new ServiceCollection();
+        serviceCollection.AddLogging(builder =>
+        {
+            builder.Services.AddSingleton<LogBuffer, StubLogBuffer>();
+            builder.AddGlobalBuffer();
+        });
+
+        using ServiceProvider serviceProvider = serviceCollection.BuildServiceProvider();
+
+        Assert.IsType<StubLogBuffer>(serviceProvider.GetRequiredService<LogBuffer>());
+        Assert.NotNull(serviceProvider.GetRequiredService<GlobalLogBuffer>());
     }
 
     [Fact]
@@ -142,6 +159,17 @@ public class GlobalBufferLoggerBuilderExtensionsTests
         {
             Assert.Equivalent(updatedData, buffer.LastKnownGoodFilterRules, strict: true);
         }
+    }
+
+    private sealed class StubLogBuffer : LogBuffer
+    {
+        public override void Flush()
+        {
+        }
+
+        public override bool TryEnqueue<TState>(
+            IBufferedLogger bufferedLogger,
+            in LogEntry<TState> logEntry) => false;
     }
 }
 #endif

@@ -119,6 +119,13 @@ internal sealed class ExtendedLoggerFactory : ILoggerFactory
             _enrichmentOptionsChangeTokenRegistration?.Dispose();
             _redactionOptionsChangeTokenRegistration?.Dispose();
 
+#if NET9_0_OR_GREATER
+            if (_logBuffer is IFlushOnShutdownLogBuffer)
+            {
+                _logBuffer.Flush();
+            }
+#endif
+
             foreach (ProviderRegistration registration in _providerRegistrations)
             {
                 try

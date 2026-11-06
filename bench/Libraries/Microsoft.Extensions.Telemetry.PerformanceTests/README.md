@@ -99,3 +99,108 @@ WarmupCount=10
 |      ClassicCodeGen_ValueTypes | NewWi(...)pling [27] | 173.94 ns | 0.709 ns | 1.039 ns | 174.08 ns | 0.0429 |     360 B |
 |         ModernCodeGen_RefTypes | NewWi(...)pling [27] | 150.95 ns | 0.723 ns | 1.082 ns | 150.75 ns | 0.0038 |      32 B |
 |       ModernCodeGen_ValueTypes | NewWi(...)pling [27] | 165.48 ns | 0.387 ns | 0.579 ns | 165.53 ns | 0.0238 |     200 B |
+
+## 2026 Bottom-K sampling results
+
+These results cover the Bottom-K implementation and benchmark suites described in
+[design.md](design.md). Runs used Windows 11 under Hyper-V, .NET 10 x64 RyuJIT AVX2,
+two launches, ten warmup iterations, and fifteen measured iterations. Tiered compilation
+was disabled. Treat the figures as directional because virtualization can affect timing.
+The results were rerun after correcting benchmark cleanup so adaptive frequency state is
+preserved between iterations.
+
+Some saved artifacts use the implementation's earlier `Cckr` name. Those rows correspond
+to the Bottom-K implementation in this project.
+
+### Serialized exporter
+
+This is the most representative CPU and allocation comparison because the provider formats
+and serializes retained logs to UTF-8 JSON. Bottom-K and random sampling both target 1%
+retention. Times and allocations are for the complete input batch.
+
+| Strategy | Input logs | Mean | Allocated | Ratio to no sampling |
+| --- | ---: | ---: | ---: | ---: |
+| No sampling | 10,000 | 9.818 ms | 2,805.66 KB | 1.00 |
+| Random 1% | 10,000 | 3.119 ms | 966.35 KB | 0.31 |
+| Bottom-K 1% | 10,000 | 2.932 ms | 769.30 KB | 0.30 |
+| No sampling | 20,000 | 19.813 ms | 5,618.16 KB | 1.00 |
+| Random 1% | 20,000 | 5.988 ms | 1,927.37 KB | 0.29 |
+| Bottom-K 1% | 20,000 | 5.880 ms | 1,518.05 KB | 0.30 |
+
+At 20,000 logs, Bottom-K and random 1% sampling had similar execution times, while Bottom-K
+allocated approximately 21% less managed memory. Both sampling strategies were substantially
+cheaper than serializing every log.
+
+### Category cardinality
+
+This suite processes 20,000 logs at 1% retention while varying the number of categories.
+
+| Categories | Strategy | Mean | Allocated |
+| ---: | --- | ---: | ---: |
+| 50 | Random 1% | 5.736 ms | 1.88 MB |
+| 50 | Bottom-K 1% | 6.290 ms | 1.63 MB |
+| 100 | Random 1% | 5.997 ms | 1.88 MB |
+| 100 | Bottom-K 1% | 7.070 ms | 1.72 MB |
+| 200 | Random 1% | 5.980 ms | 1.88 MB |
+| 200 | Bottom-K 1% | 7.078 ms | 1.82 MB |
+
+Bottom-K remained stable from 100 through 200 categories, but was 10% to 18% slower than
+random sampling in this suite. It allocated less than random sampling at every cardinality,
+although allocation increased because it maintains one bounded reservoir per category.
+
+### Multithreaded contention
+
+This suite processes 20,000 logs across 100 shared categories. The measured operation includes
+the Bottom-K flush.
+
+| Workers | Strategy | Mean | Allocated |
+| ---: | --- | ---: | ---: |
+| 1 | Random 1% | 5.614 ms | 1.84 MB |
+| 1 | Bottom-K 1% | 6.002 ms | 1.71 MB |
+| 4 | Random 1% | 2.221 ms | 1.84 MB |
+| 4 | Bottom-K 1% | 3.459 ms | 1.72 MB |
+| 8 | Random 1% | 2.216 ms | 1.84 MB |
+| 8 | Bottom-K 1% | 3.833 ms | 1.71 MB |
+
+Bottom-K allocated less but showed increasing synchronization cost relative to random sampling
+at four and eight workers.
+
+### Retained memory
+
+Each scenario ran in a fresh worker process. `Retained managed` is live managed memory after
+a forced full collection; `Peak managed` is the largest observed managed-heap increase while
+processing the batch.
+
+| Pipeline | Input logs | Retained managed | Peak managed |
+| --- | ---: | ---: | ---: |
+| No sampling | 10,000 | ~0 MiB | 0.59 MiB |
+| Random 1% | 10,000 | ~0 MiB | 1.05 MiB |
+| Global buffer | 10,000 | 3.26 MiB | 4.46 MiB |
+| Bottom-K adaptive | 10,000 | 0.20 MiB | 1.18 MiB |
+| Bottom-K retain all | 10,000 | 3.79 MiB | 5.02 MiB |
+| No sampling | 20,000 | ~0 MiB | 0.84 MiB |
+| Random 1% | 20,000 | ~0 MiB | 2.09 MiB |
+| Global buffer | 20,000 | 6.53 MiB | 9.16 MiB |
+| Bottom-K adaptive | 20,000 | 0.20 MiB | 1.96 MiB |
+| Bottom-K retain all | 20,000 | 7.66 MiB | 10.20 MiB |
+
+Adaptive Bottom-K retained approximately 0.20 MiB at both traffic volumes because its sample
+capacity was fixed. Retain-all configurations use a per-category capacity sized to each
+category's share of the workload; they intentionally scale with input volume and are included
+only to expose the upper-bound buffering cost.
+
+### Category-policy cost
+
+The following run used .NET 10.0.12. Each row processes the complete input batch and all
+patterns miss, so output volume remains equivalent.
+
+| Policy | 10,000 logs | 20,000 logs |
+| --- | ---: | ---: |
+| No category policy | 3.879 ms | 6.423 ms |
+| Two wildcard misses | 4.806 ms | 7.737 ms |
+| 100 wildcard misses | 27.766 ms | 54.854 ms |
+| 100 exact misses | 4.124 ms | 6.973 ms |
+
+Exact category names use a case-insensitive frozen set and therefore remain effectively
+constant-time. Wildcard patterns are checked sequentially; use them selectively for specific
+namespace families.

@@ -3,12 +3,14 @@
 #if NET9_0_OR_GREATER
 
 using System;
+using System.Linq;
 using Microsoft.AspNetCore.Diagnostics.Buffering;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.Buffering;
+using Microsoft.Extensions.Diagnostics.Sampling;
 using Microsoft.Extensions.Options;
 using Microsoft.Shared.Diagnostics;
 
@@ -111,6 +113,13 @@ public static class PerIncomingRequestLoggingBuilderExtensions
 
     private static ILoggingBuilder AddPerRequestBufferManager(this ILoggingBuilder builder)
     {
+        if (builder.Services.Any(descriptor =>
+            !descriptor.IsKeyedService && descriptor.ServiceType == typeof(BottomKLogBuffer)))
+        {
+            Throw.InvalidOperationException(
+                "Per-request log buffering cannot be combined with Bottom-K log sampling in the same logging pipeline.");
+        }
+
         builder.Services.TryAddScoped<IncomingRequestLogBufferHolder>();
         builder.Services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
         builder.Services.TryAddSingleton(sp =>

@@ -3,6 +3,9 @@
 
 using System;
 using System.Diagnostics.CodeAnalysis;
+#if NET9_0_OR_GREATER
+using System.Linq;
+#endif
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -48,6 +51,9 @@ public static class SamplingLoggerBuilderExtensions
         _ = Throw.IfNull(builder);
         _ = Throw.IfNull(configuration);
 
+#if NET9_0_OR_GREATER
+        RejectSamplerCombinedWithBottomK<RandomProbabilisticSampler>(builder);
+#endif
         _ = builder.Services
             .AddOptionsWithValidateOnStart<RandomProbabilisticSamplerOptions, RandomProbabilisticSamplerOptionsValidator>();
         _ = builder.Services
@@ -79,6 +85,9 @@ public static class SamplingLoggerBuilderExtensions
         _ = Throw.IfNull(builder);
         _ = Throw.IfNull(configure);
 
+#if NET9_0_OR_GREATER
+        RejectSamplerCombinedWithBottomK<RandomProbabilisticSampler>(builder);
+#endif
         _ = builder.Services
             .AddOptionsWithValidateOnStart<RandomProbabilisticSamplerOptions, RandomProbabilisticSamplerOptionsValidator>()
             .Configure(configure);
@@ -106,6 +115,9 @@ public static class SamplingLoggerBuilderExtensions
         _ = Throw.IfNull(builder);
         _ = Throw.IfOutOfRange(probability, 0, 1, nameof(probability));
 
+#if NET9_0_OR_GREATER
+        RejectSamplerCombinedWithBottomK<RandomProbabilisticSampler>(builder);
+#endif
         _ = builder.Services
             .AddOptionsWithValidateOnStart<RandomProbabilisticSamplerOptions, RandomProbabilisticSamplerOptionsValidator>()
             .Configure(options => options.Rules.Add(new RandomProbabilisticSamplerFilterRule(probability, logLevel: level)));
@@ -127,6 +139,9 @@ public static class SamplingLoggerBuilderExtensions
     {
         _ = Throw.IfNull(builder);
 
+#if NET9_0_OR_GREATER
+        RejectSamplerCombinedWithBottomK<T>(builder);
+#endif
         builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<ILoggerFactory, ExtendedLoggerFactory>());
         _ = builder.Services.AddSingleton<LoggingSampler, T>();
 
@@ -145,9 +160,29 @@ public static class SamplingLoggerBuilderExtensions
         _ = Throw.IfNull(builder);
         _ = Throw.IfNull(sampler);
 
+#if NET9_0_OR_GREATER
+        RejectSamplerCombinedWithBottomK(builder, sampler.GetType());
+#endif
         builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<ILoggerFactory, ExtendedLoggerFactory>());
         _ = builder.Services.AddSingleton(sampler);
 
         return builder;
     }
+
+#if NET9_0_OR_GREATER
+    private static void RejectSamplerCombinedWithBottomK<T>(ILoggingBuilder builder)
+        where T : LoggingSampler
+        => RejectSamplerCombinedWithBottomK(builder, typeof(T));
+
+    private static void RejectSamplerCombinedWithBottomK(ILoggingBuilder builder, Type samplerType)
+    {
+        if (samplerType != typeof(BottomKLoggingSampler)
+            && builder.Services.Any(descriptor =>
+                !descriptor.IsKeyedService && descriptor.ServiceType == typeof(BottomKLogBuffer)))
+        {
+            Throw.InvalidOperationException(
+                "Another logging sampler cannot be combined with Bottom-K log sampling in the same logging pipeline.");
+        }
+    }
+#endif
 }

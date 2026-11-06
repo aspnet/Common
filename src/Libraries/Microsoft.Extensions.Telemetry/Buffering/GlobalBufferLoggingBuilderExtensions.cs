@@ -3,10 +3,12 @@
 #if NET9_0_OR_GREATER
 
 using System;
+using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.Buffering;
+using Microsoft.Extensions.Diagnostics.Sampling;
 using Microsoft.Extensions.Options;
 using Microsoft.Shared.Diagnostics;
 
@@ -90,6 +92,13 @@ public static class GlobalBufferLoggingBuilderExtensions
 
     private static ILoggingBuilder AddGlobalBufferManager(this ILoggingBuilder builder)
     {
+        if (builder.Services.Any(descriptor =>
+            !descriptor.IsKeyedService && descriptor.ServiceType == typeof(BottomKLogBuffer)))
+        {
+            Throw.InvalidOperationException(
+                "Global log buffering cannot be combined with Bottom-K log sampling in the same logging pipeline.");
+        }
+
         _ = builder.Services.AddExtendedLoggerFeactory();
 
         builder.Services.TryAddSingleton<IExternalScopeProvider>(static sp =>
