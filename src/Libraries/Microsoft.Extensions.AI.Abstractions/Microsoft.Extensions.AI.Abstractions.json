@@ -5707,6 +5707,10 @@
         {
           "Member": "static Microsoft.Extensions.AI.DecisionDefinition<TResult> Microsoft.Extensions.AI.DecisionDefinition<TResult>.Create(System.Text.Json.Serialization.Metadata.JsonTypeInfo<TResult> resultTypeInfo, System.Action<Microsoft.Extensions.AI.DecisionDefinition<TResult>.Builder> configure);",
           "Stage": "Experimental"
+        },
+        {
+          "Member": "Microsoft.Extensions.AI.AIFunction Microsoft.Extensions.AI.DecisionDefinition<TResult>.AsAIFunction<TState>(Microsoft.Extensions.AI.IDecisionClient client, Microsoft.Extensions.AI.AIFunctionFactoryOptions? functionOptions = null, Microsoft.Extensions.AI.DecisionOptions? decisionOptions = null, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TState>? stateTypeInfo = null);",
+          "Stage": "Experimental"
         }
       ],
       "Properties": [

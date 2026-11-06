@@ -19,6 +19,8 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Shared.DiagnosticIds;
 using Microsoft.Shared.Diagnostics;
 
@@ -90,6 +92,63 @@ public sealed class DecisionDefinition<TResult>
         Builder builder = new(resultTypeInfo);
         configure(builder);
         return builder.Build();
+    }
+
+    private static AIFunctionFactoryOptions GetFunctionOptions(
+        AIFunctionFactoryOptions? functionOptions,
+        JsonSerializerOptions serializerOptions)
+    {
+        if (functionOptions is null)
+        {
+            return new AIFunctionFactoryOptions { SerializerOptions = serializerOptions };
+        }
+
+        if (functionOptions.SerializerOptions is not null)
+        {
+            return functionOptions;
+        }
+
+        return new AIFunctionFactoryOptions
+        {
+            SerializerOptions = serializerOptions,
+            JsonSchemaCreateOptions = functionOptions.JsonSchemaCreateOptions,
+            Name = functionOptions.Name,
+            Description = functionOptions.Description,
+            AdditionalProperties = functionOptions.AdditionalProperties,
+            ConfigureParameterBinding = functionOptions.ConfigureParameterBinding,
+            MarshalResult = functionOptions.MarshalResult,
+            ExcludeResultSchema = functionOptions.ExcludeResultSchema,
+        };
+    }
+
+    /// <summary>Creates an <see cref="AIFunction"/> that evaluates this definition for a caller-owned state type.</summary>
+    /// <typeparam name="TState">The application-owned state type exposed as the function's input.</typeparam>
+    /// <param name="client">The caller-owned decision client.</param>
+    /// <param name="functionOptions">Optional standard function factory options.</param>
+    /// <param name="decisionOptions">
+    /// Optional decision options shallow-copied during construction and cloned for each invocation. Nested values and
+    /// the raw-options factory remain caller/provider-owned.
+    /// </param>
+    /// <param name="stateTypeInfo">
+    /// Optional explicit JSON contract for <typeparamref name="TState"/>. When omitted, the definition's serializer
+    /// options must contain the state contract.
+    /// </param>
+    /// <returns>A function whose only model-facing input is <typeparamref name="TState"/> and whose result is <typeparamref name="TResult"/>.</returns>
+    public AIFunction AsAIFunction<TState>(
+        IDecisionClient client,
+        AIFunctionFactoryOptions? functionOptions = null,
+        DecisionOptions? decisionOptions = null,
+        JsonTypeInfo<TState>? stateTypeInfo = null)
+    {
+        _ = Throw.IfNull(client);
+
+        stateTypeInfo ??= GetStateTypeInfo<TState>();
+        DecisionOptions? decisionOptionsSnapshot = decisionOptions?.Clone();
+        DecisionFunctionInvoker<TState> invoker = new(client, this, stateTypeInfo, decisionOptionsSnapshot);
+
+        return AIFunctionFactory.Create(
+            invoker.InvokeAsync,
+            GetFunctionOptions(functionOptions, stateTypeInfo.Options));
     }
 
     internal DecisionResponse<TResult> Bind(DecisionResponse response, DecisionRequest expectedRequest)
@@ -184,6 +243,41 @@ public sealed class DecisionDefinition<TResult>
         }
 
         return new DecisionResponse<TResult>(result, response, this);
+    }
+
+    private JsonTypeInfo<TState> GetStateTypeInfo<TState>()
+    {
+        return SerializerOptions.GetTypeInfo(typeof(TState)) is JsonTypeInfo<TState> stateTypeInfo
+            ? stateTypeInfo
+            : throw new NotSupportedException(
+                $"The configured JSON options do not contain a contract for state type '{typeof(TState)}'.");
+    }
+
+    private sealed class DecisionFunctionInvoker<TState>(
+        IDecisionClient client,
+        DecisionDefinition<TResult> definition,
+        JsonTypeInfo<TState> stateTypeInfo,
+        DecisionOptions? decisionOptionsSnapshot)
+    {
+        private readonly IDecisionClient _client = client;
+        private readonly DecisionDefinition<TResult> _definition = definition;
+        private readonly JsonTypeInfo<TState> _stateTypeInfo = stateTypeInfo;
+        private readonly DecisionOptions? _decisionOptionsSnapshot = decisionOptionsSnapshot;
+
+        [DisplayName("evaluate_decision")]
+        [Description("Evaluate the declared decision for one application state.")]
+        public async Task<TResult> InvokeAsync(
+            [Description("The application state for the declared decision.")] TState state,
+            CancellationToken cancellationToken)
+        {
+            DecisionResponse<TResult> response = await _client.GetResponseAsync(
+                state,
+                _stateTypeInfo,
+                _definition,
+                _decisionOptionsSnapshot?.Clone(),
+                cancellationToken).ConfigureAwait(false);
+            return response.Result;
+        }
     }
 
     internal IReadOnlyDictionary<TEnum, double> GetDistribution<TEnum>(

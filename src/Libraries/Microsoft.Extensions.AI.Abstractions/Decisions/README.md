@@ -1,12 +1,12 @@
 # Experimental decision abstractions
 
-The `Microsoft.Extensions.AI.Abstractions` decision contracts provide a small provider-neutral proposed Layer 1 capability for heterogeneous binary, choice, and ordinal-score questions. Requests preserve caller-owned question and candidate IDs and order; responses preserve complete probability observations, score precision, provenance, usage, and provider extensions without applying thresholds, calibration, probability repair, retry policy, or a joint-distribution promise.
+The `Microsoft.Extensions.AI.Abstractions` decision contracts provide a small provider-neutral Layer 1 capability for heterogeneous binary, choice, and ordinal-score questions. Requests preserve caller-owned question and candidate IDs and order. Responses retain complete probability observations, score precision, provenance, usage, and provider evidence without applying thresholds, calibration, probability repair, retry policy, or a joint-distribution promise.
 
 ## A business example
 
-Suppose a retailer annotates customer-support tickets. The application wants a normal .NET category, a probability that the ticket is a refund request, and the complete provider evidence for reporting, human review, or downstream training. It is not automatically authorizing a refund, choosing a route, or treating a probability as a calibrated business decision.
+Suppose a retailer annotates customer-support tickets. The application wants a normal .NET category, a probability that the ticket is a refund request, and complete provider evidence for reporting or human review. It is not automatically authorizing a refund, choosing a route, or treating a probability as a calibrated business decision.
 
-The domain types remain ordinary application-owned types. The standard `DescriptionAttribute` on the positional record parameters supplies business instructions for the selected result properties, while the enum members supply separate candidate criteria:
+The domain types remain ordinary application-owned types:
 
 ```csharp
 #pragma warning disable MEAI001
@@ -32,120 +32,275 @@ public sealed record TicketAnalysis(
     [Description("Is the customer requesting a refund or payment reversal?")] double RefundRequestProbability);
 ```
 
-The business call is ordinary application code. Assume the host supplies the `IDecisionClient client`; the declaration is reusable and explicit. `Choice` declares the closed enum domain and uses its configured JSON enum names as exact candidate IDs; `BinaryProbability` maps the binary answer's `TrueProbability` to a `double`. No handwritten question IDs, enum dictionary, result mapper, JSON schema, or feature schema is required for this ordinary flow:
+The host explicitly supplies an `IDecisionClient`. It is provider-neutral; MEAI does not create a default implementation and an arbitrary `IChatClient` is not automatically a decision client. Provider acquisition is intentionally separate from platform composition: the provider owner supplies the configured client entry point, while these examples consume only the interface. Jev/OllamaSharp and the Ollaya, Laya, Julia, and Qwen adapters remain provider-owned and are not shipped, repinned, or executed by this repository. A deterministic test double is used for the platform proofs.
+
+An external, unpublished Julia/MEAI bridge was used as historical implementation evidence. It is not a released dependency or a runnable setup promised by this README. The provider owner's desired native shape is a separate, prospective entry point such as `JuliaDecisionClient.LoadFromDirectory(assetDirectory)`; that client is not implemented or available in this package.
+
+The reusable typed declaration is ordinary application code:
 
 ```csharp
-using Microsoft.Extensions.AI;
-
-var definition = DecisionDefinition<TicketAnalysis>.Create(builder =>
-{
-    builder.Choice(result => result.Category);
-    builder.BinaryProbability(result => result.RefundRequestProbability);
-});
-
-var ticket = new SupportTicket(
-    "I was charged twice. Please refund the duplicate payment.");
-
-var response = await client.GetResponseAsync(ticket, definition);
-
-TicketAnalysis analysis = response.Result;
-DecisionResponse evidence = response.Evidence;
-```
-
-When the complete choice evidence is useful for reporting or review, the typed distribution remains available:
-
-```csharp
-var categoryDistribution = response.GetDistribution(value => value.Category);
-```
-
-The same definition can include an explicitly ordered score rubric, and heterogeneous declarations remain independent:
-
-```csharp
-var definitionWithScore = DecisionDefinition<TicketAnalysis>.Create(builder =>
-{
-    builder.Choice(result => result.Category, "Classify the customer's main concern.");
-    builder.BinaryProbability(result => result.RefundRequestProbability);
-    // A score property would be declared with an explicit DecisionScoreLevel list:
-    // builder.Score(result => result.Satisfaction, [new("low", "Low"), new("high", "High")]);
-    // builder.ExpectedScore(result => result.Satisfaction, [new("low", "Low"), new("high", "High")]);
-});
-```
-
-`Score` projects only a provider-reported native ordinal score and fails explicitly when that scalar is absent. `ExpectedScore` projects the unmodified ordinal expectation calculated from the complete observed distribution, so the two choices remain distinguishable; after probability rounding, that observed expectation can fall outside the ordinal bounds and is not repaired. Every probability is conditioned on the full request state and question set; declaring questions independently does not promise marginal invariance, independence, a joint distribution, or calibration.
-
-Reported scalar consistency uses normalized latent feasibility within clipped rounding intervals; the observed probabilities are never normalized or rewritten. Typed binding verifies the actual CLR property values after materialization, independently of write-only JSON formatting. When options omit a resolver, the definition supplies the MEAI default resolver, while explicit caller resolvers and converters remain unchanged.
-
-At an explicit JSON boundary, callers can use source-generated metadata for both state and result contracts. The explicit generic arguments are optional for inference, but make the boundary visible:
-
-```csharp
-var metadataDefinition =
-    DecisionDefinition<TicketAnalysis>.Create(TicketJsonContext.Default.TicketAnalysis, builder =>
+DecisionDefinition<TicketAnalysis> definition =
+    DecisionDefinition<TicketAnalysis>.Create(builder =>
     {
         builder.Choice(result => result.Category);
         builder.BinaryProbability(result => result.RefundRequestProbability);
     });
 
-var metadataResponse = await client.GetResponseAsync<SupportTicket, TicketAnalysis>(
-    ticket,
-    TicketJsonContext.Default.SupportTicket,
-    metadataDefinition);
+SupportTicket ticket = new(
+    "I was charged twice. Please refund the duplicate payment.");
+
+DecisionResponse<TicketAnalysis> response =
+    await client.GetResponseAsync(ticket, definition);
+
+TicketAnalysis analysis = response.Result;
+DecisionResponse evidence = response.Evidence;
 ```
 
-When the application already has a JSON state snapshot, the result-only overload keeps the same local binding behavior without re-serializing the state:
+`response.Evidence` contains the complete neutral response, including every category probability and the binary observation. It is separate from any chat usage or business action. The mapped result is not a hidden threshold or calibration claim.
+
+For an explicit JSON boundary, supply source-generated metadata to both state and result contracts:
 
 ```csharp
-using System.Text.Json;
+DecisionDefinition<TicketAnalysis> metadataDefinition =
+    DecisionDefinition<TicketAnalysis>.Create(
+        TicketJsonContext.Default.TicketAnalysis,
+        builder =>
+        {
+            builder.Choice(result => result.Category);
+            builder.BinaryProbability(result => result.RefundRequestProbability);
+        });
 
-JsonElement stateJson = JsonSerializer.SerializeToElement(
-    ticket,
-    TicketJsonContext.Default.SupportTicket);
-var analyzedFromJson = await client.GetResponseAsync<TicketAnalysis>(
-    stateJson,
-    metadataDefinition);
-```
+DecisionResponse<TicketAnalysis> metadataResponse =
+    await client.GetResponseAsync(
+        ticket,
+        TicketJsonContext.Default.SupportTicket,
+        metadataDefinition);
 
-Applications that only need the neutral response can keep the no-binding path:
-
-```csharp
-var evidenceOnly = await client.GetResponseAsync(
-    ticket,
-    TicketJsonContext.Default.SupportTicket,
-    metadataDefinition.Questions);
-```
-
-The JSON metadata setup is separate from the business call:
-
-```csharp
-using System.Text.Json.Serialization;
-
-[JsonSourceGenerationOptions(UseStringEnumConverter = true)]
+[JsonSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    UseStringEnumConverter = true)]
 [JsonSerializable(typeof(SupportTicket))]
 [JsonSerializable(typeof(TicketCategory))]
 [JsonSerializable(typeof(TicketAnalysis))]
 public partial class TicketJsonContext : JsonSerializerContext;
 ```
 
-`TicketCategory` is a normal caller-owned enum. `DecisionDefinition<TicketAnalysis>` is an explicit declaration of which result members participate; it is not an enum generator, ORM, arbitrary POCO/union inference engine, or LINQ query provider. The candidate IDs come from the configured JSON enum contract and are exact ordinal wire-correlation identities. They are stable simple strings reused through the question definition; no pipe/version syntax is required. If a domain needs dynamic IDs instead of a closed enum, use the lower-level `ChoiceDecisionQuestion` and explicit mapping APIs so stale or unknown IDs remain rejected.
+`JsonTypeInfo<T>` describes a serialized state or result shape. It does not replace decision instructions, exact IDs, complete distributions, or stale-domain checks. JSON enum naming controls candidate IDs, while decision correlation remains exact and rejects unknown or changed IDs.
 
-Attributes are an ergonomic fallback for instructions and enum candidate descriptions. A fluent instruction supplied to `Choice`, `BinaryProbability`, or `Score` wins over an attribute. The metadata reader checks an attributed property first, then an associated positional-record constructor parameter, then a type-level fallback. JSON enum serialization controls the candidate IDs, but JSON conversion's permissive/case-insensitive behavior does not replace exact decision correlation validation.
+## Layer 2 interoperability: two independent paths
 
-`JsonTypeInfo<T>` describes the serialized shape of state or a result. It may come from source generation or a configured reflection resolver; it is not handwritten JSON schema and it does not replace decision instructions, exact IDs, complete distributions, or stale-domain checks. The older `DecisionResultBinding<T>` API still requires result metadata even though a delegate mapper may not use it; simplifying that requirement is an API review candidate, not an implicit behavior of this convenience layer.
+Layer 2 keeps function composition and chat routing independent. The function examples use either the stock `AIFunctionFactory` directly or the thin definition-based `AsAIFunction` convenience member. Neither path discovers a provider or takes a client from model-supplied arguments.
 
-The returned `Evidence` is the complete `DecisionResponse`, including every category probability and the binary observation. The mapped `TicketAnalysis` is therefore not a claim that a hidden threshold or calibration step established a business fact. Applications can retain or inspect the complete evidence for reporting, review, or later training. Feature projection is an optional follow-on: callers may define a versioned `DecisionFeatureSchema` of named native-`double` coordinates over complete observations when a downstream feature export is useful. That schema is a downstream column/coordinate contract, distinct from JSON metadata and not a prerequisite for typed classification.
+### 1. Annotated application method to `AIFunctionFactory`
 
-## .NET platform reuse / ergonomics under review
+An ordinary annotated method can close over a host-injected client and definition. The client, definition, endpoint, model, and options are not model-supplied tool arguments:
 
-Layer 1 intentionally reuses existing .NET and MEAI primitives rather than adding `IQueryable`, an ORM, or a new source-generator dependency:
+```csharp
+// Inside an existing application type, these are ordinary host-owned fields:
+// IDecisionClient client;
+// DecisionDefinition<TicketAnalysis> definition;
+// Action<DecisionResponse>? recordEvidence;
 
-- [`JsonSchemaExporter`](https://learn.microsoft.com/dotnet/standard/serialization/system-text-json/extract-schema) was introduced in .NET 9. The decision contracts use `JsonTypeInfo` and serializer options for explicit metadata; they do not add another schema exporter, and `AIJsonUtilities` provides the existing MEAI compatibility helpers where applicable.
-- [System.Text.Json source generation](https://learn.microsoft.com/dotnet/standard/serialization/system-text-json/source-generation) is the AOT-friendly way to supply `JsonTypeInfo`. `JsonTypeInfo` itself is not synonymous with generated code; ordinary JIT reflection through a configured resolver remains a platform option.
-- [`JsonStringEnumMemberNameAttribute`](https://learn.microsoft.com/dotnet/standard/serialization/system-text-json/customize-properties#custom-enum-member-names) and the generic [`JsonStringEnumConverter`](https://learn.microsoft.com/dotnet/api/system.text.json.serialization.jsonstringenumconverter-1) are useful for JSON enum representation. They do not replace decision ID validation: enum conversion is case-insensitive and permits integer values by default, while decision IDs are exact ordinal identities.
-- [`AIFunctionFactory`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.ai.aifunctionfactory) remains the existing MEAI primitive for inspecting an explicitly declared delegate, producing a tool schema, and marshalling inputs and outputs. Tool interoperability is a later layer, not a prerequisite for this decision foundation.
-- [Structured output](https://learn.microsoft.com/dotnet/ai/quickstarts/structured-output) already supports enum/record-shaped chat results. If an application only needs a label or JSON result, `IChatClient.GetResponseAsync<T>` may be the simpler choice; that path does not by itself establish a provider-reported probability distribution.
-- [EF Core model conventions and explicit overrides](https://learn.microsoft.com/ef/core/modeling/) are useful precedent for bounded opt-in conventions, not a reason to add an EF dependency or `DbContext`. [EF Core query providers](https://learn.microsoft.com/ef/core/querying/) likewise do not justify an `IQueryable` decision API for explicit paid asynchronous model inference; ordinary LINQ projection over returned probabilities remains appropriate.
+[DisplayName("analyze_support_ticket")]
+[Description("Annotate one support ticket.")]
+public async Task<TicketAnalysis> AnalyzeSupportTicketAsync(
+    [Description("The ticket to classify.")] SupportTicket ticket,
+    CancellationToken cancellationToken)
+{
+    DecisionResponse<TicketAnalysis> response = await client.GetResponseAsync(
+        ticket,
+        definition,
+        cancellationToken: cancellationToken);
 
-Automated arbitrary semantic inference is out. This layer already uses bounded opt-in conventions for JSON enum naming and standard member descriptions; future conventions for known enum/member mappings remain reasonable only when explicit, source-generation/AOT-compatible, and unable to hide provider-facing identities or application-owned result mapping.
+    recordEvidence?.Invoke(response.Evidence);
+    return response.Result;
+}
 
-Provider evidence for the package-level contract is bounded and documented in the [upstream provider-validation report](https://github.com/luisquintanilla/typesafe-meai/blob/13adb58c7d7479bc8c73bf31960c08349b7c3185/docs/upstream-provider-validation.md): Julia/Laya provide CPU binary/choice/score proof, Qwen provides choice-only proof, and the dedicated `tev1:0.8b` Ollama/OllamaSharp path provides live binary/choice/score proof. Other adapters use native HTTP fixtures rather than live executions; this is not a claim of universal provider accuracy.
+AIFunction analyzeTicket = AIFunctionFactory.Create(
+    AnalyzeSupportTicketAsync,
+    new AIFunctionFactoryOptions
+    {
+        Name = "analyze_support_ticket",
+        Description = "Annotate a support ticket for review.",
+    });
 
-This layer intentionally does not define tools, routing composition, MEDI processors, provider adapters, ML.NET or Arrow integrations, or automatic arbitrary POCO/union semantic inference. AIFunction/tool interoperability is a Layer 2 concern and is not implied by these abstractions.
+IChatClient chatClient = configuredChatClient
+    .AsBuilder()
+    .UseFunctionInvocation()
+    .Build();
+
+ChatResponse chatResponse = await chatClient.GetResponseAsync(
+    messages,
+    new ChatOptions { Tools = [analyzeTicket] },
+    cancellationToken);
+```
+
+The result-only method returns the business result by default. `recordEvidence` is an explicit host-owned per-invocation callback; it is not a shared last-response slot or automatic analytics. If selected metadata is useful, define an application DTO and return only the mapped result plus `response.Evidence.Provenance` and `response.Evidence.Usage`. Do not return raw state, provider extensions, credentials, reasoning text, or unrestricted dictionaries. Each invocation performs one logical decision operation, cancellation and provider/mapper/host failures propagate, and decision usage remains separate from chat usage. The callback must retain or process each invocation itself; the platform does not retain a last response.
+
+`AIFunctionFactory` options can override method attributes. Its schema contains only the application input (`ticket` here); `client`, `definition`, and `CancellationToken` are infrastructure, not model-facing parameters. The middleware example above exercises normal function invocation; direct `AIFunction.InvokeAsync` is sufficient for a platform-only proof and should not be described as a chat-loop proof.
+
+### 1a. Definition shorthand
+
+When the application does not need a custom evidence callback, the definition can create the same ordinary `AIFunction` directly. The generic state type is explicit, while the result type remains the `TResult` from the definition:
+
+```csharp
+AIFunction analyzeTicket = definition.AsAIFunction<SupportTicket>(
+    client,
+    new AIFunctionFactoryOptions
+    {
+        Name = "analyze_support_ticket",
+        Description = "Annotate one support ticket for review.",
+        SerializerOptions = TicketJsonContext.Default.Options,
+    });
+```
+
+The helper exposes only one model-facing `state` parameter and returns `TicketAnalysis`. It does not return `DecisionResponse<TicketAnalysis>`, evidence, provenance, usage, raw provider data, or a credentials/options object. Use the annotated-method path when the host needs an explicit per-invocation evidence callback.
+
+For reflection-disabled or trimmed deployments, provide source-generated metadata at both boundaries. The state contract can also provide genuine generic input inference:
+
+```csharp
+AIFunction generatedAnalyzeTicket = definition.AsAIFunction(
+    client,
+    functionOptions: new AIFunctionFactoryOptions
+    {
+        SerializerOptions = TicketJsonContext.Default.Options,
+    },
+    stateTypeInfo: TicketJsonContext.Default.SupportTicket);
+```
+
+`TicketJsonContext.Default.Options` covers both `SupportTicket` and `TicketAnalysis`; `stateTypeInfo` supplies the `TState` contract while `TResult` comes from `definition`. This is source-generation-compatible validation, not a Native AOT certification. Standard factory options remain standard: name and description overrides, schema options, parameter binding, result marshalling, additional properties, and result-schema exclusion are passed through. `DecisionOptions`, when supplied, are copied during construction and cloned again for each invocation. The clone is deliberately shallow: the options dictionary is copied, but nested values and a raw-options factory remain caller/provider-owned.
+
+When registering a function with DI, resolve the caller-owned decision client once while constructing the ordinary function. Do not resolve services from model-supplied arguments or from an ambient service provider during invocation:
+
+```csharp
+services.AddScoped<AIFunction>(serviceProvider =>
+{
+    IDecisionClient decisions =
+        serviceProvider.GetRequiredService<IDecisionClient>();
+
+    return definition.AsAIFunction<SupportTicket>(
+        decisions,
+        new AIFunctionFactoryOptions
+        {
+            Name = "analyze_support_ticket",
+            SerializerOptions = TicketJsonContext.Default.Options,
+        });
+});
+```
+
+The registration's lifetime must be compatible with the registered client. The helper never disposes the client; the owner (for example, the DI scope) does.
+
+### 2. Decision-driven chat routing
+
+Routing is a separate provider/client-selection problem. Construct one provider-neutral decision client and multiple configured, caller-owned `IChatClient` instances. Project meaningful bounded request state, use a typed `DecisionDefinition`, and compose with the existing `RoutingChatClient.Create`:
+
+```csharp
+public enum RouteKind
+{
+    [Description("Fast: use for short, routine requests where lower latency is preferred and deep multi-step reasoning is not needed.")]
+    Fast,
+
+    [Description("Reasoning: use for multi-step analysis, comparisons, or requests that benefit from deeper deliberation.")]
+    Reasoning,
+}
+
+public sealed record RoutingDecision(RouteKind Route);
+public sealed record RoutingMessage(string Role, string Text);
+public sealed record RoutingState(IReadOnlyList<RoutingMessage> Messages, bool HasTools);
+
+DecisionDefinition<RoutingDecision> routeDefinition =
+    DecisionDefinition<RoutingDecision>.Create(
+        RoutingJsonContext.Default.RoutingDecision,
+        builder => builder.Choice(
+            result => result.Route,
+            "Choose Fast for short, routine requests where latency is the priority. " +
+            "Choose Reasoning for multi-step analysis, comparisons, or requests that benefit from deeper deliberation."));
+
+// Each provider-owned client must enforce its route identity on every request:
+// Fast -> "fast-model"; Reasoning -> "reasoning-model". A provider's default
+// model ID alone is not sufficient because RoutingChatClient forwards a clone
+// of caller ChatOptions, including ModelId.
+IReadOnlyDictionary<RouteKind, IChatClient> clients =
+    new Dictionary<RouteKind, IChatClient>
+    {
+        [RouteKind.Fast] = fastConfiguredClient,
+        [RouteKind.Reasoning] = reasoningConfiguredClient,
+    };
+
+RoutingChatClient router = RoutingChatClient.Create(
+    async (context, cancellationToken) =>
+    {
+        const int maxMessages = 32;
+        const int maxMessageTextCharacters = 4_096;
+        const int maxTotalTextCharacters = 64_000;
+        List<RoutingMessage> projectedMessages = [];
+        int totalTextCharacters = 0;
+        foreach (ChatMessage message in context.Messages)
+        {
+            if (projectedMessages.Count == maxMessages)
+            {
+                throw new InvalidOperationException(
+                    $"Route selection accepts at most {maxMessages} messages; no history is truncated.");
+            }
+
+            if (message.Role != ChatRole.System &&
+                message.Role != ChatRole.User &&
+                message.Role != ChatRole.Assistant &&
+                message.Role != ChatRole.Tool)
+            {
+                throw new NotSupportedException(
+                    $"Role '{message.Role}' is not supported by this route selector.");
+            }
+
+            if (message.Contents.Any(static content => content is not TextContent))
+            {
+                throw new NotSupportedException(
+                    "This route selector accepts text content only; no content may be silently dropped.");
+            }
+
+            if (message.Text.Length > maxMessageTextCharacters ||
+                totalTextCharacters > maxTotalTextCharacters - message.Text.Length)
+            {
+                throw new InvalidOperationException(
+                    "Route selection text budgets were exceeded; no text is truncated.");
+            }
+
+            projectedMessages.Add(new(message.Role.Value, message.Text));
+            totalTextCharacters += message.Text.Length;
+        }
+
+        RoutingState state = new(
+            projectedMessages,
+            context.ChatOptions?.Tools is not null);
+
+        DecisionResponse<RoutingDecision> decision =
+            await decisionClient.GetResponseAsync(
+                state,
+                RoutingJsonContext.Default.RoutingState,
+                routeDefinition,
+                cancellationToken: cancellationToken);
+
+        if (!clients.TryGetValue(decision.Result.Route, out IChatClient? selected))
+        {
+            throw new InvalidOperationException("The decision selected an unconfigured route.");
+        }
+
+        return selected;
+    });
+```
+
+Each configured client must enforce its route-specific model identity and options on every forwarded call (for example, by overwriting a caller-supplied `ChatOptions.ModelId` in the provider-owned client adapter or rejecting a conflicting value); merely setting a provider default is not enough. The router forwards the original messages and a cloned request-options object to exactly one selected client, including streaming calls. The caller owns the configured clients and remains responsible for disposing them; the router does not dispose borrowed clients. Invalid or wrong-domain decision responses, cancellation, and provider failures stop before chat forwarding. There is no retry, failover, conversation affinity, mid-stream switching, outcome learning, or automatic calibration. Routing selects before each ordinary or streaming call. If function middleware wraps the router, a later tool-loop round can re-enter the router; if a selected configured client owns its own loop, that client remains selected. This example does not add either behavior automatically. Decision probabilities are task observations, not calibrated task-success guarantees.
+
+### Semantic ingestion proof
+
+The MEDI proof remains consumer-owned and uses the existing document-reader -> chunker -> semantic decision chunk processor -> collecting/serializing writer flow. It preserves chunk content, document identity/context, unrelated metadata, bounded streaming, cancellation, and stable feature schema identity/version/provenance. It does not add `IngestionDocument.Metadata`, alter `ClassificationEnricher` or batching, fabricate chat responses, or add an upstream ML.NET/Arrow dependency.
+
+## Alternative Designs
+
+- A decision-specific `AIFunction` wrapper was removed: ordinary annotated methods plus `AIFunctionFactory.Create` already provide the safe schema, host closure, cancellation, and standard middleware composition.
+- A reusable decision router was not added: typed `DecisionDefinition` plus `RoutingChatClient.Create` is enough for application-specific eligibility and client maps.
+- A reusable MEDI processor was not added: the real pipeline proof does not establish a separately justified public ingestion API.
+
+## Risks and limitations
+
+These contracts are experimental (`MEAI001`). Hosts own client lifetime, safe output DTOs, evidence retention, route policy, and business actions. Provider adapters and external proof packages are not shipped or repinned here. No live provider/model execution, package-release availability, Native AOT certification, calibration guarantee, or universal provider accuracy is claimed.
