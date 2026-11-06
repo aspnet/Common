@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+#if RUNTIME_PACKAGES_11_OR_GREATER
 using System.Collections.Concurrent;
 using System.Reflection;
 using Microsoft.Extensions.Caching.Distributed;
@@ -506,3 +507,4 @@ public class FactoryOptionsTests(ITestOutputHelper log) : IClassFixture<TestEven
         Assert.Equal("options", ex.ParamName);
     }
 }
+#endif

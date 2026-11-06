@@ -122,7 +122,7 @@ internal sealed partial class DefaultHybridCache : HybridCache
         _defaultFlags = (defaultEntryOptions?.Flags ?? HybridCacheEntryFlags.None) | _hardFlags;
         _defaultExpiration = defaultEntryOptions?.Expiration ?? TimeSpan.FromMinutes(DefaultExpirationMinutes);
         _defaultLocalCacheExpiration = GetEffectiveLocalCacheExpiration(defaultEntryOptions) ?? _defaultExpiration;
-        _defaultLocalSize = defaultEntryOptions?.LocalSize;
+        _defaultLocalSize = GetLocalSize(defaultEntryOptions);
         _defaultDistributedCacheExpiration = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = _defaultExpiration };
 
 #if NET9_0_OR_GREATER
@@ -169,6 +169,7 @@ internal sealed partial class DefaultHybridCache : HybridCache
         return stampede.UnwrapReservedAsync(_logger);
     }
 
+#if RUNTIME_PACKAGES_11_OR_GREATER
     public override ValueTask<T> GetOrCreateAsync<TState, T>(string key, TState state,
         Func<TState, HybridCacheEntryContext, CancellationToken, ValueTask<T>> factory,
         HybridCacheEntryOptions? options = null, IEnumerable<string>? tags = null, CancellationToken cancellationToken = default)
@@ -201,6 +202,7 @@ internal sealed partial class DefaultHybridCache : HybridCache
 
         return stampede.UnwrapReservedAsync(_logger);
     }
+#endif
 
     private enum GetOrCreateOutcome
     {
@@ -283,13 +285,25 @@ internal sealed partial class DefaultHybridCache : HybridCache
 
     private static void ValidateOptions(HybridCacheEntryOptions? options)
     {
+#if RUNTIME_PACKAGES_11_OR_GREATER
         if (options?.LocalSize is { } size && size < 0)
         {
             Throw.ArgumentException(nameof(options),
                 $"{nameof(HybridCacheEntryOptions)}.{nameof(HybridCacheEntryOptions.LocalSize)} must be non-negative.");
         }
+#endif
     }
 
+    private static long? GetLocalSize(HybridCacheEntryOptions? options)
+    {
+#if RUNTIME_PACKAGES_11_OR_GREATER
+        return options?.LocalSize;
+#else
+        return null;
+#endif
+    }
+
+#if RUNTIME_PACKAGES_11_OR_GREATER
     // Projects the (possibly factory-mutated) context back into an options instance that the write paths
     // (SetL1 / SetL2Async / ResolveLocalSize) read. Keep in sync when HybridCacheEntryContext gains a property.
     internal static HybridCacheEntryOptions CreateOptionsFromContext(HybridCacheEntryContext context)
@@ -300,6 +314,7 @@ internal sealed partial class DefaultHybridCache : HybridCache
             Flags = context.Flags,
             LocalSize = context.LocalSize,
         };
+#endif
 
     public override ValueTask SetAsync<T>(string key, T value, HybridCacheEntryOptions? options = null, IEnumerable<string>? tags = null, CancellationToken cancellationToken = default)
     {

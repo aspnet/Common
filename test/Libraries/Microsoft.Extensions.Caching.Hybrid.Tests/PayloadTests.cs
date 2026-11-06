@@ -92,6 +92,47 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         ArrayPool<byte>.Shared.Return(oversized);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LocalCacheSize_FromL2_Honored(bool mutable)
+    {
+        // .NET 8/9 must honor size metadata from newer L2 writers even without the public LocalSize API.
+        var backend = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
+        using var provider = GetDefaultCache(out var cache, config =>
+        {
+            config.AddMemoryCache(options => options.SizeLimit = 5);
+            config.AddSingleton<IDistributedCache>(new LoggingCache(log, backend));
+        });
+
+        string key = nameof(LocalCacheSize_FromL2_Honored);
+        string value = new('x', 256);
+        byte[] payload = HybridCachePayload.Encoding.GetBytes(value);
+        byte[] framed = new byte[HybridCachePayload.GetMaxBytes(key, TagSet.Empty, payload.Length)];
+        int length = HybridCachePayload.Write(framed, key, cache.CurrentTimestamp(), TimeSpan.FromMinutes(1),
+            HybridCachePayload.PayloadFlags.None, TagSet.Empty, new(payload), localCacheSize: 1);
+        backend.Set(key, framed.AsSpan(0, length).ToArray());
+
+        if (mutable)
+        {
+            await AssertCachedAsync(payload);
+        }
+        else
+        {
+            await AssertCachedAsync(value);
+        }
+
+        async Task AssertCachedAsync<T>(T expected)
+        {
+            T first = await cache.GetOrCreateAsync<T>(key, static _ => throw new InvalidOperationException("Expected an L2 hit."));
+            Assert.Equal(expected, first);
+
+            backend.Remove(key);
+            T second = await cache.GetOrCreateAsync<T>(key, static _ => throw new InvalidOperationException("Expected an L1 hit."));
+            Assert.Equal(expected, second);
+        }
+    }
+
     // Guards the v1 wire format. This test pins a literal v1 byte sequence and asserts the reader
     // still accepts it.
     //
@@ -394,6 +435,7 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         collector.AssertErrors([Log.IdTagInvalidUnicode]);
     }
 
+#if RUNTIME_PACKAGES_11_OR_GREATER
     public enum FactoryMutation
     {
         MutateNonFlags,
@@ -470,6 +512,7 @@ public class PayloadTests(ITestOutputHelper log) : IClassFixture<TestEventListen
         // tag-invalidation reads against valid tag keys may still appear in the backend.)
         Assert.Null(localCache.Get(key));
     }
+#endif
 
     [Theory]
     [InlineData("tag1,tag2", 2)]

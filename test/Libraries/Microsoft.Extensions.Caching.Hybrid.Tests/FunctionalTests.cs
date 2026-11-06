@@ -78,6 +78,7 @@ public class FunctionalTests : IClassFixture<TestEventListener>
         Assert.Equal(96, await cache.GetOrCreateAsync(key, _ => new ValueTask<int>(96)));
     }
 
+#if RUNTIME_PACKAGES_11_OR_GREATER
     [Fact]
     public async Task GetOrCreateAsync_RejectsNegativeLocalSize()
     {
@@ -103,6 +104,7 @@ public class FunctionalTests : IClassFixture<TestEventListener>
             () => cache.SetAsync(Me(), 42, options).AsTask());
         Assert.Equal("options", ex.ParamName);
     }
+#endif
 
     private static string Me([CallerMemberName] string caller = "") => caller;
 }

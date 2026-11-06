@@ -22,10 +22,12 @@ internal partial class DefaultHybridCache
         private readonly TaskCompletionSource<CacheItem<T>>? _result;
         private TState? _state;
         private Func<TState, CancellationToken, ValueTask<T>>? _factory; // main data factory
-        private Func<TState, HybridCacheEntryContext, CancellationToken, ValueTask<T>>? _factoryWithContext; // context-aware data factory
         private HybridCacheEntryOptions? _options;
+#if RUNTIME_PACKAGES_11_OR_GREATER
+        private Func<TState, HybridCacheEntryContext, CancellationToken, ValueTask<T>>? _factoryWithContext; // context-aware data factory
         private HybridCacheEntryContext? _context; // mutable view handed to a context-aware factory
         private int _factoryContextRevision; // initial Revision of the context passed to the factory; used to detect mutations
+#endif
         private Task<T>? _sharedUnwrap; // allows multiple non-cancellable callers to share a single task (when no defensive copy needed)
 
         // ONLY set the result, without any other side-effects
@@ -63,6 +65,7 @@ internal partial class DefaultHybridCache
 #endif
         }
 
+#if RUNTIME_PACKAGES_11_OR_GREATER
         public void QueueUserWorkItem(in TState state, Func<TState, HybridCacheEntryContext, CancellationToken, ValueTask<T>> factory, HybridCacheEntryOptions? options)
         {
             Debug.Assert(_factoryWithContext is null, "should not already have factory field");
@@ -81,6 +84,7 @@ internal partial class DefaultHybridCache
             ThreadPool.UnsafeQueueUserWorkItem(SharedWaitCallback, this);
 #endif
         }
+#endif
 
         [SuppressMessage("Resilience", "EA0014:The async method doesn't support cancellation", Justification = "Cancellation is handled separately via SharedToken")]
         public Task ExecuteDirectAsync(in TState state, Func<TState, CancellationToken, ValueTask<T>> factory, HybridCacheEntryOptions? options)
@@ -96,6 +100,7 @@ internal partial class DefaultHybridCache
             return BackgroundFetchAsync();
         }
 
+#if RUNTIME_PACKAGES_11_OR_GREATER
         [SuppressMessage("Resilience", "EA0014:The async method doesn't support cancellation", Justification = "Cancellation is handled separately via SharedToken")]
         public Task ExecuteDirectAsync(in TState state, Func<TState, HybridCacheEntryContext, CancellationToken, ValueTask<T>> factory, HybridCacheEntryOptions? options)
         {
@@ -111,6 +116,7 @@ internal partial class DefaultHybridCache
 
             return BackgroundFetchAsync();
         }
+#endif
 
         public override void Execute() => _ = BackgroundFetchAsync();
 
@@ -202,9 +208,11 @@ internal partial class DefaultHybridCache
             {
                 HybridCacheEntryFlags activeFlags = Key.Flags;
 
+#if RUNTIME_PACKAGES_11_OR_GREATER
                 // Track write-side flags that are required regardless of
                 // anything the user-supplied options or the factory say.
                 HybridCacheEntryFlags mandatoryWriteSideFlags = Cache._hardFlags & WriteSideFlags;
+#endif
 
                 if ((activeFlags & HybridCacheEntryFlags.DisableDistributedCache) != HybridCacheEntryFlags.DisableDistributedCache)
                 {
@@ -212,7 +220,9 @@ internal partial class DefaultHybridCache
                     if (!ValidateUnicodeCorrectness(Cache._logger, Key.Key, CacheItem.Tags))
                     {
                         activeFlags |= HybridCacheEntryFlags.DisableDistributedCache;
+#if RUNTIME_PACKAGES_11_OR_GREATER
                         mandatoryWriteSideFlags |= HybridCacheEntryFlags.DisableDistributedCacheWrite;
+#endif
                     }
                 }
 
@@ -308,11 +318,13 @@ internal partial class DefaultHybridCache
                             HybridCacheEventSource.Log.UnderlyingDataQueryStart();
                         }
 
+#if RUNTIME_PACKAGES_11_OR_GREATER
                         if (_factoryWithContext is not null)
                         {
                             newValue = await _factoryWithContext(_state!, _context!, SharedToken).ConfigureAwait(false);
                         }
                         else
+#endif
                         {
                             newValue = await _factory!(_state!, SharedToken).ConfigureAwait(false);
                         }
@@ -339,12 +351,14 @@ internal partial class DefaultHybridCache
                         throw;
                     }
 
+#if RUNTIME_PACKAGES_11_OR_GREATER
                     // honor any mutations the factory made to the context it received; we use Revision
                     // as a fast-path skip for the common case where the factory didn't touch it.
                     if (_factoryWithContext is not null && _context!.Revision != _factoryContextRevision)
                     {
                         ApplyFactoryContext(_context, mandatoryWriteSideFlags, ref activeFlags);
                     }
+#endif
 
                     // check whether we're going to hit a timing problem with tag invalidation
                     if (!Cache.IsValid(CacheItem))
@@ -556,7 +570,7 @@ internal partial class DefaultHybridCache
             // factory mutations are captured by rebuilding _options from the context (see ApplyFactoryContext).
             // null means "use implementation default", per the LocalSize API contract — which we honor by
             // falling back to HybridCacheOptions.DefaultEntryOptions.LocalSize (also nullable).
-            return _options?.LocalSize ?? Cache._defaultLocalSize;
+            return GetLocalSize(_options) ?? Cache._defaultLocalSize;
         }
 
         private void SetImmutableResultWithoutSerialize(T value, HybridCacheEntryFlags activeFlags)
@@ -640,6 +654,7 @@ internal partial class DefaultHybridCache
             }
         }
 
+#if RUNTIME_PACKAGES_11_OR_GREATER
         private const HybridCacheEntryFlags WriteSideFlags =
             HybridCacheEntryFlags.DisableLocalCacheWrite | HybridCacheEntryFlags.DisableDistributedCacheWrite | HybridCacheEntryFlags.DisableCompression;
 
@@ -663,6 +678,7 @@ internal partial class DefaultHybridCache
             HybridCacheEntryFlags factoryFlags = context.Flags ?? HybridCacheEntryFlags.None;
             activeFlags = (activeFlags & ~WriteSideFlags) | (factoryFlags & WriteSideFlags) | mandatoryWriteSideFlags;
         }
+#endif
     }
 
     private static bool ValidateUnicodeCorrectness(ILogger logger, string key, TagSet tags)
