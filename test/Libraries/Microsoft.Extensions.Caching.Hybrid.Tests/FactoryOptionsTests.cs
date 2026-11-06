@@ -344,7 +344,9 @@ public class FactoryOptionsTests(ITestOutputHelper log) : IClassFixture<TestEven
                 var cancelTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 using (ct.Register(static state => ((TaskCompletionSource<bool>)state!).TrySetCanceled(), cancelTcs))
                 {
+#pragma warning disable VSTHRD003 // Intentionally await the write signal created by another cache operation.
                     var completed = await Task.WhenAny(task, cancelTcs.Task).ConfigureAwait(false);
+#pragma warning restore VSTHRD003
                     await completed.ConfigureAwait(false);
                 }
             }

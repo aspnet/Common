@@ -86,11 +86,11 @@ public class FunctionalTests : IClassFixture<TestEventListener>
         var options = new HybridCacheEntryOptions { LocalSize = -1 };
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => cache.GetOrCreateAsync(Me(), _ => new ValueTask<int>(42), options).AsTask());
+            async () => await cache.GetOrCreateAsync(Me(), _ => new ValueTask<int>(42), options));
         Assert.Equal("options", ex.ParamName);
 
         ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => cache.GetOrCreateAsync(Me(), 0, (_, _, _) => new ValueTask<int>(42), options).AsTask());
+            async () => await cache.GetOrCreateAsync(Me(), 0, (_, _, _) => new ValueTask<int>(42), options));
         Assert.Equal("options", ex.ParamName);
     }
 
