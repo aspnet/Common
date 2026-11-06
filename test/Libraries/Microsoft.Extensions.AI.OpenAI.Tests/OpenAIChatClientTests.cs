@@ -2052,6 +2052,52 @@ public class OpenAIChatClientTests
         Assert.Equal(2, usage.Details.TotalTokenCount);
     }
 
+    [Fact]
+    public async Task Refusal_Streaming_SurfacedAsErrorContent()
+    {
+        const string Input = """
+            {
+                "messages":[{"role":"user","content":"Hello"}],
+                "model":"gpt-4o-mini",
+                "stream":true,
+                "stream_options":{"include_usage":true}
+            }
+            """;
+
+        const string Output = """
+            data: {"id":"chatcmpl-refusal","object":"chat.completion.chunk","created":1727888631,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"role":"assistant","content":null,"refusal":""},"finish_reason":null}]}
+
+            data: {"id":"chatcmpl-refusal","object":"chat.completion.chunk","created":1727888631,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"refusal":"I'm sorry, "},"finish_reason":null}]}
+
+            data: {"id":"chatcmpl-refusal","object":"chat.completion.chunk","created":1727888631,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"refusal":"I can't help with that."},"finish_reason":null}]}
+
+            data: {"id":"chatcmpl-refusal","object":"chat.completion.chunk","created":1727888631,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+            data: [DONE]
+
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateChatClient(httpClient, "gpt-4o-mini");
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync("Hello"))
+        {
+            updates.Add(update);
+        }
+
+        ErrorContent error = Assert.Single(updates.SelectMany(u => u.Contents).OfType<ErrorContent>());
+        Assert.Equal("Refusal", error.ErrorCode);
+        Assert.Equal("I'm sorry, I can't help with that.", error.Message);
+
+        ChatResponse response = updates.ToChatResponse();
+        Assert.Equal(ChatFinishReason.Stop, response.FinishReason);
+        ChatMessage message = Assert.Single(response.Messages);
+        Assert.Equal(ChatRole.Assistant, message.Role);
+        Assert.Same(error, Assert.Single(message.Contents.OfType<ErrorContent>()));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

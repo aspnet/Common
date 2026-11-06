@@ -447,8 +447,8 @@ internal sealed partial class OpenAIChatClient : IChatClient
             yield return responseUpdate;
         }
 
-        // Now that we've received all updates, combine any for function calls into a single item to yield.
-        if (functionCallInfos is not null)
+        // Now that we've received all updates, combine any function calls and any refusal into a single item to yield.
+        if (functionCallInfos is not null || refusal is not null)
         {
             ChatResponseUpdate responseUpdate = new()
             {
@@ -460,21 +460,23 @@ internal sealed partial class OpenAIChatClient : IChatClient
                 Role = streamedRole,
             };
 
-            foreach (var entry in functionCallInfos)
+            if (functionCallInfos is not null)
             {
-                FunctionCallInfo fci = entry.Value;
-                if (!string.IsNullOrWhiteSpace(fci.Name))
+                foreach (var entry in functionCallInfos)
                 {
-                    var callContent = OpenAIClientExtensions.ParseCallContent(
-                        fci.Arguments?.ToString() ?? string.Empty,
-                        fci.CallId!,
-                        fci.Name!);
-                    responseUpdate.Contents.Add(callContent);
+                    FunctionCallInfo fci = entry.Value;
+                    if (!string.IsNullOrWhiteSpace(fci.Name))
+                    {
+                        var callContent = OpenAIClientExtensions.ParseCallContent(
+                            fci.Arguments?.ToString() ?? string.Empty,
+                            fci.CallId!,
+                            fci.Name!);
+                        responseUpdate.Contents.Add(callContent);
+                    }
                 }
             }
 
-            // Refusals are about the model not following the schema for tool calls. As such, if we have any refusal,
-            // add it to this function calling item.
+            // Refusals represent errors in generating output that conforms to a provided schema, as in the non-streaming path.
             if (refusal is not null)
             {
                 responseUpdate.Contents.Add(new ErrorContent(refusal.ToString()) { ErrorCode = "Refusal" });
