@@ -218,4 +218,145 @@ public sealed class OSFileSystemTests
             cnt++;
         }
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(255)]
+    [InlineData(256)]
+    [InlineData(257)]
+    [InlineData(2047)]
+    [InlineData(2048)]
+    [InlineData(2049)]
+    [InlineData(5000)]
+    public void ReadAll_Returns_Whole_File_Across_Multiple_Reads(int length)
+    {
+        var content = CreateContent(length);
+        var file = CreateTempFile(content);
+
+        try
+        {
+            var bw = new BufferWriter<char>();
+            new OSFileSystem().ReadAll(file, bw);
+
+            Assert.Equal(content, new string(bw.WrittenSpan));
+        }
+        finally
+        {
+            file.Delete();
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(10)]
+    [InlineData(255)]
+    [InlineData(256)]
+    [InlineData(257)]
+    [InlineData(1000)]
+    public void ReadFirstLine_Stops_At_Newline_Across_Multiple_Reads(int firstLineLength)
+    {
+        var firstLine = CreateContent(firstLineLength);
+        var file = CreateTempFile(firstLine + "\n" + CreateContent(3000));
+
+        try
+        {
+            var bw = new BufferWriter<char>();
+            new OSFileSystem().ReadFirstLine(file, bw);
+
+            Assert.Equal(firstLine, new string(bw.WrittenSpan));
+        }
+        finally
+        {
+            file.Delete();
+        }
+    }
+
+    [Fact]
+    public void ReadFirstLine_Returns_Whole_File_If_There_Is_No_Newline()
+    {
+        var content = CreateContent(600);
+        var file = CreateTempFile(content);
+
+        try
+        {
+            var bw = new BufferWriter<char>();
+            new OSFileSystem().ReadFirstLine(file, bw);
+
+            Assert.Equal(content, new string(bw.WrittenSpan));
+        }
+        finally
+        {
+            file.Delete();
+        }
+    }
+
+    [Fact]
+    public void Read_Returns_At_Most_The_Requested_Length()
+    {
+        var content = CreateContent(1000);
+        var file = CreateTempFile(content);
+
+        try
+        {
+            var destination = new char[400];
+            var written = new OSFileSystem().Read(file, 300, destination);
+
+            Assert.Equal(300, written);
+            Assert.Equal(content.Substring(0, 300), new string(destination, 0, written));
+        }
+        finally
+        {
+            file.Delete();
+        }
+    }
+
+    [Fact]
+    public void Reading_Nonexistent_File_Throws_FileNotFoundException()
+    {
+        var file = new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")));
+        var fileSystem = new OSFileSystem();
+
+        Assert.Throws<FileNotFoundException>(() => fileSystem.ReadAll(file, new BufferWriter<char>()));
+        Assert.Throws<FileNotFoundException>(() => fileSystem.ReadFirstLine(file, new BufferWriter<char>()));
+        Assert.Throws<FileNotFoundException>(() => fileSystem.Read(file, 10, new char[10]));
+    }
+
+    [Fact]
+    public void Reading_Can_Be_Done_While_File_Is_Open_For_Reading()
+    {
+        var file = CreateTempFile("line 1\nline 2\n");
+
+        try
+        {
+            using var other = file.OpenRead();
+
+            var bw = new BufferWriter<char>();
+            new OSFileSystem().ReadAll(file, bw);
+
+            Assert.Equal("line 1\nline 2\n", new string(bw.WrittenSpan));
+        }
+        finally
+        {
+            file.Delete();
+        }
+    }
+
+    private static string CreateContent(int length)
+    {
+        var builder = new StringBuilder(length);
+        for (var i = 0; i < length; i++)
+        {
+            builder.Append((char)('a' + (i % 26)));
+        }
+
+        return builder.ToString();
+    }
+
+    private static FileInfo CreateTempFile(string content)
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        File.WriteAllText(path, content, Encoding.ASCII);
+        return new FileInfo(path);
+    }
 }

@@ -10,6 +10,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Shared.Pools;
+using Microsoft.Win32.SafeHandles;
 
 namespace Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux;
 
@@ -33,10 +34,10 @@ internal sealed class OSFileSystem : IFileSystem
 
     public int Read(FileInfo file, int length, Span<char> destination)
     {
-        using var stream = file.OpenRead();
+        using var handle = OpenRead(file);
         using var rentedBuffer = new RentedSpan<byte>(length);
 
-        var read = stream.Read(rentedBuffer.Span);
+        var read = RandomAccess.Read(handle, rentedBuffer.Span, 0);
 
         return Encoding.ASCII.GetChars(rentedBuffer.Span.Slice(0, read), destination);
     }
@@ -49,21 +50,25 @@ internal sealed class OSFileSystem : IFileSystem
 
     public IEnumerable<ReadOnlyMemory<char>> ReadAllByLines(FileInfo file, BufferWriter<char> destination)
     {
-        const int MaxStackalloc = 256;
+        // The file is read without a FileStream, as it would allocate its own 4 KB buffer for each file read.
+        // The pooled buffer is the same size, so large files such as /proc/net/tcp need no extra system calls.
+        const int BufferSize = 4096;
 
         if (!file.Exists)
         {
             throw new FileNotFoundException();
         }
 
-        Memory<byte> buffer = ArrayPool<byte>.Shared.Rent(MaxStackalloc);
+        Memory<byte> buffer = ArrayPool<byte>.Shared.Rent(BufferSize);
         try
         {
-            using FileStream stream = file.OpenRead();
+            using SafeFileHandle handle = OpenRead(file);
 
+            long offset = 0;
             int read;
-            while ((read = stream.Read(buffer.Span)) > 0)
+            while ((read = RandomAccess.Read(handle, buffer.Span, offset)) > 0)
             {
+                offset += read;
                 var start = 0;
                 for (int end = 0; end < read; end++)
                 {
@@ -113,12 +118,15 @@ internal sealed class OSFileSystem : IFileSystem
     [SkipLocalsInit]
     private static void ReadUntilTerminatorOrEnd(FileInfo file, BufferWriter<char> destination, byte? terminator)
     {
-        const int MaxStackalloc = 256;
+        // Reading the first line rarely needs more than one read, but reading the whole file benefits from a larger buffer.
+        const int MaxStackallocFirstLine = 256;
+        const int MaxStackallocAll = 2048;
 
-        using var stream = file.OpenRead();
+        using var handle = OpenRead(file);
 
-        Span<byte> buffer = stackalloc byte[MaxStackalloc];
-        var read = stream.Read(buffer);
+        Span<byte> buffer = stackalloc byte[terminator is null ? MaxStackallocAll : MaxStackallocFirstLine];
+        long offset = 0;
+        var read = RandomAccess.Read(handle, buffer, offset);
 
         while (read != 0)
         {
@@ -137,7 +145,13 @@ internal sealed class OSFileSystem : IFileSystem
 
             _ = Encoding.ASCII.GetChars(buffer.Slice(0, end), destination.GetSpan(end));
             destination.Advance(end);
-            read = stream.Read(buffer);
+            offset += read;
+            read = RandomAccess.Read(handle, buffer, offset);
         }
     }
+
+    // File.OpenHandle() defaults to FileMode.Open, FileAccess.Read and FileShare.Read, the same as FileInfo.OpenRead(),
+    // but it does not create a FileStream and the buffer that goes with it.
+    private static SafeFileHandle OpenRead(FileInfo file)
+        => File.OpenHandle(file.FullName);
 }

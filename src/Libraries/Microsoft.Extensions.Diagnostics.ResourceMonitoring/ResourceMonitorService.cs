@@ -103,6 +103,12 @@ internal sealed class ResourceMonitorService : BackgroundService, IResourceMonit
 
     internal async Task PublishUtilizationAsync(CancellationToken cancellationToken)
     {
+        if (_publishers.Length == 0)
+        {
+            // Nothing to publish to, so avoid calculating the utilization (which is otherwise side-effect free).
+            return;
+        }
+
         var u = GetUtilization(_publishingWindow);
         foreach (var publisher in _publishers)
         {

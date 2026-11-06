@@ -51,6 +51,7 @@
     <InternalsVisibleToDynamicProxyGenAssembly2 Include="*" />
     <InternalsVisibleToTest Include="$(AssemblyName).Tests" />
     <InternalsVisibleToTest Include="$(AssemblyName).Kubernetes.Tests" />
+    <InternalsVisibleToTest Include="$(AssemblyName).PerformanceTests" />
     <InternalsVisibleToTest Include="Microsoft.Extensions.Diagnostics.HealthChecks.ResourceUtilization.Tests" />
   </ItemGroup>
 </Project>

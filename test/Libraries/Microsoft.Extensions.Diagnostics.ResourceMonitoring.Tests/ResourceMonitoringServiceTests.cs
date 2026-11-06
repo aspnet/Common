@@ -300,6 +300,25 @@ public sealed class ResourceMonitoringServiceTests
         Assert.Contains(_publisherUnableToPublishErrorMessage, logger.Collector.LatestRecord.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task PublishUtilizationAsync_WithNoPublishers_DoesNotCalculateUtilization()
+    {
+        var provider = new Mock<ISnapshotProvider>();
+        provider.Setup(x => x.GetSnapshot()).Returns(new Snapshot(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero, 0));
+        provider.SetupGet(x => x.Resources).Returns(new SystemResources(1, 1, 1, 1));
+
+        using var tracker = new ResourceMonitorService(
+            provider.Object,
+            new NullLogger<ResourceMonitorService>(),
+            Create(new ResourceMonitoringOptions()),
+            new List<IResourceUtilizationPublisher>(),
+            _clock);
+
+        await tracker.PublishUtilizationAsync(CancellationToken.None);
+
+        provider.VerifyGet(x => x.Resources, Times.Never);
+    }
+
     /// <summary>
     /// Validate that the tracker invokes the publisher's Publish method.
     /// </summary>
