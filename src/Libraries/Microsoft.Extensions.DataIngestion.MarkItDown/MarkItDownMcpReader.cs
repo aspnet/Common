@@ -89,6 +89,27 @@ public class MarkItDownMcpReader : IngestionDocumentReader
                 // Call the convert_to_markdown tool
                 var result = await client.CallToolAsync("convert_to_markdown", parameters, cancellationToken: cancellationToken).ConfigureAwait(false);
 
+                // FIX: Check if the tool execution returned an error (handles bool?)
+                if (result.IsError == true)
+                {
+                    // Extract the error message from the content block if available, or fall back to a default error
+                    string errorText = "An unknown error occurred during document conversion.";
+
+                    if (result.Content != null && result.Content.Count > 0)
+                    {
+                        foreach (var content in result.Content)
+                        {
+                            if (content.Type == "text" && content is TextContentBlock textBlock)
+                            {
+                                errorText = textBlock.Text;
+                                break;
+                            }
+                        }
+                    }
+
+                    throw new InvalidOperationException($"Failed to convert document to markdown: {errorText}");
+                }
+
                 // Extract markdown content from result
                 // The result is expected to be in the format: { "content": [{ "type": "text", "text": "markdown content" }] }
                 if (result.Content != null && result.Content.Count > 0)
