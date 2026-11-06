@@ -21,7 +21,8 @@ internal static class ResolvConf
 
         while (reader.ReadLine() is string line)
         {
-            string[] tokens = line.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            // The keyword and its value can be separated by any white space, including tabs.
+            string[] tokens = line.Split(Array.Empty<char>(), StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
             if (line.StartsWith("nameserver"))
             {
