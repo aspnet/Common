@@ -34,7 +34,12 @@ public enum ReasoningEffort
     High,
 
     /// <summary>
-    /// Extra high reasoning effort. Maximum reasoning for the most demanding tasks.
+    /// Extra high reasoning effort. More extensive reasoning than <see cref="High"/>.
     /// </summary>
     ExtraHigh,
+
+    /// <summary>
+    /// Maximum reasoning effort. The highest level available, for the most demanding tasks.
+    /// </summary>
+    Max,
 }

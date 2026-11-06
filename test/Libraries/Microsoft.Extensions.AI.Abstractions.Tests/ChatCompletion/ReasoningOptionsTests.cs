@@ -23,6 +23,7 @@ public class ReasoningOptionsTests
     [InlineData(ReasoningEffort.Medium)]
     [InlineData(ReasoningEffort.High)]
     [InlineData(ReasoningEffort.ExtraHigh)]
+    [InlineData(ReasoningEffort.Max)]
     public void Effort_Roundtrips(ReasoningEffort effort)
     {
         ReasoningOptions options = new() { Effort = effort };
@@ -99,7 +100,7 @@ public class ReasoningOptionsTests
     public void JsonSerialization_AllEffortValues_SerializeAsStrings()
     {
         // Test all ReasoningEffort values serialize correctly
-        foreach (ReasoningEffort effort in new[] { ReasoningEffort.None, ReasoningEffort.Low, ReasoningEffort.Medium, ReasoningEffort.High, ReasoningEffort.ExtraHigh })
+        foreach (ReasoningEffort effort in new[] { ReasoningEffort.None, ReasoningEffort.Low, ReasoningEffort.Medium, ReasoningEffort.High, ReasoningEffort.ExtraHigh, ReasoningEffort.Max })
         {
             string json = JsonSerializer.Serialize(effort, TestJsonSerializerContext.Default.ReasoningEffort);
             ReasoningEffort? deserialized = JsonSerializer.Deserialize(json, TestJsonSerializerContext.Default.ReasoningEffort);

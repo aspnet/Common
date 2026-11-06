@@ -7140,6 +7140,7 @@ public class OpenAIResponseClientTests
     [InlineData(ReasoningEffort.Medium, ReasoningOutput.Full, "medium", "detailed")]
     [InlineData(ReasoningEffort.High, ReasoningOutput.Summary, "high", "concise")]
     [InlineData(ReasoningEffort.ExtraHigh, ReasoningOutput.Full, "xhigh", "detailed")]
+    [InlineData(ReasoningEffort.Max, ReasoningOutput.Full, "max", "detailed")]
     public async Task ReasoningOptions_EffortAndOutput_ProducesExpectedJson(
         ReasoningEffort effort,
         ReasoningOutput output,

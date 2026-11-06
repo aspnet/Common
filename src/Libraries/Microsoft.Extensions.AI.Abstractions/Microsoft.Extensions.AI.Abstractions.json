@@ -3768,6 +3768,11 @@
           "Value": "1"
         },
         {
+          "Member": "const Microsoft.Extensions.AI.ReasoningEffort Microsoft.Extensions.AI.ReasoningEffort.Max",
+          "Stage": "Stable",
+          "Value": "5"
+        },
+        {
           "Member": "const Microsoft.Extensions.AI.ReasoningEffort Microsoft.Extensions.AI.ReasoningEffort.Medium",
           "Stage": "Stable",
           "Value": "2"
