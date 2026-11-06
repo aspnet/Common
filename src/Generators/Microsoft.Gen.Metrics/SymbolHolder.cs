@@ -16,4 +16,5 @@ internal sealed record class SymbolHolder(
     INamedTypeSymbol? GaugeAttribute,
     INamedTypeSymbol? GaugeOfTAttribute,
     INamedTypeSymbol LongTypeSymbol,
-    INamedTypeSymbol? TagNameAttribute);
+    INamedTypeSymbol? TagNameAttribute,
+    INamedTypeSymbol? CommonTagAttribute);

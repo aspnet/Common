@@ -94,7 +94,7 @@ internal sealed class Emitter : EmitterBase
                 OutLn();
             }
 
-            GenInstrumentClass(metricMethod);
+            GenInstrumentClass(metricMethod, metricType.CommonTags);
         }
     }
 
@@ -145,7 +145,7 @@ internal sealed class Emitter : EmitterBase
         }
     }
 
-    private void GenInstrumentClass(MetricMethod metricMethod)
+    private void GenInstrumentClass(MetricMethod metricMethod, List<KeyValuePair<string, string>>? commonTags)
     {
         const string CounterObjectName = "counter";
         const string HistogramObjectName = "histogram";
@@ -189,7 +189,8 @@ internal sealed class Emitter : EmitterBase
         }
 
         var tagListInit = metricMethod.TagKeys.Count != 0 ||
-                          metricMethod.StrongTypeConfigs.Count != 0;
+                          metricMethod.StrongTypeConfigs.Count != 0 ||
+                          (commonTags != null && commonTags.Count != 0);
 
         var accessModifier = metricMethod.MetricTypeModifiers.Contains("public")
             ? "public"
@@ -240,7 +241,7 @@ internal sealed class Emitter : EmitterBase
             Indent();
             OutLn("var tagList = new global::System.Diagnostics.TagList");
             OutOpenBrace();
-            GenTagList(metricMethod);
+            GenTagList(metricMethod, commonTags);
             Unindent();
             OutLn("};");
             Unindent();
@@ -299,7 +300,7 @@ internal sealed class Emitter : EmitterBase
         OutLn();
     }
 
-    private void GenTagList(MetricMethod metricMethod)
+    private void GenTagList(MetricMethod metricMethod, List<KeyValuePair<string, string>>? commonTags)
     {
         if (string.IsNullOrEmpty(metricMethod.StrongTypeObjectName))
         {
@@ -332,6 +333,14 @@ internal sealed class Emitter : EmitterBase
                     : "o." + config.Path + "." + paramInvoke;
 
                 OutLn($"new global::System.Collections.Generic.KeyValuePair<string, object?>(\"{config.TagName}\", {access}),");
+            }
+        }
+
+        if (commonTags != null)
+        {
+            foreach (var tag in commonTags)
+            {
+                OutLn($"new global::System.Collections.Generic.KeyValuePair<string, object?>(\"{tag.Key}\", \"{tag.Value}\"),");
             }
         }
     }

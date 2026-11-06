@@ -91,6 +91,8 @@ internal sealed class Parser
 
                 MetricType? metricType = null;
                 string nspace = string.Empty;
+                semanticModel ??= _compilation.GetSemanticModel(typeDeclaration.SyntaxTree);
+                var commonTags = GetCommonTags(typeDeclaration, symbols, semanticModel, _cancellationToken);
 
                 metricNames.Clear();
 
@@ -151,6 +153,7 @@ internal sealed class Parser
                             {
                                 Namespace = nspace,
                                 Name = typeDeclaration.Identifier.ToString() + typeDeclaration.TypeParameterList,
+                                CommonTags = commonTags,
                                 Constraints = typeDeclaration.ConstraintClauses.ToString(),
                                 Keyword = typeDeclaration.Keyword.ValueText,
                                 Parent = null,
@@ -173,6 +176,7 @@ internal sealed class Parser
                                 {
                                     Namespace = nspace,
                                     Name = parentMetricClass.Identifier.ToString() + parentMetricClass.TypeParameterList,
+                                    CommonTags = commonTags,
                                     Constraints = parentMetricClass.ConstraintClauses.ToString(),
                                     Keyword = parentMetricClass.Keyword.ValueText,
                                     Modifiers = parentMetricClass.Modifiers.ToString(),
@@ -201,6 +205,54 @@ internal sealed class Parser
         }
 
         return results;
+    }
+
+    private static List<KeyValuePair<string, string>> GetCommonTags(TypeDeclarationSyntax classDeclaration, SymbolHolder symbols, SemanticModel semanticModel, CancellationToken cancellationToken)
+    {
+        List<KeyValuePair<string, string>> commonTags = new();
+        var attributes = classDeclaration.AttributeLists.SelectMany(al => al.Attributes);
+
+        foreach (var attribute in attributes)
+        {
+            var attributeTypeInfo = semanticModel.GetTypeInfo(attribute, cancellationToken);
+            if (attributeTypeInfo.Type == null || !attributeTypeInfo.Type.Equals(symbols.CommonTagAttribute, SymbolEqualityComparer.Default))
+            {
+                continue;
+            }
+
+            if (attribute.ArgumentList != null)
+            {
+                KeyValuePair<string, string> tag;
+                string tagKey = string.Empty;
+                string tagValue = string.Empty;
+
+                foreach (var argument in attribute.ArgumentList.Arguments)
+                {
+                    var key = argument.NameColon?.Name.ToString();
+                    var value = argument.Expression.ToString().Trim('"');
+                    if (key != null && !string.IsNullOrWhiteSpace(key))
+                    {
+                        if (key == "tagName")
+                        {
+                            tagKey = value;
+                        }
+                        else if (key == "tagValue")
+                        {
+                            tagValue = value;
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(tagKey))
+                {
+                    tag = new KeyValuePair<string, string>(tagKey, tagValue);
+                }
+
+                commonTags.Add(tag);
+            }
+        }
+
+        return commonTags;
     }
 
     private static void UpdateMetricKeywordIfRequired(TypeDeclarationSyntax? typeDeclaration, MetricType metricType)

@@ -14,4 +14,5 @@ internal sealed class MetricType
     public string Modifiers = string.Empty;
     public string Keyword = string.Empty;
     public MetricType? Parent;
+    public List<KeyValuePair<string, string>>? CommonTags;
 }
