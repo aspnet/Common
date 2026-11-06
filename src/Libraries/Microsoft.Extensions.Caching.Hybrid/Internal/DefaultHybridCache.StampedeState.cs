@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Diagnostics;
 using System.Threading;
 
 #if !NETCOREAPP3_0_OR_GREATER
@@ -96,12 +97,21 @@ internal partial class DefaultHybridCache
         public bool TryAddCaller() => _cacheItem.TryReserve();
     }
 
-    private void RemoveStampedeState(in StampedeKey key)
+    private void RemoveStampedeState(StampedeState expected)
     {
+        ref readonly StampedeKey key = ref expected.Key;
+
         // see notes in SyncLock.cs
         lock (GetPartitionedSyncLock(in key))
         {
-            _ = _currentOperations.TryRemove(key, out _);
+            if (_currentOperations.TryGetValue(key, out StampedeState? current)
+                && ReferenceEquals(current, expected))
+            {
+                // Replacements take the same partitioned lock, and the unlocked TryAdd cannot replace an existing entry,
+                // so this is safe.
+                _ = _currentOperations.TryRemove(key, out StampedeState? removed);
+                Debug.Assert(ReferenceEquals(removed, expected), "The stampede state changed while holding its partition lock.");
+            }
         }
     }
 }

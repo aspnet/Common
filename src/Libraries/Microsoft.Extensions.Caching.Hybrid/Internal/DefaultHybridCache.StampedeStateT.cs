@@ -483,7 +483,7 @@ internal partial class DefaultHybridCache
         {
             if (_result is not null)
             {
-                Cache.RemoveStampedeState(in Key);
+                Cache.RemoveStampedeState(this);
                 _ = _result.TrySetException(ex);
             }
         }
@@ -510,7 +510,7 @@ internal partial class DefaultHybridCache
                         break;
                 }
 
-                Cache.RemoveStampedeState(in Key);
+                Cache.RemoveStampedeState(this);
                 _ = _result.TrySetResult(cacheItem);
             }
         }
@@ -635,7 +635,7 @@ internal partial class DefaultHybridCache
 
             if (_result is not null)
             {
-                Cache.RemoveStampedeState(in Key);
+                Cache.RemoveStampedeState(this);
                 _ = _result.TrySetResult(value);
             }
         }

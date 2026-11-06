@@ -10,13 +10,21 @@
 
 # Experiments
 
-As new functionality is introduced to this repo, new in-development APIs are marked as being experimental. Experimental APIs offer no
-compatibility guarantees and can change without notice. They are usually published in order to gather feedback before finalizing
-a design.
+As new functionality is introduced to this repo, in-development APIs may be marked as experimental. The
+[`ExperimentalAttribute`](https://learn.microsoft.com/dotnet/api/system.diagnostics.codeanalysis.experimentalattribute) lets a
+library ship preview APIs in an otherwise stable package and reports a diagnostic at call sites. It does not require a preview
+SDK or target framework. Experimental APIs offer no compatibility guarantees: their design or behavior may change, or they may
+be removed, as the library gathers feedback and finalizes the design. Experimental status describes the API's compatibility
+commitment, not its quality or reliability.
 
-You may use experimental APIs in your application, but we advise against using these APIs in production scenarios as they may not be
-fully tested nor fully reliable. Additionally, we strongly recommend that library authors do not publish versions of their libraries
-that depend on experimental APIs as this will quite possibly lead to future breaking changes and diamond problems.
+Consumers may evaluate experimental APIs in applications, but should use them in production only when they can accept possible
+compatibility changes. Library authors should generally avoid exposing stable APIs that depend on experimental APIs from another
+package. If that dependency is necessary, keep the dependent API experimental until its dependencies are stable, and consider
+the downstream breaking-change and diamond-dependency risks. These cautions do not prevent implementation-level dependencies
+between packages in this repository; they do require the public experimental boundary and consumer impact to be understood.
+
+See the [contribution guidance](../CONTRIBUTING.md#using-experimental) for when experimental APIs may be released before formal
+API Review approval and how review expectations vary by library.
 
 If you use experimental APIs, you will get one of the diagnostic shown below. The diagnostic is there to let you know you're
 using such an API so that you can avoid accidentally depending on experimental features. You may suppress these diagnostics
