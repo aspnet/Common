@@ -1,7 +1,5 @@
 # Microsoft.Extensions.Hosting.Testing
 
-This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
-
 Tools for integration testing of apps built with Microsoft.Extensions.Hosting.
 
 ## Install the package
@@ -52,3 +50,7 @@ using var host = await FakeHost.CreateBuilder(options => { });
 ## Feedback & Contributing
 
 For any feedback or contributions, please visit us in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

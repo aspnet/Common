@@ -1,7 +1,5 @@
 # Microsoft.Extensions.Http.Diagnostics
 
-This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
-
 Telemetry support for `HttpClient` that allows tracking latency and enriching and redacting log output for structured logs.
 
 ## Install the package
@@ -146,3 +144,7 @@ var host = builder.Build();
 ## Feedback & Contributing
 
 We welcome feedback and contributions in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

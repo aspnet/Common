@@ -1,7 +1,5 @@
 # Microsoft.Extensions.DataIngestion
 
-This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
-
 .NET developers need to efficiently process, chunk, and retrieve information from diverse document formats while preserving semantic meaning and structural context. The `Microsoft.Extensions.DataIngestion` libraries provide a unified approach for representing document ingestion components.
 
 ## The packages
@@ -34,3 +32,7 @@ Or directly in the C# project file:
 ## Feedback & Contributing
 
 We welcome feedback and contributions in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

@@ -1,7 +1,5 @@
 # Microsoft.Extensions.AsyncState
 
-This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
-
 This provides the ability to store and retrieve objects that flow with the current asynchronous context.
 It has a few advantages over using the [`AsyncLocal<T>`](https://learn.microsoft.com/dotnet/api/system.threading.asynclocal-1) class directly:
 - By abstracting the way the ambient data is stored we can use more optimized implementations, for instance when using ASP.NET Core, without exposing these components.
@@ -62,3 +60,7 @@ public class MyClass
 ## Feedback & Contributing
 
 We welcome feedback and contributions in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

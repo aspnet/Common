@@ -1,7 +1,5 @@
 ﻿# The Microsoft.Extensions.AI.Evaluation libraries
 
-This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
-
 `Microsoft.Extensions.AI.Evaluation` is a set of .NET libraries defined in the following NuGet packages that have been designed to work together to support building processes for evaluating the quality of AI software.
 
 * [`Microsoft.Extensions.AI.Evaluation`](https://www.nuget.org/packages/Microsoft.Extensions.AI.Evaluation) - Defines core abstractions and types for supporting evaluation.
@@ -56,3 +54,7 @@ For `Microsoft.Extensions.AI.Evaluation` library usage examples, see the followi
 ## Feedback & Contributing
 
 We welcome feedback and contributions in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

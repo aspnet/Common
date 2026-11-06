@@ -1,7 +1,5 @@
 # Microsoft.Extensions.VectorData.Abstractions
 
-This package is supported on .NET Framework 4.6.2 and later.
-
 This package contains abstract classes and utilities for accessing vector databases. Actual implementations are provided separately in other packages; see <https://learn.microsoft.com/dotnet/ai/vector-stores/overview> for more information.
 
 The abstractions in this package expose functionality for:
@@ -32,3 +30,7 @@ The main types provided by this library are:
 ## Feedback & Contributing
 
 Microsoft.Extensions.VectorData.Abstractions is released as open source under the [MIT license](https://licenses.nuget.org/MIT). Bug reports and contributions are welcome at [the GitHub repository](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is supported on .NET Framework 4.6.2 and later.

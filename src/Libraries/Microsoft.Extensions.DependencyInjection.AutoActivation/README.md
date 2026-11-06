@@ -1,7 +1,5 @@
 # Microsoft.Extensions.DependencyInjection.AutoActivation
 
-This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
-
 This provides the ability to instantiate registered singletons during startup instead of during the first time it is used.
 
 A singleton is typically created when it is first used, which can lead to higher than usual latency in responding to incoming requests. Creating the instances on startup helps prevent the service from exceeding its SLA for the first set of requests it processes.
@@ -104,3 +102,7 @@ builder.Services.ActivateSingleton<OtherService>();
 ## Feedback & Contributing
 
 We welcome feedback and contributions in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

@@ -1,7 +1,5 @@
 # Microsoft.Extensions.Diagnostics.ExceptionSummarization
 
-This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
-
 This provides the ability to extract essential information from well-known exception types and return a single string that can be used to create low-cardinality diagnostic messages for use in telemetry.
 
 ## Install the package
@@ -77,3 +75,7 @@ Custom implementations of the `IExceptionSummaryProvider` interface can be used 
 ## Feedback & Contributing
 
 We welcome feedback and contributions in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

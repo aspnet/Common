@@ -1,7 +1,5 @@
 # Microsoft.Extensions.Diagnostics.HealthChecks.ResourceUtilization
 
-This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
-
 This provides configurable health check reporting based on the current system resource utilization. See `Microsoft.Extensions.Diagnostics.ResourceMonitoring` for details on how resources are measured. See the [health checks](https://learn.microsoft.com/aspnet/core/host-and-deploy/health-checks) documentation for general usage guidance.
 
 ## Install the package
@@ -68,3 +66,7 @@ app.Run();
 ## Feedback & Contributing
 
 We welcome feedback and contributions in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

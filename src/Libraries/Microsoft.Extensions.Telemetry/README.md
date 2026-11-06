@@ -1,7 +1,5 @@
 # Microsoft.Extensions.Telemetry
 
-This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
-
 This library provides advanced logging and telemetry enrichment capabilities for .NET applications. It allows for detailed and configurable enrichment of log entries, along with enhanced latency monitoring and logging features. It is built for applications needing sophisticated telemetry and logging insights.
 
 ## Install the package
@@ -217,3 +215,7 @@ builder.Services.AddRedaction(); // <- This call is required in order for the re
 ## Feedback & Contributing
 
 We welcome feedback and contributions in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

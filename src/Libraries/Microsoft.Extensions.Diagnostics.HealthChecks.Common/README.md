@@ -1,7 +1,5 @@
 # Microsoft.Extensions.Diagnostics.HealthChecks.Common
 
-This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
-
 This package contains common health check implementations. Here are the main features it provides:
 
 Application Lifecycle Health Check
@@ -150,3 +148,7 @@ app.Run();
 ## Feedback & Contributing
 
 We welcome feedback and contributions in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.

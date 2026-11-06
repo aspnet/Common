@@ -1,7 +1,5 @@
 # Microsoft.Extensions.ObjectPool.DependencyInjection
 
-This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
-
 This provides the ability to retrieve pooled instances that can be initialized using dependency injection.
 
 ## Install the package
@@ -93,3 +91,7 @@ builder.Services.AddPooled<MyPooledClass>(options => options.Capacity = 64);
 ## Feedback & Contributing
 
 We welcome feedback and contributions in [our GitHub repo](https://github.com/dotnet/extensions).
+
+## Supported Platforms
+
+This package is not supported on .NET Framework. Compatibility issues may be closed as not planned.
