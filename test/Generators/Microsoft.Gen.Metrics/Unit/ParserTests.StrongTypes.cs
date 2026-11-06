@@ -593,19 +593,20 @@ public partial class ParserTests
     }
 
     [Fact]
-    public async Task MaxDimensions()
+    public async Task MoreThanThirtyDimensions()
     {
         StringBuilder sb = new StringBuilder();
-        int i = 1;
-        for (; i < 30; i++)
+        sb.AppendLine("public class ManyTags");
+        sb.AppendLine("{");
+        for (int i = 1; i <= 33; i++)
         {
-            sb.AppendLine($"public class C{i} : C{i + 1} {{ public string dim{i} {{get;set;}}}}");
+            sb.AppendLine($"    public string D{i} {{ get; set; }} = string.Empty;");
         }
 
-        sb.AppendLine($"public class C{i} {{ public string dim{i} {{get;set;}}}}");
+        sb.AppendLine("}");
         sb.AppendLine(@"        public static partial class MetricClass
         {
-            [Histogram(typeof(C1), Name=""TotalCountTest"")]
+            [Histogram(typeof(ManyTags), Name=""TotalCountTest"")]
             public static partial TotalCount CreateTotalCountCounter(Meter meter);
         }");
         var d = await RunGenerator(sb.ToString());

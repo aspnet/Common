@@ -213,12 +213,6 @@
   <data name="ErrorNotStaticMethodTitle" xml:space="preserve">
     <value>Metric methods must be static</value>
   </data>
-  <data name="ErrorTooManyTagNamesMessage" xml:space="preserve">
-    <value>The type {0} has too many tag names</value>
-  </data>
-  <data name="ErrorTooManyTagNamesTitle" xml:space="preserve">
-    <value>A metric class contains too many tag names</value>
-  </data>
   <data name="ErrorXmlNotLoadedCorrectlyTitle" xml:space="preserve">
     <value>Xml comment was not parsed correctly</value>
   </data>

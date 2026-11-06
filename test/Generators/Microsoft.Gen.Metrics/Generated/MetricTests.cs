@@ -608,4 +608,24 @@ public partial class MetricTests : IDisposable
             },
             measurement.Tags.Select(x => (x.Key, x.Value)));
     }
+
+    [Fact]
+    public void ValidateStrongTypeWithMoreThanThirtyTags()
+    {
+        var tags = new ManyTagsDimensions();
+        for (int i = 1; i <= 33; i++)
+        {
+            typeof(ManyTagsDimensions).GetProperty($"D{i}")!.SetValue(tags, $"v{i}");
+        }
+
+        using var collector = new MetricCollector<long>(_meter, nameof(ManyTagsCounter));
+        ManyTagsCounter counter = ManyTagsTestExtensions.CreateManyTagsCounter(_meter);
+        counter.Add(1L, tags);
+
+        var measurement = Assert.Single(collector.GetMeasurementSnapshot());
+        Assert.Equal(1L, measurement.Value);
+        Assert.Equal(
+            Enumerable.Range(1, 33).Select(i => ($"D{i}", (object?)$"v{i}")),
+            measurement.Tags.Select(x => (x.Key, x.Value)));
+    }
 }

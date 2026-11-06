@@ -128,7 +128,6 @@ You may continue using obsolete APIs in your application, but we advise explorin
 | `METGEN010` | Metric methods must be static |
 | `METGEN011` | A strong type object contains duplicate tag names |
 | `METGEN012` | A metric class contains an invalid tag name type |
-| `METGEN013` | A metric class contains too many tag names |
 | `METGEN014` | A metering attribute type argument is invalid |
 | `METGEN015` | Metric methods mustn't use any external type as the return type |
 | `METGEN016` | Metric methods mustn't use any generic type as the return type |

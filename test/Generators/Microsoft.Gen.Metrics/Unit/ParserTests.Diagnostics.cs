@@ -359,32 +359,6 @@ public partial class ParserTests
         Assert.Equal(DiagDescriptors.ErrorInvalidTagNameType.Id, d[0].Id);
     }
 
-    [Fact]
-    public async Task TooManyDimensions()
-    {
-        StringBuilder sb = new StringBuilder();
-
-        int i = 0;
-
-        for (; i < 30; i++)
-        {
-            sb.AppendLine($"public class C{i} : C{i + 1} {{ public string dim{i} {{get;set;}}}}");
-        }
-
-        sb.AppendLine($"public class C{i} {{ public string dim{i} {{get;set;}}}}");
-
-        sb.AppendLine(@"        public static partial class MetricClass
-        {
-            [Histogram(typeof(C0), Name=""TotalCountTest"")]
-            public static partial TotalCount CreateTotalCountCounter(Meter meter);
-        }");
-
-        var d = await RunGenerator(sb.ToString());
-
-        _ = Assert.Single(d);
-        Assert.Equal(DiagDescriptors.ErrorTooManyTagNames.Id, d[0].Id);
-    }
-
     [Theory]
     [InlineData("ulong")]
     [InlineData("uint")]
@@ -542,29 +516,27 @@ public partial class ParserTests
     }
 
     [Fact]
-    public async Task Gauge_StrongType_TooManyTags()
+    public async Task Gauge_StrongType_MoreThanThirtyTags()
     {
         var sb = new StringBuilder();
 
-        // Create 31 nested classes (max is 30)
-        for (int i = 0; i < 31; i++)
+        for (int i = 0; i < 33; i++)
         {
             sb.AppendLine($"public class C{i} : C{i + 1} {{ public string Tag{i} {{ get; set; }} }}");
         }
 
-        sb.AppendLine("public class C31 { public string Tag31 { get; set; } }");
+        sb.AppendLine("public class C33 { public string Tag33 { get; set; } }");
 
         sb.AppendLine(@"
         partial class C
         {
-            [Gauge(typeof(C0), Name=""TooManyTags"")]
-            static partial TooManyTags CreateGauge(Meter meter);
+            [Gauge(typeof(C0), Name=""ManyTags"")]
+            static partial ManyTags CreateGauge(Meter meter);
         }");
 
         var d = await RunGenerator(sb.ToString());
 
-        var diag = Assert.Single(d);
-        Assert.Equal(DiagDescriptors.ErrorTooManyTagNames.Id, diag.Id);
+        Assert.Empty(d);
     }
 
     [Fact]

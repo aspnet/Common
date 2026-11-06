@@ -89,12 +89,6 @@ internal sealed class DiagDescriptors : DiagDescriptorsBase
         messageFormat: Resources.ErrorInvalidTagTypeMessage,
         category: Category);
 
-    public static DiagnosticDescriptor ErrorTooManyTagNames { get; } = Make(
-        id: DiagnosticIds.Metrics.METGEN013,
-        title: Resources.ErrorTooManyTagNamesTitle,
-        messageFormat: Resources.ErrorTooManyTagNamesMessage,
-        category: Category);
-
     public static DiagnosticDescriptor ErrorInvalidAttributeGenericType { get; } = Make(
         id: DiagnosticIds.Metrics.METGEN014,
         title: Resources.ErrorInvalidAttributeGenericTypeTitle,

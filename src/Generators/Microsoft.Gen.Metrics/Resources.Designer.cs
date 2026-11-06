@@ -366,24 +366,6 @@ namespace Microsoft.Gen.Metrics {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The type {0} has too many tag names.
-        /// </summary>
-        internal static string ErrorTooManyTagNamesMessage {
-            get {
-                return ResourceManager.GetString("ErrorTooManyTagNamesMessage", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to A metric class contains too many tag names.
-        /// </summary>
-        internal static string ErrorTooManyTagNamesTitle {
-            get {
-                return ResourceManager.GetString("ErrorTooManyTagNamesTitle", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Xml comment was not parsed correctly, exception {0} was thrown.
         /// </summary>
         internal static string ErrorXmlNotLoadedCorrectlyMessage {
