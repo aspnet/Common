@@ -35,7 +35,7 @@ public static class LoggingEnrichmentExtensions
         _ = Throw.IfNull(configure);
 
         _ = builder.Services
-            .AddExtendedLoggerFeactory()
+            .AddExtendedLoggerFactory()
             .Configure(configure)
             .AddOptionsWithValidateOnStart<LoggerEnrichmentOptions, LoggerEnrichmentOptionsValidator>();
 
@@ -54,7 +54,7 @@ public static class LoggingEnrichmentExtensions
         _ = Throw.IfNull(section);
 
         _ = builder.Services
-            .AddExtendedLoggerFeactory()
+            .AddExtendedLoggerFactory()
             .AddOptionsWithValidateOnStart<LoggerEnrichmentOptions, LoggerEnrichmentOptionsValidator>().Bind(section);
 
         return builder;
@@ -65,7 +65,7 @@ public static class LoggingEnrichmentExtensions
     /// </summary>
     /// <param name="services">The <see cref="IServiceCollection" />.</param>
     /// <returns>The value of <paramref name="services"/>.</returns>
-    internal static IServiceCollection AddExtendedLoggerFeactory(this IServiceCollection services)
+    internal static IServiceCollection AddExtendedLoggerFactory(this IServiceCollection services)
     {
         _ = Throw.IfNull(services);
 

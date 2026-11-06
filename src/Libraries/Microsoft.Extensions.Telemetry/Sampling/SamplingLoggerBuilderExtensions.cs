@@ -127,7 +127,7 @@ public static class SamplingLoggerBuilderExtensions
     {
         _ = Throw.IfNull(builder);
 
-        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<ILoggerFactory, ExtendedLoggerFactory>());
+        _ = builder.Services.AddExtendedLoggerFactory();
         _ = builder.Services.AddSingleton<LoggingSampler, T>();
 
         return builder;
@@ -145,7 +145,7 @@ public static class SamplingLoggerBuilderExtensions
         _ = Throw.IfNull(builder);
         _ = Throw.IfNull(sampler);
 
-        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<ILoggerFactory, ExtendedLoggerFactory>());
+        _ = builder.Services.AddExtendedLoggerFactory();
         _ = builder.Services.AddSingleton(sampler);
 
         return builder;

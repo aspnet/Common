@@ -34,7 +34,7 @@ public static class LoggingRedactionExtensions
         _ = Throw.IfNull(configure);
 
         _ = builder.Services
-                .AddExtendedLoggerFeactory()
+                .AddExtendedLoggerFactory()
                 .Configure(configure);
 
         return builder;
@@ -52,7 +52,7 @@ public static class LoggingRedactionExtensions
         _ = Throw.IfNull(section);
 
         _ = builder.Services
-                .AddExtendedLoggerFeactory()
+                .AddExtendedLoggerFactory()
                 .AddOptions<LoggerRedactionOptions>().Bind(section);
 
         return builder;
