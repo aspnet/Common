@@ -683,8 +683,8 @@ public class HttpParserTests
 
         ValidateRouteSegment(routeSegments.Segments[0], ("api/", false, "", "", 0, 4, false));
         ValidateRouteSegment(routeSegments.Segments[1], ("id:regex(^\\d{{3}}$)", true, "id", "", 4, 25, false));
-        ValidateRouteSegment(routeSegments.Segments[2], ("/a{b}c/", false, "", "", 25, 32, false));
-        ValidateRouteSegment(routeSegments.Segments[3], ("name", true, "name", "", 32, 38, false));
+        ValidateRouteSegment(routeSegments.Segments[2], ("/a%7Bb%7Dc/", false, "", "", 25, 36, false));
+        ValidateRouteSegment(routeSegments.Segments[3], ("name", true, "name", "", 36, 42, false));
     }
 
     [Theory]
@@ -709,7 +709,7 @@ public class HttpParserTests
         ValidateRouteParameter(httpRouteParameters[1], "token", $"{redactedPrefix}secret", isRedacted);
 
         Assert.True(httpParser.TryExtractParameters(
-            "/b{c}/123/secret", httpParser.ParseRoute("/b{{c}}/{id}/{token}"), redactionMode, parametersToRedact, ref httpRouteParameters));
+            "/b%7Bc%7D/123/secret", httpParser.ParseRoute("/b{{c}}/{id}/{token}"), redactionMode, parametersToRedact, ref httpRouteParameters));
         ValidateRouteParameter(httpRouteParameters[0], "id", "123", false);
         ValidateRouteParameter(httpRouteParameters[1], "token", $"{redactedPrefix}secret", isRedacted);
     }

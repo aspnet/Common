@@ -106,8 +106,8 @@ internal sealed class HttpRouteParser : IHttpRouteParser
             var start = 0;
             char ch;
 
-            // An escaped brace "{{" or "}}" in a literal is a single character in the path,
-            // so segment positions don't count the escape characters.
+            // The path is escaped, e.g. Uri.AbsolutePath, so an escaped brace "{{" or "}}" in a literal is "%7B" or "%7D" there,
+            // one character longer, which shifts the positions of the following segments.
             var escapedBraces = 0;
 
             var segments = new List<Segment>();
@@ -130,14 +130,14 @@ internal sealed class HttpRouteParser : IHttpRouteParser
                     // End of the current text segment.
                     if (pos > start)
                     {
-#if NETCOREAPP3_1_OR_GREATER
-                        var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "{", StringComparison.Ordinal).Replace("}}", "}", StringComparison.Ordinal);
+#if NET
+                        var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "%7B", StringComparison.Ordinal).Replace("}}", "%7D", StringComparison.Ordinal);
 #else
-                        var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "{").Replace("}}", "}");
+                        var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "%7B").Replace("}}", "%7D");
 #endif
                         segments.Add(new Segment(
-                            start: pos - escapedBraces - content.Length,
-                            end: pos - escapedBraces,
+                            start: pos + escapedBraces - content.Length,
+                            end: pos + escapedBraces,
                             content: content,
                             isParam: false));
                     }
@@ -160,14 +160,14 @@ internal sealed class HttpRouteParser : IHttpRouteParser
             // End the last text segment if any.
             if (start < pos)
             {
-#if NETCOREAPP3_1_OR_GREATER
-                var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "{", StringComparison.Ordinal).Replace("}}", "}", StringComparison.Ordinal);
+#if NET
+                var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "%7B", StringComparison.Ordinal).Replace("}}", "%7D", StringComparison.Ordinal);
 #else
-                var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "{").Replace("}}", "}");
+                var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "%7B").Replace("}}", "%7D");
 #endif
                 segments.Add(new Segment(
-                    start: pos - escapedBraces - content.Length,
-                    end: pos - escapedBraces,
+                    start: pos + escapedBraces - content.Length,
+                    end: pos + escapedBraces,
                     content: content,
                     isParam: false));
             }
@@ -313,8 +313,8 @@ internal sealed class HttpRouteParser : IHttpRouteParser
 
         // Remove the opening and closing curly braces when getting content.
         return new Segment(
-            start: start - escapedBraces,
-            end: pos + 1 - escapedBraces,
+            start: start + escapedBraces,
+            end: pos + 1 + escapedBraces,
             content: content,
             isParam: true,
             paramName: paramName,
