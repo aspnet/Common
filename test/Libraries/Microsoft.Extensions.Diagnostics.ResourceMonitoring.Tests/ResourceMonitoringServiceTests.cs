@@ -222,7 +222,7 @@ public sealed class ResourceMonitoringServiceTests
         Assert.Equal(0, numberOfSnapshots);
     }
 
-    [Fact(Skip = "Flaky test, see https://github.com/dotnet/extensions/issues/7009")]
+    [Fact]
     public async Task RunTrackerAsync_IfProviderThrows_LogsError()
     {
         var clock = new FakeTimeProvider();
