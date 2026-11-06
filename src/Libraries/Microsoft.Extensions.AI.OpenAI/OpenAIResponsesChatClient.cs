@@ -1291,6 +1291,26 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
         };
     }
 
+    /// <summary>Gets whether any of the contents carries a raw <see cref="ResponseItem"/> or <see cref="ResponseContentPart"/>.</summary>
+    private static bool HasRawResponseRepresentation(IList<AIContent> contents)
+    {
+        foreach (AIContent content in contents)
+        {
+            if (content.RawRepresentation is ResponseItem or ResponseContentPart)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Creates a system or developer message item from its content parts.</summary>
+    private static MessageResponseItem CreateInstructionsMessageItem(bool isSystem, List<ResponseContentPart> parts) =>
+        isSystem ?
+            ResponseItem.CreateSystemMessageItem(parts) :
+            ResponseItem.CreateDeveloperMessageItem(parts);
+
     /// <summary>Convert a sequence of <see cref="ChatMessage"/>s to <see cref="ResponseItem"/>s.</summary>
     internal static IEnumerable<ResponseItem> ToOpenAIResponseItems(IEnumerable<ChatMessage> inputs, ChatOptions? options)
     {
@@ -1303,12 +1323,51 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
             if (input.Role == ChatRole.System ||
                 input.Role == OpenAIClientExtensions.ChatRoleDeveloper)
             {
-                string text = input.Text;
-                if (!string.IsNullOrWhiteSpace(text))
+                bool isSystem = input.Role == ChatRole.System;
+
+                if (!HasRawResponseRepresentation(input.Contents))
                 {
-                    yield return input.Role == ChatRole.System ?
-                        ResponseItem.CreateSystemMessageItem(text) :
-                        ResponseItem.CreateDeveloperMessageItem(text);
+                    string text = input.Text;
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        yield return isSystem ?
+                            ResponseItem.CreateSystemMessageItem(text) :
+                            ResponseItem.CreateDeveloperMessageItem(text);
+                    }
+
+                    continue;
+                }
+
+                // Contents carrying a raw ResponseItem or ResponseContentPart are sent as is, as for user messages,
+                // grouping the parts between yielded items into their own message item to preserve ordering.
+                List<ResponseContentPart>? instructionParts = null;
+                foreach (AIContent item in input.Contents)
+                {
+                    switch (item)
+                    {
+                        case AIContent when item.RawRepresentation is ResponseItem rawRep:
+                            if (instructionParts is not null)
+                            {
+                                yield return CreateInstructionsMessageItem(isSystem, instructionParts);
+                                instructionParts = null;
+                            }
+
+                            yield return rawRep;
+                            break;
+
+                        case AIContent when item.RawRepresentation is ResponseContentPart rawRep:
+                            (instructionParts ??= []).Add(rawRep);
+                            break;
+
+                        case TextContent textContent:
+                            (instructionParts ??= []).Add(ResponseContentPart.CreateInputTextPart(textContent.Text));
+                            break;
+                    }
+                }
+
+                if (instructionParts is not null)
+                {
+                    yield return CreateInstructionsMessageItem(isSystem, instructionParts);
                 }
 
                 continue;

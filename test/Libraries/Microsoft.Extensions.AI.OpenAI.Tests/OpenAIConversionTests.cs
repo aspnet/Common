@@ -878,6 +878,49 @@ public class OpenAIConversionTests
     }
 
     [Fact]
+    public void AsOpenAIResponseItems_SystemAndDeveloperMessages_RoundtripRawRepresentation()
+    {
+        ResponseContentPart systemPart = ResponseContentPart.CreateInputTextPart("cached instructions");
+        ResponseContentPart developerPart = ResponseContentPart.CreateInputTextPart("developer notes");
+        ResponseItem rawItem = ResponseItem.CreateReferenceItem("123");
+
+        List<ChatMessage> messages =
+        [
+            new(ChatRole.System,
+            [
+                new TextContent("You are helpful. "),
+                new TextContent("cached instructions") { RawRepresentation = systemPart },
+            ]),
+            new(new ChatRole("developer"),
+            [
+                new AIContent { RawRepresentation = developerPart },
+                new AIContent { RawRepresentation = rawItem },
+                new TextContent("Be brief."),
+            ]),
+        ];
+
+        var items = messages.AsOpenAIResponseItems().ToArray();
+
+        Assert.Equal(4, items.Length);
+
+        MessageResponseItem system = Assert.IsAssignableFrom<MessageResponseItem>(items[0]);
+        Assert.Equal(OpenAI.Responses.MessageRole.System, system.Role);
+        Assert.Equal(2, system.Content.Count);
+        Assert.Equal("You are helpful. ", system.Content[0].Text);
+        Assert.Same(systemPart, system.Content[1]);
+
+        MessageResponseItem developer = Assert.IsAssignableFrom<MessageResponseItem>(items[1]);
+        Assert.Equal(OpenAI.Responses.MessageRole.Developer, developer.Role);
+        Assert.Same(developerPart, Assert.Single(developer.Content));
+
+        Assert.Same(rawItem, items[2]);
+
+        MessageResponseItem developerAfter = Assert.IsAssignableFrom<MessageResponseItem>(items[3]);
+        Assert.Equal(OpenAI.Responses.MessageRole.Developer, developerAfter.Role);
+        Assert.Equal("Be brief.", Assert.Single(developerAfter.Content).Text);
+    }
+
+    [Fact]
     public void AsChatResponse_ConvertsOpenAIChatCompletion()
     {
         Assert.Throws<ArgumentNullException>("chatCompletion", () => ((ChatCompletion)null!).AsChatResponse());
