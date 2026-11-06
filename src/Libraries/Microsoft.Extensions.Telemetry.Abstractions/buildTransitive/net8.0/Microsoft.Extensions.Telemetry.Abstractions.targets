@@ -1,6 +1,6 @@
 <Project>
   <!-- This package should replace the "Microsoft.Extensions.Logging.Abstractions" source generator. -->
-  <Target Name="_Microsoft_Extensions_Logging_AbstractionsRemoveAnalyzers"
+  <Target Name="_Microsoft_Extensions_Telemetry_AbstractionsRemoveAnalyzers"
           Condition="'$(DisableMicrosoftExtensionsLoggingSourceGenerator)' == 'true'"
           AfterTargets="ResolveReferences">
     <ItemGroup>
@@ -19,7 +19,7 @@
   <!-- We have a WPF-specific target because WPF projects generate and compile a temporary project (via "GenerateTemporaryTargetAssembly" target),
        and that temp project doesn't have "ResolveReferences" target we expect.
        This leads to the runtime's generator not being removed and to a compile-time error CS0757. This additional target resolves the problem. -->
-  <Target Name="_Microsoft_Extensions_Logging_AbstractionsRemoveAnalyzersWPF"
+  <Target Name="_Microsoft_Extensions_Telemetry_AbstractionsRemoveAnalyzersWPF"
           Condition="'$(DisableMicrosoftExtensionsLoggingSourceGenerator)' == 'true'"
           AfterTargets="RemoveDuplicateAnalyzers">
     <ItemGroup>
