@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -52,7 +52,7 @@ public static class HttpClientResiliencePredicates
 
     internal static bool IsHttpConnectionTimeout(in Outcome<HttpResponseMessage> outcome, in CancellationToken cancellationToken)
         => !cancellationToken.IsCancellationRequested
-           && outcome.Exception is OperationCanceledException { Source: "System.Private.CoreLib", InnerException: TimeoutException };
+           && outcome.Exception is OperationCanceledException { InnerException: TimeoutException };
 
     /// <summary>
     /// Determines whether a response contains a transient failure.

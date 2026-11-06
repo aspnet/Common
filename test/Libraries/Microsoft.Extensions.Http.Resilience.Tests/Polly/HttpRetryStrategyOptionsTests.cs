@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -27,6 +27,8 @@ public class HttpRetryStrategyOptionsTests
         [new OperationCanceledExceptionMock(new TimeoutException()), default(CancellationToken), true],
         [new OperationCanceledExceptionMock(new InvalidOperationException()), default(CancellationToken), false],
         [new OperationCanceledExceptionMock(new TimeoutException()), new CancellationToken(canceled: true), false],
+        [new OperationCanceledException("<unknown>", new TimeoutException()) { Source = "<unknown>" }, default(CancellationToken), true],
+        [new TaskCanceledException("Connection timed out", new TimeoutException()), default(CancellationToken), true],
     };
 
     private readonly HttpRetryStrategyOptions _testClass = new();
