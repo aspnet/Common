@@ -713,6 +713,10 @@
           "Stage": "Stable"
         },
         {
+          "Member": "virtual bool Microsoft.Extensions.Logging.LoggingSampler.ShouldSample(string categoryName, Microsoft.Extensions.Logging.LogLevel logLevel);",
+          "Stage": "Experimental"
+        },
+        {
           "Member": "abstract bool Microsoft.Extensions.Logging.LoggingSampler.ShouldSample<TState>(in Microsoft.Extensions.Logging.Abstractions.LogEntry<TState> logEntry);",
           "Stage": "Stable"
         }

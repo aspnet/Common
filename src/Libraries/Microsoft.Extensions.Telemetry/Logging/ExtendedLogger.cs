@@ -28,6 +28,7 @@ internal sealed partial class ExtendedLogger : ILogger
     private const string ExceptionStackTrace = "exception.stacktrace";
 
     private readonly ExtendedLoggerFactory _factory;
+    private readonly string _categoryName;
 
     public LoggerInformation[] Loggers { get; set; }
     public MessageLogger[] MessageLoggers { get; set; } = Array.Empty<MessageLogger>();
@@ -37,9 +38,10 @@ internal sealed partial class ExtendedLogger : ILogger
     private readonly IBufferedLogger? _bufferedLogger;
 #endif
 
-    public ExtendedLogger(ExtendedLoggerFactory factory, LoggerInformation[] loggers)
+    public ExtendedLogger(ExtendedLoggerFactory factory, string categoryName, LoggerInformation[] loggers)
     {
         _factory = factory;
+        _categoryName = categoryName;
         Loggers = loggers;
 #if NET9_0_OR_GREATER
         _logBuffer = _factory.Config.LogBuffer;
@@ -52,6 +54,11 @@ internal sealed partial class ExtendedLogger : ILogger
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
+        if (_factory.Config.Sampler?.ShouldSample(_categoryName, logLevel) == false)
+        {
+            return;
+        }
+
         if (typeof(TState) == typeof(LoggerMessageState))
         {
             var msgState = (LoggerMessageState?)(object?)state;
@@ -101,6 +108,11 @@ internal sealed partial class ExtendedLogger : ILogger
 
     public bool IsEnabled(LogLevel logLevel)
     {
+        if (_factory.Config.Sampler?.ShouldSample(_categoryName, logLevel) == false)
+        {
+            return false;
+        }
+
         var loggers = MessageLoggers;
 
         List<Exception>? exceptions = null;

@@ -149,7 +149,7 @@ internal sealed class ExtendedLoggerFactory : ILoggerFactory
         {
             if (!_loggers.TryGetValue(categoryName, out ExtendedLogger? logger))
             {
-                logger = new ExtendedLogger(this, CreateLoggers(categoryName));
+                logger = new ExtendedLogger(this, categoryName, CreateLoggers(categoryName));
 
                 (logger.MessageLoggers, logger.ScopeLoggers) = ApplyFilters(logger.Loggers);
 

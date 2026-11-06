@@ -8,6 +8,7 @@ using Microsoft.Extensions.Compliance.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Enrichment;
 using Microsoft.Extensions.Diagnostics.Sampling;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -156,6 +157,34 @@ public static class ExtendedLoggerTests
         Assert.Equal(0, provider.Logger!.Collector.Count);
     }
 
+    [Fact]
+    public static void EarlySamplingRejectsBeforeLogEntrySampling()
+    {
+        const string Category = "C1";
+        var sampler = new EarlyRejectingSampler();
+        using var provider = new Provider();
+        using var factory = new ExtendedLoggerFactory(
+            providers: new[] { provider },
+            filterOptions: new StaticOptionsMonitor<LoggerFilterOptions>(new()),
+            enrichers: Array.Empty<ILogEnricher>(),
+            staticEnrichers: Array.Empty<IStaticLogEnricher>(),
+            sampler: sampler);
+        ILogger logger = factory.CreateLogger(Category);
+
+        Assert.False(logger.IsEnabled(LogLevel.Information));
+        logger.Log(
+            LogLevel.Information,
+            new EventId(1),
+            "state",
+            null,
+            static (state, _) => state);
+
+        Assert.Equal(0, provider.Logger!.Collector.Count);
+        Assert.Equal(0, sampler.LogEntryDecisionCount);
+        Assert.Equal(Category, sampler.CategoryName);
+        Assert.Equal(LogLevel.Information, sampler.LogLevel);
+    }
+
     [Theory]
     [CombinatorialData]
     public static void BagAndJoiner(bool objectVersion)
@@ -210,6 +239,28 @@ public static class ExtendedLoggerTests
         Assert.Equal("PV2", snap[1].GetStructuredStateValue("PK2"));
         Assert.Equal("EV1", snap[1].GetStructuredStateValue("EK1"));
         Assert.Equal("EV2", snap[1].GetStructuredStateValue("EK2"));
+    }
+
+    private sealed class EarlyRejectingSampler : LoggingSampler
+    {
+        public int LogEntryDecisionCount { get; private set; }
+
+        public string? CategoryName { get; private set; }
+
+        public LogLevel LogLevel { get; private set; }
+
+        public override bool ShouldSample(string categoryName, LogLevel logLevel)
+        {
+            CategoryName = categoryName;
+            LogLevel = logLevel;
+            return false;
+        }
+
+        public override bool ShouldSample<TState>(in LogEntry<TState> logEntry)
+        {
+            LogEntryDecisionCount++;
+            return true;
+        }
     }
 
     [Fact]
