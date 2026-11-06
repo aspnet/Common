@@ -135,10 +135,10 @@ public class OpenTelemetryRealtimeClientTests
         Assert.Equal(25, activity.GetTagItem("gen_ai.usage.output_tokens"));
         Assert.Equal(3, activity.GetTagItem("gen_ai.usage.cache_read.input_tokens"));
         Assert.Equal(6, activity.GetTagItem("gen_ai.usage.reasoning.output_tokens"));
-        Assert.Equal(10, activity.GetTagItem("gen_ai.usage.input_audio_tokens"));
-        Assert.Equal(5, activity.GetTagItem("gen_ai.usage.input_text_tokens"));
-        Assert.Equal(18, activity.GetTagItem("gen_ai.usage.output_audio_tokens"));
-        Assert.Equal(7, activity.GetTagItem("gen_ai.usage.output_text_tokens"));
+        Assert.Equal(10, activity.GetTagItem("gen_ai.usage.audio.input_tokens"));
+        Assert.Equal(5, activity.GetTagItem("gen_ai.usage.text.input_tokens"));
+        Assert.Equal(18, activity.GetTagItem("gen_ai.usage.audio.output_tokens"));
+        Assert.Equal(7, activity.GetTagItem("gen_ai.usage.text.output_tokens"));
 
         var timeToFirstChunk = Assert.IsType<double>(activity.GetTagItem("gen_ai.response.time_to_first_chunk"));
         Assert.True(timeToFirstChunk >= 0);

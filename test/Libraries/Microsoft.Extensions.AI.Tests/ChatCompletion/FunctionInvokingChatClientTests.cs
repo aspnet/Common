@@ -3824,5 +3824,50 @@ public class FunctionInvokingChatClientTests
         Assert.Contains(response.Messages, m =>
             m.Contents.Any(c => c is FunctionResultContent frc2 && frc2.CallId == "callId1"));
     }
-}
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteToolDuration_MetricRecorded(bool streaming)
+    {
+        string sourceName = Guid.NewGuid().ToString();
+
+        ChatOptions options = new()
+        {
+            Tools = [AIFunctionFactory.Create(() => "Result 1", "Func1")]
+        };
+
+        List<ChatMessage> plan =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+            new ChatMessage(ChatRole.Assistant, "world"),
+        ];
+
+        using var metricCollector = new Microsoft.Extensions.Diagnostics.Metrics.Testing.MetricCollector<double>(null, sourceName, "gen_ai.execute_tool.duration");
+
+        Func<ChatClientBuilder, ChatClientBuilder> configurePipeline = b =>
+        {
+            b.UseFunctionInvocation();
+            b.UseOpenTelemetry(sourceName: sourceName);
+            return b;
+        };
+
+        if (streaming)
+        {
+            await InvokeAndAssertStreamingAsync(options, plan, configurePipeline: configurePipeline);
+        }
+        else
+        {
+            await InvokeAndAssertAsync(options, plan, configurePipeline: configurePipeline);
+        }
+
+        var measurements = metricCollector.GetMeasurementSnapshot();
+        var measurement = Assert.Single(measurements);
+        Assert.True(measurement.Value >= 0);
+        Assert.True(measurement.ContainsTags(
+            new KeyValuePair<string, object?>("gen_ai.tool.name", "Func1"),
+            new KeyValuePair<string, object?>("gen_ai.tool.type", "function")));
+    }
+}

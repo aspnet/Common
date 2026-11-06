@@ -131,6 +131,7 @@ public class OpenTelemetryChatClientTests
             Temperature = 6.0f,
             Seed = 42,
             StopSequences = ["hello", "world"],
+            Reasoning = new ReasoningOptions { Effort = ReasoningEffort.High },
             AdditionalProperties = new()
             {
                 ["service_tier"] = "value1",
@@ -183,6 +184,7 @@ public class OpenTelemetryChatClientTests
         Assert.Equal(enableSensitiveData ? "value1" : null, activity.GetTagItem("service_tier"));
         Assert.Equal(enableSensitiveData ? "value2" : null, activity.GetTagItem("SomethingElse"));
         Assert.Equal(42L, activity.GetTagItem("gen_ai.request.seed"));
+        Assert.Equal("high", activity.GetTagItem("gen_ai.request.reasoning.level"));
 
         Assert.Equal("id123", activity.GetTagItem("gen_ai.response.id"));
         Assert.Equal("""["stop"]""", activity.GetTagItem("gen_ai.response.finish_reasons"));
@@ -280,8 +282,7 @@ public class OpenTelemetryChatClientTests
                         "type": "text",
                         "content": "The blue whale, I think."
                       }
-                    ],
-                    "finish_reason": "stop"
+                    ]
                   }
                 ]
                 """), ReplaceWhitespace(tags["gen_ai.output.messages"]));
@@ -445,6 +446,7 @@ public class OpenTelemetryChatClientTests
                 new TextReasoningContent("User reasoning"),
                 new DataContent(Convert.FromBase64String("ZGF0YSBjb250ZW50"), "audio/mp3"),
                 new UriContent(new Uri("https://example.com/video.mp4"), "video/mp4"),
+                new DataContent(Convert.FromBase64String("cGRmY29udGVudA=="), "application/pdf"),
                 new HostedFileContent("file-xyz789"),
             ]),
             new(ChatRole.Assistant, [new FunctionCallContent("call-456", "SearchFiles")]),
@@ -491,6 +493,12 @@ public class OpenTelemetryChatClientTests
                     "uri": "https://example.com/video.mp4",
                     "mime_type": "video/mp4",
                     "modality": "video"
+                  },
+                  {
+                    "type": "blob",
+                    "content": "cGRmY29udGVudA==",
+                    "mime_type": "application/pdf",
+                    "modality": "document"
                   },
                   {
                     "type": "file",

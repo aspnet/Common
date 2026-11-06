@@ -24,7 +24,7 @@ namespace Microsoft.Extensions.AI;
 /// <summary>Represents a delegating realtime session that follows the OpenTelemetry Semantic Conventions for Generative AI systems where applicable.</summary>
 /// <remarks>
 /// <para>
-/// This class follows the patterns of the Semantic Conventions for Generative AI systems v1.41 where applicable, as defined at
+/// This class follows the patterns of the GenAI Semantic Conventions v1.41 where applicable, as defined at
 /// <see href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />, with custom extensions for realtime-specific behavior.
 /// The specification does not currently define a realtime operation; a custom operation name is used.
 /// </para>
@@ -168,6 +168,7 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
 
         return
             serviceType == typeof(ActivitySource) ? _activitySource :
+            serviceType == typeof(Meter) ? _meter :
             serviceKey is null && serviceType.IsInstanceOfType(this) ? this :
             _innerSession.GetService(serviceType, serviceKey);
     }
@@ -859,22 +860,22 @@ internal sealed partial class OpenTelemetryRealtimeClientSession : IRealtimeClie
 
                 if (responseUsage.InputAudioTokenCount is long inputAudioTokens)
                 {
-                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.InputAudioTokens, (int)inputAudioTokens);
+                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.AudioInputTokens, (int)inputAudioTokens);
                 }
 
                 if (responseUsage.InputTextTokenCount is long inputTextTokens)
                 {
-                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.InputTextTokens, (int)inputTextTokens);
+                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.TextInputTokens, (int)inputTextTokens);
                 }
 
                 if (responseUsage.OutputAudioTokenCount is long outputAudioTokens)
                 {
-                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.OutputAudioTokens, (int)outputAudioTokens);
+                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.AudioOutputTokens, (int)outputAudioTokens);
                 }
 
                 if (responseUsage.OutputTextTokenCount is long outputTextTokens)
                 {
-                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.OutputTextTokens, (int)outputTextTokens);
+                    _ = activity.AddTag(OpenTelemetryConsts.GenAI.Usage.TextOutputTokens, (int)outputTextTokens);
                 }
             }
 

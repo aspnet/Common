@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -67,6 +68,10 @@ internal sealed class FunctionInvokingRealtimeClientSession : IRealtimeClientSes
     /// <remarks>This component does not own the instance and should not dispose it.</remarks>
     private readonly ActivitySource? _activitySource;
 
+    /// <summary>The <see cref="Meter"/> to use for metrics.</summary>
+    /// <remarks>This component does not own the instance and should not dispose it.</remarks>
+    private readonly Meter? _meter;
+
     /// <summary>The inner session to delegate to.</summary>
     private readonly IRealtimeClientSession _innerSession;
 
@@ -86,6 +91,7 @@ internal sealed class FunctionInvokingRealtimeClientSession : IRealtimeClientSes
         _client = Throw.IfNull(client);
         _logger = (ILogger?)loggerFactory?.CreateLogger<FunctionInvokingRealtimeClientSession>() ?? NullLogger.Instance;
         _activitySource = innerSession.GetService<ActivitySource>();
+        _meter = innerSession.GetService<Meter>();
         FunctionInvocationServices = functionInvocationServices;
     }
 
@@ -93,7 +99,8 @@ internal sealed class FunctionInvokingRealtimeClientSession : IRealtimeClientSes
     private FunctionInvocationProcessor Processor => field ??= new FunctionInvocationProcessor(
         _logger,
         _activitySource,
-        InvokeFunctionAsync);
+        InvokeFunctionAsync,
+        executeToolDurationHistogram: _meter is not null ? OtelMetricHelpers.CreateGenAIExecuteToolDurationHistogram(_meter) : null);
 
     /// <summary>
     /// Gets or sets the <see cref="FunctionInvocationContext"/> for the current function invocation.

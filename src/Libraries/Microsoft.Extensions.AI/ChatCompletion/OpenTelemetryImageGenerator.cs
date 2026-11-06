@@ -20,7 +20,7 @@ namespace Microsoft.Extensions.AI;
 
 /// <summary>Represents a delegating image generator that implements the OpenTelemetry Semantic Conventions for Generative AI systems.</summary>
 /// <remarks>
-/// This class provides an implementation of the Semantic Conventions for Generative AI systems v1.41, defined at <see href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />.
+/// This class provides an implementation of the GenAI Semantic Conventions v1.41, defined at <see href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />.
 /// The specification is still experimental and subject to change; as such, the telemetry output by this client is also subject to change.
 /// </remarks>
 [Experimental(DiagnosticIds.Experiments.AIImageGeneration, UrlFormat = DiagnosticIds.UrlFormat)]

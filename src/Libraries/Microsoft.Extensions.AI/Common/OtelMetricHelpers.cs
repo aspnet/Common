@@ -23,4 +23,12 @@ internal static class OtelMetricHelpers
             OpenTelemetryConsts.SecondsUnit,
             OpenTelemetryConsts.GenAI.Client.OperationDuration.Description,
             advice: new() { HistogramBucketBoundaries = OpenTelemetryConsts.GenAI.Client.OperationDuration.ExplicitBucketBoundaries });
+
+    /// <summary>Creates the standard <c>gen_ai.execute_tool.duration</c> histogram on <paramref name="meter"/>.</summary>
+    public static Histogram<double> CreateGenAIExecuteToolDurationHistogram(Meter meter) =>
+        meter.CreateHistogram<double>(
+            OpenTelemetryConsts.GenAI.ExecuteTool.Duration.Name,
+            OpenTelemetryConsts.SecondsUnit,
+            OpenTelemetryConsts.GenAI.ExecuteTool.Duration.Description,
+            advice: new() { HistogramBucketBoundaries = OpenTelemetryConsts.GenAI.ExecuteTool.Duration.ExplicitBucketBoundaries });
 }

@@ -22,7 +22,7 @@ namespace Microsoft.Extensions.AI;
 
 /// <summary>Represents a delegating chat client that implements the OpenTelemetry Semantic Conventions for Generative AI systems.</summary>
 /// <remarks>
-/// This class provides an implementation of the Semantic Conventions for Generative AI systems v1.41, defined at <see href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />.
+/// This class provides an implementation of the GenAI Semantic Conventions v1.41, defined at <see href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />.
 /// The specification is still experimental and subject to change; as such, the telemetry output by this client is also subject to change.
 /// </remarks>
 public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
@@ -129,6 +129,7 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
     /// <inheritdoc/>
     public override object? GetService(Type serviceType, object? serviceKey = null) =>
         serviceType == typeof(ActivitySource) ? _activitySource :
+        serviceType == typeof(Meter) ? _meter :
         base.GetService(serviceType, serviceKey);
 
     /// <inheritdoc/>
@@ -353,6 +354,24 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
                         _ = activity.AddTag(OpenTelemetryConsts.GenAI.Request.TopP, top_p);
                     }
 
+                    if (options.Reasoning?.Effort is ReasoningEffort reasoningEffort)
+                    {
+                        string? reasoningLevel = reasoningEffort switch
+                        {
+                            ReasoningEffort.None => "none",
+                            ReasoningEffort.Low => "low",
+                            ReasoningEffort.Medium => "medium",
+                            ReasoningEffort.High => "high",
+                            ReasoningEffort.ExtraHigh => "extrahigh",
+                            _ => null,
+                        };
+
+                        if (reasoningLevel is not null)
+                        {
+                            _ = activity.AddTag(OpenTelemetryConsts.GenAI.Request.ReasoningLevel, reasoningLevel);
+                        }
+                    }
+
                     if (options.ResponseFormat is not null)
                     {
                         switch (options.ResponseFormat)
@@ -542,7 +561,7 @@ public sealed partial class OpenTelemetryChatClient : DelegatingChatClient
         {
             _ = activity.AddTag(
                 OpenTelemetryConsts.GenAI.Output.Messages,
-                OtelMessageSerializer.SerializeChatMessages(response.Messages, response.FinishReason, customContentSerializerOptions: _jsonSerializerOptions));
+                OtelMessageSerializer.SerializeChatMessages(response.Messages, customContentSerializerOptions: _jsonSerializerOptions));
         }
     }
 
@@ -561,7 +580,6 @@ internal sealed class OtelMessage
     public string? Role { get; set; }
     public string? Name { get; set; }
     public List<object> Parts { get; set; } = [];
-    public string? FinishReason { get; set; }
 }
 
 internal sealed class OtelToolCallRequestPart
