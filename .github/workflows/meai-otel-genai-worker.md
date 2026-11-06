@@ -181,8 +181,15 @@ post-steps:
           rc=1
         fi
       done <<< "$idx"
-      [ "$rc" -eq 0 ] && echo "Agent output identity validated."
-      exit $rc
+      if [ "$rc" -ne 0 ]; then
+        # The generated safe-output job intentionally runs after failed agents to report
+        # valid partial outputs. Quarantine this invalid mutation so it cannot be published.
+        cp "$out" /tmp/gh-aw/agent/rejected_agent_output.json
+        printf '%s\n' '{"items":[]}' > "$out"
+        echo "::error::Rejected invalid agent output; downstream safe outputs will receive no items."
+        exit "$rc"
+      fi
+      echo "Agent output identity validated."
 
 # ###############################################################
 # Select a PAT from the pool and override COPILOT_GITHUB_TOKEN.
@@ -681,6 +688,24 @@ value from `/tmp/gh-aw/agent/target.json` (this run's start time, captured befor
 began) whenever a maintained draft PR exists -- see Step 4's "Honoring reviewer feedback";
 on a **fresh** PR there is no prior feedback, so initialize it to the same `run_started_at`.
 Carry the value forward unchanged only when there is no PR to maintain.
+
+### Mandatory safe-output body preflight
+
+Before emitting **any** `create-pull-request` or `update-pull-request` safe output, first
+assemble its complete replacement `body` value, including the tracking block above. Do not
+submit a summary, an abbreviated body, or a reference to a local file: the exact final body
+string in the safe-output item must contain all of the following:
+
+- one complete `# meai-otel-genai-worker:state:begin` ...
+  `# meai-otel-genai-worker:state:end` block;
+- a non-empty `upstream-scan-ref` set to `target.json.upstream_sha`; and
+- a non-empty `feedback-processed-through` set to `target.json.run_started_at`.
+
+Validate that final string before submitting the safe output (inspect the exact value you
+will put in `body`, not an earlier draft). If any invariant is missing, rebuild the complete
+body and validate it again; do **not** emit the `create-pull-request` or
+`update-pull-request` item. This workflow never uses append or prepend body updates:
+every `update-pull-request` body is a full replacement and must pass this preflight.
 
 ## Step 6 -- When the upstream release is published
 
