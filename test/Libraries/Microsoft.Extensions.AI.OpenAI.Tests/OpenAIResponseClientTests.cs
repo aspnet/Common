@@ -350,6 +350,246 @@ public class OpenAIResponseClientTests
     }
 
     [Fact]
+    public async Task ReasoningContent_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model":"openai/gpt-oss-20b",
+                "input":[{
+                    "type":"message",
+                    "role":"user",
+                    "content":[{"type":"input_text","text":"Calculate the sum of the first 5 positive integers."}]
+                }]
+            }
+            """;
+
+        // Some Responses API implementations (e.g. OpenRouter) return raw reasoning in the reasoning item's
+        // "content" instead of "summary". It should surface as TextReasoningContent the same way.
+        const string Output = """
+            {
+              "id": "resp_67d327649b288191aeb46a824e49dc40058a5e08c46a181d",
+              "object": "response",
+              "created_at": 1741891428,
+              "status": "completed",
+              "error": null,
+              "incomplete_details": null,
+              "instructions": null,
+              "model": "openai/gpt-oss-20b",
+              "output": [
+                {
+                  "type": "reasoning",
+                  "id": "rs_67d327649b288191aeb46a824e49dc40058a5e08c46a181e",
+                  "summary": [],
+                  "content": [
+                    {
+                      "type": "reasoning_text",
+                      "text": "We need answer user asks calculate sum first 5 positive integers. "
+                    },
+                    {
+                      "type": "reasoning_text",
+                      "text": "Compute 1+2+3+4+5=15. Need final concise."
+                    },
+                    {
+                      "type": "output_text",
+                      "text": "This is not reasoning and must not be surfaced."
+                    }
+                  ]
+                },
+                {
+                  "type": "message",
+                  "id": "msg_67d32764fcdc8191bcf2e444d4088804058a5e08c46a181d",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "type": "output_text",
+                      "text": "The sum of the first 5 positive integers is 15.",
+                      "annotations": []
+                    }
+                  ]
+                }
+              ],
+              "parallel_tool_calls": true,
+              "previous_response_id": null,
+              "reasoning": {
+                "effort": null,
+                "generate_summary": null
+              },
+              "store": true,
+              "temperature": 1.0,
+              "text": {
+                "format": {
+                  "type": "text"
+                }
+              },
+              "tool_choice": "auto",
+              "tools": [],
+              "top_p": 1.0,
+              "usage": {
+                "input_tokens": 26,
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens": 10,
+                "output_tokens_details": {
+                  "reasoning_tokens": 0
+                },
+                "total_tokens": 36
+              },
+              "user": null,
+              "metadata": {}
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "openai/gpt-oss-20b");
+
+        ChatResponse response = await client.GetResponseAsync("Calculate the sum of the first 5 positive integers.");
+
+        Assert.NotNull(response);
+        Assert.Equal("resp_67d327649b288191aeb46a824e49dc40058a5e08c46a181d", response.ResponseId);
+        Assert.Equal("The sum of the first 5 positive integers is 15.", response.Text);
+
+        ChatMessage message = response.Messages.Single();
+        Assert.Equal(ChatRole.Assistant, message.Role);
+        Assert.Equal(2, message.Contents.Count);
+
+        TextReasoningContent reasoning = Assert.IsType<TextReasoningContent>(message.Contents[0]);
+        Assert.Equal(
+            "We need answer user asks calculate sum first 5 positive integers. Compute 1+2+3+4+5=15. Need final concise.",
+            reasoning.Text);
+
+        TextContent text = Assert.IsType<TextContent>(message.Contents[1]);
+        Assert.Equal("The sum of the first 5 positive integers is 15.", text.Text);
+    }
+
+    [Fact]
+    public async Task ReasoningContent_SkipsMalformedParts_NonStreaming()
+    {
+        const string Input = """
+            {
+                "model":"openai/gpt-oss-20b",
+                "input":[{
+                    "type":"message",
+                    "role":"user",
+                    "content":[{"type":"input_text","text":"Say hello."}]
+                }]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "resp_77d327649b288191aeb46a824e49dc40058a5e08c46a181f",
+              "object": "response",
+              "created_at": 1741891428,
+              "status": "completed",
+              "error": null,
+              "incomplete_details": null,
+              "instructions": null,
+              "model": "openai/gpt-oss-20b",
+              "output": [
+                {
+                  "type": "reasoning",
+                  "id": "rs_01",
+                  "summary": []
+                },
+                {
+                  "type": "reasoning",
+                  "id": "rs_02",
+                  "summary": [],
+                  "content": { "unexpected": "shape" }
+                },
+                {
+                  "type": "reasoning",
+                  "id": "rs_03",
+                  "summary": [],
+                  "content": [
+                    "a bare string",
+                    { "text": "no type" },
+                    { "type": "reasoning_text" },
+                    { "type": "reasoning_text", "text": 123 },
+                    { "type": "output_text", "text": "not reasoning" }
+                  ]
+                },
+                {
+                  "type": "reasoning",
+                  "id": "rs_04",
+                  "summary": [],
+                  "content": [
+                    { "type": "reasoning_text", "text": 123 },
+                    { "type": "reasoning_text", "text": "kept" }
+                  ]
+                },
+                {
+                  "type": "message",
+                  "id": "msg_77d32764fcdc8191bcf2e444d4088804058a5e08c46a181d",
+                  "status": "completed",
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "type": "output_text",
+                      "text": "Hello!",
+                      "annotations": []
+                    }
+                  ]
+                }
+              ],
+              "parallel_tool_calls": true,
+              "previous_response_id": null,
+              "reasoning": {
+                "effort": null,
+                "generate_summary": null
+              },
+              "store": true,
+              "temperature": 1.0,
+              "text": {
+                "format": {
+                  "type": "text"
+                }
+              },
+              "tool_choice": "auto",
+              "tools": [],
+              "top_p": 1.0,
+              "usage": {
+                "input_tokens": 5,
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens": 2,
+                "output_tokens_details": {
+                  "reasoning_tokens": 0
+                },
+                "total_tokens": 7
+              },
+              "user": null,
+              "metadata": {}
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "openai/gpt-oss-20b");
+
+        ChatResponse response = await client.GetResponseAsync("Say hello.");
+
+        ChatMessage message = response.Messages.Single();
+        Assert.Equal(5, message.Contents.Count);
+
+        // Items with no "content", a non-array "content", or only malformed parts produce no reasoning text.
+        for (int i = 0; i < 3; i++)
+        {
+            Assert.Empty(Assert.IsType<TextReasoningContent>(message.Contents[i]).Text);
+        }
+
+        TextReasoningContent reasoning = Assert.IsType<TextReasoningContent>(message.Contents[3]);
+        Assert.Equal("kept", reasoning.Text);
+
+        TextContent text = Assert.IsType<TextContent>(message.Contents[4]);
+        Assert.Equal("Hello!", text.Text);
+    }
+
+    [Fact]
     public async Task ReasoningTextDelta_Streaming()
     {
         const string Input = """

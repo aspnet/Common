@@ -204,7 +204,16 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                     break;
 
                 case ReasoningResponseItem reasoningItem:
-                    message.Contents.Add(CreateReasoningContent(reasoningItem.GetSummaryText(), reasoningItem.EncryptedContent, reasoningItem.Id, outputItem));
+                    string? reasoningText = reasoningItem.GetSummaryText();
+                    if (string.IsNullOrEmpty(reasoningText))
+                    {
+                        // Some Responses API implementations (e.g. OpenRouter) return raw reasoning in the item's
+                        // "content" rather than in "summary". The OpenAI client doesn't surface that field, but
+                        // it's preserved in the item's patch, so read it from there.
+                        reasoningText = GetReasoningContentText(reasoningItem) ?? reasoningText;
+                    }
+
+                    message.Contents.Add(CreateReasoningContent(reasoningText, reasoningItem.EncryptedContent, reasoningItem.Id, outputItem));
                     break;
 
                 case FunctionCallResponseItem functionCall:
@@ -951,6 +960,37 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
 
         return content;
     }
+
+#pragma warning disable SCME0001 // JsonPatch is experimental
+    /// <summary>Gets the reasoning text from a <see cref="ReasoningResponseItem"/>'s "content" parts, which the
+    /// OpenAI client doesn't expose as a property but preserves in the item's <see cref="ResponseItem.Patch"/>.</summary>
+    private static string? GetReasoningContentText(ReasoningResponseItem reasoningItem)
+    {
+        if (reasoningItem.Patch.TryGetJson("$.content"u8, out ReadOnlyMemory<byte> contentJson))
+        {
+            using JsonDocument document = JsonDocument.Parse(contentJson);
+            if (document.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                StringBuilder? builder = null;
+                foreach (JsonElement part in document.RootElement.EnumerateArray())
+                {
+                    if (part.ValueKind == JsonValueKind.Object &&
+                        part.TryGetProperty("type"u8, out JsonElement typeElement) &&
+                        typeElement.ValueEquals("reasoning_text"u8) &&
+                        part.TryGetProperty("text"u8, out JsonElement textElement) &&
+                        textElement.ValueKind == JsonValueKind.String)
+                    {
+                        _ = (builder ??= new()).Append(textElement.GetString());
+                    }
+                }
+
+                return builder?.ToString();
+            }
+        }
+
+        return null;
+    }
+#pragma warning restore SCME0001
 
     /// <summary>Creates a <see cref="ChatFinishReason"/> from a <see cref="ResponseIncompleteStatusReason"/>.</summary>
     private static ChatFinishReason? AsFinishReason(ResponseIncompleteStatusReason? statusReason) =>
