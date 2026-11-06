@@ -8,11 +8,11 @@
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["aichatweb.styles.css"]" />
     <ImportMap />
-    <HeadOutlet @rendermode="@renderMode" />
+    <HeadOutlet @rendermode="@PageRenderMode" />
 </head>
 
 <body>
-    <Routes @rendermode="@renderMode" />
+    <Routes @rendermode="@PageRenderMode" />
     <script src="@Assets["app.js"]" type="module"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
@@ -21,4 +21,9 @@
 
 @code {
     private readonly IComponentRenderMode renderMode = new InteractiveServerRenderMode(prerender: false);
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private IComponentRenderMode? PageRenderMode => HttpContext.AcceptsInteractiveRouting() ? renderMode : null;
 }
