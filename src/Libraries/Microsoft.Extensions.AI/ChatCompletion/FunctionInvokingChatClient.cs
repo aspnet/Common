@@ -1368,16 +1368,26 @@ public class FunctionInvokingChatClient : DelegatingChatClient
 
         // Extract any approval responses where we need to execute or reject the function calls.
         // The original messages are also modified to remove all approval requests and responses.
-        var notInvokedResponses = ExtractAndRemoveApprovalRequestsAndResponses(originalMessages);
+        // When the caller supplies the history (no conversation ID), the reconstructed function calls are restored in place of their
+        // approval requests so they keep their position within the assistant message they were originally returned in.
+        var notInvokedResponses = ExtractAndRemoveApprovalRequestsAndResponses(originalMessages, restoreCallsInPlace: !hasConversationId);
 
         // Insert just before the last approval message's surviving content (see above). When there are no trailing
         // or residual messages this reduces to appending at the end of the list.
         int insertIndex = originalMessages.Count - trailingMessageCount;
 
         // Wrap the function call content in message(s).
-        ICollection<ChatMessage>? allPreDownstreamCallMessages = ConvertToFunctionCallContentMessages(
-            [.. notInvokedResponses.rejections ?? Enumerable.Empty<ApprovalResultWithRequestMessage>(), .. notInvokedResponses.approvals ?? Enumerable.Empty<ApprovalResultWithRequestMessage>()],
-            functionCallContentFallbackMessageId);
+        List<ApprovalResultWithRequestMessage> allResponses =
+            [.. notInvokedResponses.rejections ?? Enumerable.Empty<ApprovalResultWithRequestMessage>(), .. notInvokedResponses.approvals ?? Enumerable.Empty<ApprovalResultWithRequestMessage>()];
+        ICollection<ChatMessage>? allPreDownstreamCallMessages = ConvertToFunctionCallContentMessages(allResponses, functionCallContentFallbackMessageId);
+
+        // Function calls that were restored in place already live in the message they were originally returned in,
+        // so only the remaining ones need new messages in the list that is passed to the inner client.
+        ICollection<ChatMessage>? messagesToInsert = allPreDownstreamCallMessages;
+        if (allResponses.Exists(static r => r.RestoredInPlace))
+        {
+            messagesToInsert = ConvertToFunctionCallContentMessages(allResponses.FindAll(static r => !r.RestoredInPlace), functionCallContentFallbackMessageId);
+        }
 
         // Generate failed function result contents for any rejected requests and wrap it in a message.
         List<AIContent>? rejectedFunctionCallResults = GenerateRejectedFunctionResults(notInvokedResponses.rejections);
@@ -1392,10 +1402,10 @@ public class FunctionInvokingChatClient : DelegatingChatClient
         if (allPreDownstreamCallMessages is not null)
         {
             preDownstreamCallHistory = [.. allPreDownstreamCallMessages];
-            if (!hasConversationId)
+            if (!hasConversationId && messagesToInsert is not null)
             {
-                originalMessages.InsertRange(insertIndex, preDownstreamCallHistory);
-                insertIndex += preDownstreamCallHistory.Count;
+                originalMessages.InsertRange(insertIndex, messagesToInsert);
+                insertIndex += messagesToInsert.Count;
             }
         }
 
@@ -1423,12 +1433,14 @@ public class FunctionInvokingChatClient : DelegatingChatClient
     /// the FunctionCallContent to users it's part of a message/update that contains the same metadata as originally returned to the downstream service.
     /// </remarks>
     private (List<ApprovalResultWithRequestMessage>? approvals, List<ApprovalResultWithRequestMessage>? rejections) ExtractAndRemoveApprovalRequestsAndResponses(
-        List<ChatMessage> messages)
+        List<ChatMessage> messages, bool restoreCallsInPlace)
     {
         Dictionary<string, (ChatMessage Message, ToolApprovalRequestContent RequestContent)>? allApprovalRequestsMessages = null;
         List<ToolApprovalResponseContent>? allApprovalResponses = null;
         HashSet<string>? approvalRequestCallIds = null;
         HashSet<string>? functionResultCallIds = null;
+        Dictionary<string, (List<AIContent> Contents, int Index)>? requestPlaceholders = null;
+        List<List<AIContent>>? messagesWithPlaceholders = null;
 
         // 1st iteration, over all messages and content:
         // - Build a list of all function call ids that are already executed.
@@ -1442,6 +1454,7 @@ public class FunctionInvokingChatClient : DelegatingChatClient
             var message = messages[i];
 
             List<AIContent>? keptContents = null;
+            List<(string RequestId, int Index)>? messagePlaceholders = null;
 
             // Examine all content to populate our various collections.
             for (int j = 0; j < message.Contents.Count; j++)
@@ -1453,6 +1466,15 @@ public class FunctionInvokingChatClient : DelegatingChatClient
                         // Validation: Capture each call id for each approval request to ensure later we have a matching response.
                         _ = (approvalRequestCallIds ??= []).Add(tarc.ToolCall.CallId);
                         (allApprovalRequestsMessages ??= []).Add(tarc.RequestId, (message, tarc));
+
+                        if (restoreCallsInPlace)
+                        {
+                            // Keep a placeholder at the position of the request, so that the function call can be restored
+                            // there if the message survives, instead of being moved into a message of its own.
+                            (messagePlaceholders ??= []).Add((tarc.RequestId, (keptContents ??= []).Count));
+                            keptContents.Add(content);
+                        }
+
                         break;
 
                     case ToolApprovalResponseContent tarc when tarc.ToolCall is FunctionCallContent { InformationalOnly: false }:
@@ -1474,14 +1496,25 @@ public class FunctionInvokingChatClient : DelegatingChatClient
             }
 
             // If any contents were filtered out, we need to either remove the message entirely (if no contents remain) or create a new message with the filtered contents.
-            if (keptContents?.Count != message.Contents.Count)
+            int placeholderCount = messagePlaceholders?.Count ?? 0;
+            if (keptContents?.Count != message.Contents.Count || placeholderCount > 0)
             {
-                if (keptContents is { Count: > 0 })
+                if (keptContents is not null && keptContents.Count > placeholderCount)
                 {
                     // Create a new replacement message to store the filtered contents.
                     var newMessage = message.Clone();
                     newMessage.Contents = keptContents;
                     messages[i] = newMessage;
+
+                    if (messagePlaceholders is not null)
+                    {
+                        foreach (var (requestId, index) in messagePlaceholders)
+                        {
+                            (requestPlaceholders ??= [])[requestId] = (keptContents, index);
+                        }
+
+                        (messagesWithPlaceholders ??= []).Add(keptContents);
+                    }
                 }
                 else
                 {
@@ -1534,7 +1567,25 @@ public class FunctionInvokingChatClient : DelegatingChatClient
                     requestContent = requestInfo.RequestContent;
                 }
 
-                (targetList ??= []).Add(new() { Response = approvalResponse, Request = requestContent, RequestMessage = requestMessage });
+                // If the message that held the approval request survived extraction, put the function call back where the request was.
+                bool restoredInPlace = false;
+                if (requestPlaceholders is not null && requestPlaceholders.TryGetValue(approvalResponse.RequestId, out var placeholder))
+                {
+                    placeholder.Contents[placeholder.Index] = fcc;
+                    _ = requestPlaceholders.Remove(approvalResponse.RequestId);
+                    restoredInPlace = true;
+                }
+
+                (targetList ??= []).Add(new() { Response = approvalResponse, Request = requestContent, RequestMessage = requestMessage, RestoredInPlace = restoredInPlace });
+            }
+        }
+
+        // Remove the placeholders of any approval requests whose function call was not restored in place.
+        if (requestPlaceholders is { Count: > 0 })
+        {
+            foreach (var contents in messagesWithPlaceholders!)
+            {
+                _ = contents.RemoveAll(c => c is ToolApprovalRequestContent tarc && requestPlaceholders.ContainsKey(tarc.RequestId));
             }
         }
 
@@ -1916,6 +1967,7 @@ public class FunctionInvokingChatClient : DelegatingChatClient
         public ToolApprovalResponseContent Response { get; init; }
         public ToolApprovalRequestContent? Request { get; init; }
         public ChatMessage? RequestMessage { get; init; }
+        public bool RestoredInPlace { get; init; }
         public FunctionCallContent ResponseFunctionCallContent => (FunctionCallContent)Response.ToolCall;
         public FunctionCallContent? RequestFunctionCallContent => Request?.ToolCall as FunctionCallContent;
     }

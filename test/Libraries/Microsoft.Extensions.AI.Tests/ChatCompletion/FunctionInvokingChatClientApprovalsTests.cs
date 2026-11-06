@@ -1775,6 +1775,207 @@ public class FunctionInvokingChatClientApprovalsTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task ApprovedFunctionCallStaysInItsMessageAfterTextAsync(bool streaming)
+    {
+        // The model returned text and a call in one assistant message. The call must be sent back in that same message,
+        // not in a second assistant message with the same MessageId.
+        var options = new ChatOptions
+        {
+            Tools = [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 1", "Func1"))],
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new TextContent("I will call it."),
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+            ]) { MessageId = "m1" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", true, new FunctionCallContent("callId1", "Func1")),
+            ]),
+        ];
+
+        List<ChatMessage> expectedDownstreamClientInput =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, [new TextContent("I will call it."), new FunctionCallContent("callId1", "Func1")]) { MessageId = "m1" },
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+        ];
+
+        var actual = await InvokeAndCaptureDownstreamInputAsync(options, input, streaming);
+        AssertExtensions.EqualMessageLists(expectedDownstreamClientInput, actual);
+        Assert.Equal("m1", actual[1].MessageId);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ApprovedFunctionCallKeepsPositionBeforeThoughtSignatureAsync(bool streaming)
+    {
+        // Gemini 3 returns the thought signature of a call as a TextReasoningContent right after the FunctionCallContent.
+        // The call must not be moved behind it, and must not be split from it.
+        var options = new ChatOptions
+        {
+            Tools = [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 1", "Func1"))],
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+                new TextReasoningContent(null) { ProtectedData = "c2ln" },
+            ]) { MessageId = "m1" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", true, new FunctionCallContent("callId1", "Func1")),
+            ]),
+        ];
+
+        List<ChatMessage> expectedDownstreamClientInput =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1"), new TextReasoningContent(null) { ProtectedData = "c2ln" }]) { MessageId = "m1" },
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Result 1")]),
+        ];
+
+        var actual = await InvokeAndCaptureDownstreamInputAsync(options, input, streaming);
+        AssertExtensions.EqualMessageLists(expectedDownstreamClientInput, actual);
+        Assert.Equal("m1", actual[1].MessageId);
+        Assert.Equal("c2ln", Assert.IsType<TextReasoningContent>(actual[1].Contents[1]).ProtectedData);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ApprovedParallelFunctionCallsStayInItsMessageBetweenOtherContentAsync(bool streaming)
+    {
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 1", "Func1")),
+                new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 2", "Func2")),
+            ],
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new TextContent("Calling both."),
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+                new TextReasoningContent("thinking"),
+                new ToolApprovalRequestContent("ficc_callId2", new FunctionCallContent("callId2", "Func2")),
+            ]) { MessageId = "m1" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", true, new FunctionCallContent("callId1", "Func1")),
+                new ToolApprovalResponseContent("ficc_callId2", true, new FunctionCallContent("callId2", "Func2")),
+            ]),
+        ];
+
+        List<ChatMessage> expectedDownstreamClientInput =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new TextContent("Calling both."),
+                new FunctionCallContent("callId1", "Func1"),
+                new TextReasoningContent("thinking"),
+                new FunctionCallContent("callId2", "Func2"),
+            ]) { MessageId = "m1" },
+            new ChatMessage(ChatRole.Tool,
+            [
+                new FunctionResultContent("callId1", result: "Result 1"),
+                new FunctionResultContent("callId2", result: "Result 2"),
+            ]),
+        ];
+
+        var actual = await InvokeAndCaptureDownstreamInputAsync(options, input, streaming);
+        AssertExtensions.EqualMessageLists(expectedDownstreamClientInput, actual);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RejectedFunctionCallStaysInItsMessageAfterTextAsync(bool streaming)
+    {
+        var options = new ChatOptions
+        {
+            Tools = [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(() => "Result 1", "Func1"))],
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new TextContent("I will call it."),
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+            ]) { MessageId = "m1" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", false, new FunctionCallContent("callId1", "Func1")),
+            ]),
+        ];
+
+        List<ChatMessage> expectedDownstreamClientInput =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, [new TextContent("I will call it."), new FunctionCallContent("callId1", "Func1")]) { MessageId = "m1" },
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Tool call invocation rejected.")]),
+        ];
+
+        var actual = await InvokeAndCaptureDownstreamInputAsync(options, input, streaming);
+        AssertExtensions.EqualMessageLists(expectedDownstreamClientInput, actual);
+        Assert.Equal("m1", actual[1].MessageId);
+    }
+
+    private static async Task<List<ChatMessage>> InvokeAndCaptureDownstreamInputAsync(ChatOptions options, List<ChatMessage> input, bool streaming)
+    {
+        List<ChatMessage>? captured = null;
+
+        using var innerClient = new TestChatClient
+        {
+            GetResponseAsyncCallback = (contents, _, _) =>
+            {
+                captured = contents.ToList();
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "done")));
+            },
+            GetStreamingResponseAsyncCallback = (contents, _, _) =>
+            {
+                captured = contents.ToList();
+                return YieldAsync(new ChatResponseUpdate(ChatRole.Assistant, "done"));
+            },
+        };
+
+        using IChatClient service = innerClient.AsBuilder().UseFunctionInvocation().Build();
+
+        if (streaming)
+        {
+            await foreach (var update in service.GetStreamingResponseAsync(CloneInput(input), options))
+            {
+                _ = update;
+            }
+        }
+        else
+        {
+            _ = await service.GetResponseAsync(CloneInput(input), options);
+        }
+
+        Assert.NotNull(captured);
+        return captured;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task FunctionCallReplacedWithApproval_MixedWithMcpApprovalAsync(bool useAdditionalTools)
     {
         AITool[] tools =
@@ -1851,12 +2052,9 @@ public class FunctionInvokingChatClientApprovalsTests
             new ChatMessage(ChatRole.User, "hello"),
             new ChatMessage(ChatRole.Assistant,
             [
+                new FunctionCallContent("callId1", "Func"),
                 new ToolApprovalRequestContent("callId2", new McpServerToolCallContent("callId2", "McpCall", "myServer"))
-            ]),
-            new ChatMessage(ChatRole.Assistant,
-            [
-                new FunctionCallContent("callId1", "Func")
-            ]),
+            ]) { MessageId = "resp1" },
             new ChatMessage(ChatRole.Tool,
             [
                 new FunctionResultContent("callId1", result: "Result 1")
@@ -1934,12 +2132,9 @@ public class FunctionInvokingChatClientApprovalsTests
                 new ChatMessage(ChatRole.User, "hello"),
                 new ChatMessage(ChatRole.Assistant,
                 [
+                    new FunctionCallContent("callId1", "Func"),
                     new ToolApprovalRequestContent("callId2", new McpServerToolCallContent("callId2", "McpCall", "myServer"))
-                ]),
-                new ChatMessage(ChatRole.Assistant,
-                [
-                    new FunctionCallContent("callId1", "Func")
-                ]),
+                ]) { MessageId = "resp1" },
                 new ChatMessage(ChatRole.Tool,
                 [
                     approveFuncCall ?
