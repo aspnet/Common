@@ -325,9 +325,11 @@ internal partial class DefaultHybridCache
                         }
                         else
 #endif
+#pragma warning disable S1199 // False positive with conditional compilation: https://github.com/SonarSource/sonar-dotnet/issues/9858
                         {
                             newValue = await _factory!(_state!, SharedToken).ConfigureAwait(false);
                         }
+#pragma warning restore S1199
 
                         if (eventSourceEnabled)
                         {
@@ -390,11 +392,11 @@ internal partial class DefaultHybridCache
                     }
 
                     // Serialization is required in any of these cases:
-                    // - the CacheItem is mutable (the serialized bytes are the L1 and stampede storage, since each
-                    //   read deserializes a defensive copy, and they double as the L2 payload);
-                    // - the CacheItem is immutable but we are writing to L2 (serialization produces
-                    //   the payload);
-                    // - the CacheItem is immutable, we are writing to L1, and the entry size is not
+                    // - The CacheItem is mutable (the serialized bytes are the L1 and stampede storage, since each
+                    //   read deserializes a defensive copy, and they double as the L2 payload).
+                    // - The CacheItem is immutable but we are writing to L2 (serialization produces
+                    //   the payload).
+                    // - The CacheItem is immutable, we are writing to L1, and the entry size is not
                     //   known up-front (MemoryCache may enforce SizeLimit, and we report the
                     //   serialized byte length as the size). When the caller or factory has supplied
                     //   LocalSize via the entry options the size is already known, so this last
