@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -178,7 +178,7 @@ public class TimerTests
         Assert.False(t.Change(TimeSpan.FromMilliseconds(1), TimeSpan.FromMilliseconds(1)));
     }
 
-    [Fact(Skip = "Flaky, https://github.com/dotnet/extensions/issues/6567")]
+    [Fact]
     public void CreateTimer_WhenDisposed_RemovesWaiterFromQueue()
     {
         var timer1Counter = 0;
@@ -208,10 +208,12 @@ public class TimerTests
         Assert.Equal(1, waitersCountOnFinish);
         Assert.Equal(1, timer1Counter);
         Assert.Equal(2, timer2Counter);
+
+        GC.KeepAlive(timer2);
     }
 
 #if RELEASE // In Release only since this might not work if the timer reference being tracked by the debugger
-    [Fact(Skip = "Flaky on .NET Framework")]
+    [Fact]
     public void CreateTimer_WhenCollectedWithoutDispose_RemovesWaiterFromQueue()
     {
         var timer1Counter = 0;
@@ -242,6 +244,8 @@ public class TimerTests
         Assert.Equal(1, timer1Counter);
         Assert.Equal(2, timer2Counter);
         Assert.Equal(1, waitersCountAfter);
+
+        GC.KeepAlive(timer2);
     }
 #endif
 
