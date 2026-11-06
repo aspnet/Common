@@ -11,7 +11,7 @@ public class IngestedChunk
 
     [VectorStoreKey(StorageName = "key")]
     [JsonPropertyName("key")]
-    public required Guid Key { get; set; }
+    public required string Key { get; set; }
 
     [VectorStoreData(StorageName = "documentid")]
     [JsonPropertyName("documentid")]

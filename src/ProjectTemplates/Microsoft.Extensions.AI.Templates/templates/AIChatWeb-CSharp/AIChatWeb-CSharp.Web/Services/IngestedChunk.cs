@@ -19,7 +19,11 @@ public class IngestedChunk
 
     [VectorStoreKey(StorageName = "key")]
     [JsonPropertyName("key")]
+#if (IsAzureAISearch)
+    public required string Key { get; set; }
+#else
     public required Guid Key { get; set; }
+#endif
 
     [VectorStoreData(StorageName = "documentid")]
     [JsonPropertyName("documentid")]

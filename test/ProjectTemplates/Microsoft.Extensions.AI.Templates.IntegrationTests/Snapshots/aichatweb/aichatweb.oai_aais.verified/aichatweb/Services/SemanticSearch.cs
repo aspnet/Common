@@ -4,7 +4,7 @@ using Microsoft.Extensions.VectorData;
 namespace aichatweb.Services;
 
 public class SemanticSearch(
-    VectorStoreCollection<Guid, IngestedChunk> vectorCollection,
+    VectorStoreCollection<string, IngestedChunk> vectorCollection,
     [FromKeyedServices("ingestion_directory")] DirectoryInfo ingestionDirectory,
     DataIngestor dataIngestor)
 {
