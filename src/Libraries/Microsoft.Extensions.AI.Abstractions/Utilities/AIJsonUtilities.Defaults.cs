@@ -56,6 +56,12 @@ public static partial class AIJsonUtilities
             options.Converters.Add(new JsonStringEnumConverter());
         }
 
+        // Temporary workaround: these types are [Experimental] and can't be added as [JsonDerivedType] on AIContent yet,
+        // or else consuming assemblies that used source generation with AIContent would implicitly reference them.
+        // Once they're no longer [Experimental] and added as [JsonDerivedType] on AIContent, these lines should be removed.
+        AddAIContentTypeChain(options, typeof(ToolAdditionContent), typeDiscriminatorId: "toolAddition", checkBuiltIn: false);
+        AddAIContentTypeChain(options, typeof(ToolRemovalContent), typeDiscriminatorId: "toolRemoval", checkBuiltIn: false);
+
         options.MakeReadOnly();
         return options;
     }
@@ -108,6 +114,10 @@ public static partial class AIJsonUtilities
     [JsonSerializable(typeof(IEnumerable<string>))]
     [JsonSerializable(typeof(AIContent))]
     [JsonSerializable(typeof(IEnumerable<AIContent>))]
+
+    // Temporary workaround: [Experimental] AIContent types registered in CreateDefaultOptions.
+    [JsonSerializable(typeof(ToolAdditionContent))]
+    [JsonSerializable(typeof(ToolRemovalContent))]
 
     // IEmbeddingGenerator
     [JsonSerializable(typeof(EmbeddingGenerationOptions))]

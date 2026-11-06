@@ -4681,6 +4681,22 @@
       ]
     },
     {
+      "Type": "sealed class Microsoft.Extensions.AI.ToolAdditionContent : Microsoft.Extensions.AI.AIContent",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.AI.ToolAdditionContent.ToolAdditionContent(Microsoft.Extensions.AI.AIFunctionDeclaration tool);",
+          "Stage": "Experimental"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "Microsoft.Extensions.AI.AIFunctionDeclaration Microsoft.Extensions.AI.ToolAdditionContent.Tool { get; }",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
       "Type": "sealed class Microsoft.Extensions.AI.ToolApprovalRequestContent : Microsoft.Extensions.AI.InputRequestContent",
       "Stage": "Stable",
       "Methods": [
@@ -4741,6 +4757,22 @@
         {
           "Member": "string Microsoft.Extensions.AI.ToolCallContent.CallId { get; }",
           "Stage": "Stable"
+        }
+      ]
+    },
+    {
+      "Type": "sealed class Microsoft.Extensions.AI.ToolRemovalContent : Microsoft.Extensions.AI.AIContent",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.AI.ToolRemovalContent.ToolRemovalContent(string toolName);",
+          "Stage": "Experimental"
+        }
+      ],
+      "Properties": [
+        {
+          "Member": "string Microsoft.Extensions.AI.ToolRemovalContent.ToolName { get; }",
+          "Stage": "Experimental"
         }
       ]
     },

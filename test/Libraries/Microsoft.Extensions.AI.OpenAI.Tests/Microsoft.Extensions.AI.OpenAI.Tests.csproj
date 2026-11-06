@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <Compile Include="..\Microsoft.Extensions.AI.Abstractions.Tests\AssertExtensions.cs" />
+    <Compile Include="..\Microsoft.Extensions.AI.Tests\EnumeratedOnceEnumerable.cs" />
   </ItemGroup>
 
   <ItemGroup>

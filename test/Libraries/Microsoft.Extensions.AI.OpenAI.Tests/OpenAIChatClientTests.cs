@@ -372,6 +372,173 @@ public class OpenAIChatClientTests
         Assert.NotNull(response);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ToolChangeContents_AppliedToTools(bool enumerateOnce)
+    {
+        // Chat Completions has no form for tool changes at a position in the conversation, so the
+        // changes are applied to the tools and a message that held only tool changes is left out.
+        const string Input = """
+            {
+                "tools": [
+                    {
+                        "function": {
+                            "description": "Gets the weather.",
+                            "name": "GetWeather",
+                            "strict": true,
+                            "parameters": {
+                                "type": "object",
+                                "required": [],
+                                "properties": {},
+                                "additionalProperties": false
+                            }
+                        },
+                        "type": "function"
+                    },
+                    {
+                        "function": {
+                            "description": "Replies to the user.",
+                            "name": "ReplyToUser",
+                            "strict": true,
+                            "parameters": {
+                                "type": "object",
+                                "required": ["text"],
+                                "properties": { "text": { "type": "string" } },
+                                "additionalProperties": false
+                            }
+                        },
+                        "type": "function"
+                    }
+                ],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "hello"
+                    }
+                ],
+                "model": "gpt-4o-mini",
+                "tool_choice": "auto"
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "chatcmpl-ADx3PvAnCwJg0woha4pYsBTi3ZpOI",
+              "object": "chat.completion",
+              "created": 1727888631,
+              "model": "gpt-4o-mini-2024-07-18",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": {
+                    "role": "assistant",
+                    "content": "Hello! How can I assist you today?",
+                    "refusal": null
+                  },
+                  "logprobs": null,
+                  "finish_reason": "stop"
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateChatClient(httpClient, "gpt-4o-mini");
+
+        var replyToUser = AIFunctionFactory.Create((string text) => text, "ReplyToUser", "Replies to the user.");
+
+        List<ChatMessage> messages =
+        [
+            new(ChatRole.User, "hello"),
+            new(ChatRole.System, [new ToolAdditionContent(replyToUser.AsDeclarationOnly()), new ToolRemovalContent("GetForecast")]),
+        ];
+
+        var response = await client.GetResponseAsync(enumerateOnce ? new EnumeratedOnceEnumerable<ChatMessage>(messages) : messages, new()
+        {
+            Tools =
+            [
+                AIFunctionFactory.Create(() => 42, "GetWeather", "Gets the weather."),
+                AIFunctionFactory.Create(() => 42, "GetForecast", "Gets the forecast."),
+            ],
+            AdditionalProperties = new()
+            {
+                ["strict"] = true,
+            },
+        });
+        Assert.NotNull(response);
+    }
+
+    [Fact]
+    public async Task ToolChangeContents_None_MessagesEnumeratedOnce()
+    {
+        // The history is scanned for tool changes before it's sent, which mustn't consume a sequence that can only be enumerated once.
+        const string Input = """
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "hello"
+                    }
+                ],
+                "model": "gpt-4o-mini"
+            }
+            """;
+
+        const string Output = """
+            {
+              "id": "chatcmpl-ADx3PvAnCwJg0woha4pYsBTi3ZpOI",
+              "object": "chat.completion",
+              "created": 1727888631,
+              "model": "gpt-4o-mini-2024-07-18",
+              "choices": [
+                {
+                  "index": 0,
+                  "message": {
+                    "role": "assistant",
+                    "content": "Hello! How can I assist you today?",
+                    "refusal": null
+                  },
+                  "logprobs": null,
+                  "finish_reason": "stop"
+                }
+              ]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateChatClient(httpClient, "gpt-4o-mini");
+
+        var response = await client.GetResponseAsync(new EnumeratedOnceEnumerable<ChatMessage>([new(ChatRole.User, "hello")]));
+        Assert.Equal("Hello! How can I assist you today?", response.Text);
+    }
+
+    [Fact]
+    public async Task ToolChangeContents_RequiredFunctionRemoved_Throws()
+    {
+        using HttpClient httpClient = new();
+        using IChatClient client = CreateChatClient(httpClient, "gpt-4o-mini");
+
+        // Applying the removal leaves the required function out of the tools, so the tool choice would name a missing function.
+        InvalidOperationException e = await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetResponseAsync(
+        [
+            new(ChatRole.User, "hello"),
+            new(ChatRole.System, [new ToolRemovalContent("GetForecast")]),
+        ], new()
+        {
+            Tools =
+            [
+                AIFunctionFactory.Create(() => 42, "GetWeather", "Gets the weather."),
+                AIFunctionFactory.Create(() => 42, "GetForecast", "Gets the forecast."),
+            ],
+            ToolMode = ChatToolMode.RequireSpecific("GetForecast"),
+        }));
+
+        Assert.Contains("GetForecast", e.Message);
+    }
+
     [Fact]
     public async Task ChatOptions_DoNotOverwrite_NotNullPropertiesInRawRepresentation_NonStreaming()
     {

@@ -106,7 +106,8 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
         OpenAIClientExtensions.AddOpenAIApiType(OpenAIClientExtensions.OpenAIApiTypeResponses);
 
         // Convert the inputs into what ResponsesClient expects.
-        var openAIOptions = AsCreateResponseOptions(options, out string? openAIConversationId);
+        // Tools that the history introduces with a ToolAdditionContent are sent at that position as an additional_tools item.
+        var openAIOptions = AsCreateResponseOptions(ToolChanges.WithoutIntroducedTools(ref messages, options), out string? openAIConversationId);
 
         // Provided continuation token signals that an existing background response should be fetched.
         if (GetContinuationToken(messages, options) is { } token)
@@ -329,7 +330,8 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
 
         OpenAIClientExtensions.AddOpenAIApiType(OpenAIClientExtensions.OpenAIApiTypeResponses);
 
-        var openAIOptions = AsCreateResponseOptions(options, out string? openAIConversationId);
+        // Tools that the history introduces with a ToolAdditionContent are sent at that position as an additional_tools item.
+        var openAIOptions = AsCreateResponseOptions(ToolChanges.WithoutIntroducedTools(ref messages, options), out string? openAIConversationId);
         openAIOptions.StreamingEnabled = true;
 
         // Provided continuation token signals that an existing background response should be fetched.
@@ -892,6 +894,50 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
     }
 
     /// <summary>
+    /// Builds an <c>{"type":"additional_tools"}</c> input item from the <see cref="ToolAdditionContent"/>s in a message, or returns
+    /// <see langword="null"/> when it has none. The OpenAI .NET SDK doesn't expose this item type, so the JSON is constructed manually.
+    /// </summary>
+    /// <remarks>
+    /// The Responses API has no item for removing a tool, so <see cref="ToolRemovalContent"/> isn't sent.
+    /// </remarks>
+    internal static ResponseItem? ToAdditionalToolsItem(ChatMessage message, ChatOptions? options)
+    {
+        List<FunctionTool>? tools = null;
+        foreach (AIContent content in message.Contents)
+        {
+            if (content is ToolAdditionContent addition)
+            {
+                (tools ??= []).Add(ToResponseTool(addition.Tool, options));
+            }
+        }
+
+        if (tools is null)
+        {
+            return null;
+        }
+
+        using var stream = new System.IO.MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("type"u8, "additional_tools"u8);
+            writer.WriteString("role"u8, "developer"u8);
+            writer.WriteStartArray("tools"u8);
+            foreach (FunctionTool tool in tools)
+            {
+                var toolData = ModelReaderWriter.Write(tool, ModelReaderWriterOptions.Json, OpenAIContext.Default);
+                using var doc = JsonDocument.Parse(toolData);
+                doc.RootElement.WriteTo(writer);
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        return ModelReaderWriter.Read<ResponseItem>(BinaryData.FromBytes(stream.ToArray()), ModelReaderWriterOptions.Json, OpenAIContext.Default)!;
+    }
+
+    /// <summary>
     /// Builds a <c>{"type":"namespace"}</c> <see cref="ResponseTool"/> from a name and set of tools.
     /// The OpenAI .NET SDK doesn't expose a NamespaceTool type, so we construct the JSON manually.
     /// </summary>
@@ -1300,6 +1346,11 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
 
         foreach (ChatMessage input in inputs)
         {
+            if (ToAdditionalToolsItem(input, options) is { } additionalTools)
+            {
+                yield return additionalTools;
+            }
+
             if (input.Role == ChatRole.System ||
                 input.Role == OpenAIClientExtensions.ChatRoleDeveloper)
             {

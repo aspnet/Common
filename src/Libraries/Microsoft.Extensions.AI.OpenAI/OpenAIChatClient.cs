@@ -94,6 +94,9 @@ internal sealed partial class OpenAIChatClient : IChatClient
 
         OpenAIClientExtensions.AddOpenAIApiType(OpenAIClientExtensions.OpenAIApiTypeChatCompletions);
 
+        // Chat Completions has no form for tool changes at a position in the conversation.
+        ToolChanges.ApplyToTools(ref messages, ref options);
+
         var openAIChatMessages = ToOpenAIChatMessages(messages, options);
         var openAIOptions = ToOpenAIOptions(options);
 
@@ -114,6 +117,9 @@ internal sealed partial class OpenAIChatClient : IChatClient
         _ = Throw.IfNull(messages);
 
         OpenAIClientExtensions.AddOpenAIApiType(OpenAIClientExtensions.OpenAIApiTypeChatCompletions);
+
+        // Chat Completions has no form for tool changes at a position in the conversation.
+        ToolChanges.ApplyToTools(ref messages, ref options);
 
         var openAIChatMessages = ToOpenAIChatMessages(messages, options);
         var openAIOptions = ToOpenAIOptions(options);
