@@ -306,9 +306,15 @@ internal sealed class LinuxUtilizationParserCgroupV2 : ILinuxUtilizationParser
             : (ulong)maybeMemory;
     }
 
+    /// <remarks>
+    /// In cgroup v2, the memory usage of a system without a container cgroup has to be read from all
+    /// the slices, which are directories in /sys/fs/cgroup matching <paramref name="pattern"/>.
+    /// The inactive file memory of each slice is subtracted from the slice's usage. It has to be read
+    /// from the slice's own memory.stat file: the one of the root cgroup accounts for the entire
+    /// system, and subtracting it would produce a negative result.
+    /// </remarks>
     public long GetMemoryUsageInBytesFromSlices(string pattern)
     {
-        // In cgroup v2, we need to read memory usage from all slices, which are directories in /sys/fs/cgroup/*.slice.
         IReadOnlyCollection<string> memoryUsageInBytesSlicesPath = _fileSystem.GetDirectoryNames("/sys/fs/cgroup/", pattern);
 
         long memoryUsageInBytesTotal = 0;
@@ -334,9 +340,21 @@ internal sealed class LinuxUtilizationParserCgroupV2 : ILinuxUtilizationParser
                     $"We tried to read '{memoryUsageInBytesFile}', and we expected to get a non-negative number but instead it was: '{memoryUsageFile}'.");
             }
 
-            memoryUsageInBytesTotal += containerMemoryUsage;
-
             bufferWriter.Buffer.Reset();
+
+            FileInfo memoryStatFile = new(Path.Combine(path, "memory.stat"));
+            if (_fileSystem.Exists(memoryStatFile))
+            {
+                containerMemoryUsage -= GetInactiveFileMemoryInBytes(memoryStatFile);
+            }
+
+            // A slice's memory.current is always greater than or equal to its inactive file memory,
+            // but the two files are read at different points in time, so the difference can be
+            // slightly negative.
+            if (containerMemoryUsage > 0)
+            {
+                memoryUsageInBytesTotal += containerMemoryUsage;
+            }
         }
 
         return memoryUsageInBytesTotal;
@@ -349,7 +367,7 @@ internal sealed class LinuxUtilizationParserCgroupV2 : ILinuxUtilizationParser
     {
         const string InactiveFile = "inactive_file";
 
-        // Regex pattern for slice directory path in real file system
+        // Glob pattern for the slice directory paths in the real file system.
         const string Pattern = "*.slice";
 
         if (!_fileSystem.Exists(_memoryStat))
@@ -377,16 +395,19 @@ internal sealed class LinuxUtilizationParserCgroupV2 : ILinuxUtilizationParser
             Throw.InvalidOperationException($"The value of inactive_file found in '{_memoryStat}' is not a positive number: '{new string(inactiveMemorySlice)}'.");
         }
 
-        long memoryUsage = 0;
-
         if (!_fileSystem.Exists(_memoryUsageInBytes))
         {
-            memoryUsage = GetMemoryUsageInBytesFromSlices(Pattern);
+            // The root cgroup of a cgroup v2 hierarchy has no memory.current file (it only exists on
+            // non-root cgroups), which is the case when running directly on a host or on WSL. The
+            // memory usage is then summed across the top-level slices, and each slice's own inactive
+            // file memory is subtracted inside GetMemoryUsageInBytesFromSlices. The root
+            // memory.stat can't be used for that subtraction because it accounts for the entire
+            // system, which produces a negative result and throws an InvalidOperationException.
+            // See https://github.com/dotnet/extensions/issues/7748.
+            return (ulong)GetMemoryUsageInBytesFromSlices(Pattern);
         }
-        else
-        {
-            memoryUsage = GetMemoryUsageInBytesPod();
-        }
+
+        long memoryUsage = GetMemoryUsageInBytesPod();
 
         long memoryUsageTotal = memoryUsage - inactiveMemory;
 
@@ -843,6 +864,36 @@ internal sealed class LinuxUtilizationParserCgroupV2 : ILinuxUtilizationParser
         shares = Math.Clamp(shares, MinValueInRange, MaxValueInRange);
 
         return (float)shares;
+    }
+
+    /// <remarks>
+    /// Reads the inactive_file value from a cgroup's memory.stat file.
+    /// </remarks>
+    private long GetInactiveFileMemoryInBytes(FileInfo memoryStatFile)
+    {
+        const string InactiveFile = "inactive_file";
+
+        using ReturnableBufferWriter<char> bufferWriter = new(_sharedBufferWriterPool);
+        _fileSystem.ReadAll(memoryStatFile, bufferWriter.Buffer);
+        ReadOnlySpan<char> memoryFile = bufferWriter.Buffer.WrittenSpan;
+
+        int index = memoryFile.IndexOf(InactiveFile.AsSpan());
+
+        if (index == -1)
+        {
+            Throw.InvalidOperationException($"Unable to find inactive_file from '{memoryStatFile}'.");
+        }
+
+        ReadOnlySpan<char> inactiveMemorySlice = memoryFile.Slice(index + InactiveFile.Length, memoryFile.Length - index - InactiveFile.Length);
+
+        _ = GetNextNumber(inactiveMemorySlice, out long inactiveMemory);
+
+        if (inactiveMemory == -1)
+        {
+            Throw.InvalidOperationException($"The value of inactive_file found in '{memoryStatFile}' is not a positive number: '{new string(inactiveMemorySlice)}'.");
+        }
+
+        return inactiveMemory;
     }
 
     private long GetMemoryUsageInBytesPod()

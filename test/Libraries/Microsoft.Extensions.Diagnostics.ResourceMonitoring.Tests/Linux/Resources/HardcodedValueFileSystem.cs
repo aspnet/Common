@@ -35,10 +35,19 @@ internal sealed class HardcodedValueFileSystem : IFileSystem
 
     public IReadOnlyCollection<string> GetDirectoryNames(string directory, string pattern)
     {
+        // Emulates Directory.GetDirectories(directory, pattern): returns the distinct names of the
+        // directories that are direct children of 'directory' and match the glob pattern
+        // ('*' matches any sequence of characters, '?' matches a single character).
+        string regexPattern = "^" + Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+
         return _fileContent.Keys
                 .Where(x => x.StartsWith(directory, StringComparison.OrdinalIgnoreCase))
-                .Select(x => Regex.Match(x, pattern, RegexOptions.IgnoreCase))
-                .Select(x => Path.Combine(directory, x.Value))
+                .Select(x => x.Substring(directory.Length))
+                .Where(x => x.Contains(Path.DirectorySeparatorChar))
+                .Select(x => x.Substring(0, x.IndexOf(Path.DirectorySeparatorChar)))
+                .Where(x => Regex.IsMatch(x, regexPattern, RegexOptions.IgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(x => Path.Combine(directory, x))
                 .ToArray();
     }
 

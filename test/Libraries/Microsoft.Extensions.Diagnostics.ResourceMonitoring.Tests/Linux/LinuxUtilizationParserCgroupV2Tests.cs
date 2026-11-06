@@ -164,14 +164,14 @@ public sealed class LinuxUtilizationParserCgroupV2Tests
     [Fact]
     public Task Throws_When_UsageInBytes_Doesnt_Contain_A_Number()
     {
-        var regexPatternforSlices = @"\w+.slice";
+        var globPatternForSlices = "*.slice";
         var f = new HardcodedValueFileSystem(new Dictionary<FileInfo, string>
         {
             { new FileInfo("/sys/fs/cgroup/system.slice/memory.current"), "dasda"},
         });
 
         var p = new LinuxUtilizationParserCgroupV2(f, new FakeUserHz(100));
-        var r = Record.Exception(() => p.GetMemoryUsageInBytesFromSlices(regexPatternforSlices));
+        var r = Record.Exception(() => p.GetMemoryUsageInBytesFromSlices(globPatternForSlices));
 
         Assert.NotNull(r);
         return Verifier.Verify(r).UseDirectory(VerifiedDataDirectory);
@@ -181,14 +181,14 @@ public sealed class LinuxUtilizationParserCgroupV2Tests
     public void Returns_Memory_Usage_When_Memory_Usage_Is_Valid()
     {
         // When memory usage is a positive number
-        var regexPatternforSlices = @"\w+.slice";
+        var globPatternForSlices = "*.slice";
         var f = new HardcodedValueFileSystem(new Dictionary<FileInfo, string>
         {
             { new FileInfo("/sys/fs/cgroup/system.slice/memory.current"), "5342342"},
         });
 
         var p = new LinuxUtilizationParserCgroupV2(f, new FakeUserHz(100));
-        var r = p.GetMemoryUsageInBytesFromSlices(regexPatternforSlices);
+        var r = p.GetMemoryUsageInBytesFromSlices(globPatternForSlices);
 
         Assert.Equal(5_342_342, r);
 
@@ -199,7 +199,7 @@ public sealed class LinuxUtilizationParserCgroupV2Tests
         });
 
         p = new LinuxUtilizationParserCgroupV2(f, new FakeUserHz(100));
-        r = p.GetMemoryUsageInBytesFromSlices(regexPatternforSlices);
+        r = p.GetMemoryUsageInBytesFromSlices(globPatternForSlices);
         Assert.Equal(0, r);
     }
 
@@ -615,5 +615,82 @@ public sealed class LinuxUtilizationParserCgroupV2Tests
         await Task.WhenAll(tasks);
 
         Assert.True(true);
+    }
+
+    [Fact]
+    public void Reads_Memory_Usage_From_Slices_When_Root_MemoryCurrent_Does_Not_Exist()
+    {
+        // Regression test for https://github.com/dotnet/extensions/issues/7748.
+        // On hosts and WSL, the root cgroup of a cgroup v2 hierarchy has a memory.stat file but no
+        // memory.current file (memory.current only exists on non-root cgroups). The memory usage is
+        // then read from the top-level *.slice directories, and the inactive file memory of each
+        // slice has to be subtracted from the slice's usage. The inactive_file of the root
+        // memory.stat covers the entire system and can't be used here: it can be bigger than the
+        // total memory usage of all the slices, which produced a negative result and an
+        // InvalidOperationException on startup.
+        var f = new HardcodedValueFileSystem(new Dictionary<FileInfo, string>
+        {
+            { new FileInfo("/sys/fs/cgroup/memory.stat"), "inactive_file 492773376" },
+            { new FileInfo("/sys/fs/cgroup/system.slice/memory.current"), "100000000" },
+            { new FileInfo("/sys/fs/cgroup/system.slice/memory.stat"), "inactive_file 40000000" },
+            { new FileInfo("/sys/fs/cgroup/user.slice/memory.current"), "40439552" },
+            { new FileInfo("/sys/fs/cgroup/user.slice/memory.stat"), "inactive_file 439552" },
+        });
+
+        var p = new LinuxUtilizationParserCgroupV2(f, new FakeUserHz(100));
+
+        Assert.Equal(100_000_000UL, p.GetMemoryUsageInBytes());
+    }
+
+    [Fact]
+    public void Reads_Memory_Usage_From_Slices_When_Slices_Have_No_MemoryStat()
+    {
+        // The WSL scenario from https://github.com/dotnet/extensions/issues/7748: the inactive_file
+        // of the root memory.stat (492773376) is bigger than the total memory usage of all the
+        // slices (140439652). It previously produced a negative result and threw.
+        var f = new HardcodedValueFileSystem(new Dictionary<FileInfo, string>
+        {
+            { new FileInfo("/sys/fs/cgroup/memory.stat"), "inactive_file 492773376" },
+            { new FileInfo("/sys/fs/cgroup/system.slice/memory.current"), "140439552" },
+            { new FileInfo("/sys/fs/cgroup/user.slice/memory.current"), "100" },
+        });
+
+        var p = new LinuxUtilizationParserCgroupV2(f, new FakeUserHz(100));
+
+        Assert.Equal(140_439_652UL, p.GetMemoryUsageInBytes());
+    }
+
+    [Fact]
+    public void Clamps_Slice_Memory_Usage_When_Inactive_File_Exceeds_Slice_Usage()
+    {
+        // Within a cgroup, memory.current is always greater than or equal to inactive_file, but the
+        // two files are read at different points in time so the difference can be slightly negative.
+        var f = new HardcodedValueFileSystem(new Dictionary<FileInfo, string>
+        {
+            { new FileInfo("/sys/fs/cgroup/memory.stat"), "inactive_file 100" },
+            { new FileInfo("/sys/fs/cgroup/system.slice/memory.current"), "100" },
+            { new FileInfo("/sys/fs/cgroup/system.slice/memory.stat"), "inactive_file 500" },
+            { new FileInfo("/sys/fs/cgroup/user.slice/memory.current"), "200" },
+            { new FileInfo("/sys/fs/cgroup/user.slice/memory.stat"), "inactive_file 50" },
+        });
+
+        var p = new LinuxUtilizationParserCgroupV2(f, new FakeUserHz(100));
+
+        Assert.Equal(150UL, p.GetMemoryUsageInBytes());
+    }
+
+    [Fact]
+    public void Throws_With_Slice_MemoryStat_Path_When_Slice_MemoryStat_Is_Invalid()
+    {
+        var f = new HardcodedValueFileSystem(new Dictionary<FileInfo, string>
+        {
+            { new FileInfo("/sys/fs/cgroup/system.slice/memory.current"), "1000" },
+            { new FileInfo("/sys/fs/cgroup/system.slice/memory.stat"), "garbage content" },
+        });
+
+        var p = new LinuxUtilizationParserCgroupV2(f, new FakeUserHz(100));
+
+        var e = Assert.Throws<InvalidOperationException>(() => p.GetMemoryUsageInBytesFromSlices("*.slice"));
+        Assert.Contains("/sys/fs/cgroup/system.slice/memory.stat", e.Message);
     }
 }
