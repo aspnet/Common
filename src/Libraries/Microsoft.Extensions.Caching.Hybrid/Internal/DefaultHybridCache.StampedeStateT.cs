@@ -5,11 +5,9 @@ using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using static Microsoft.Extensions.Caching.Hybrid.Internal.DefaultHybridCache;
 
 namespace Microsoft.Extensions.Caching.Hybrid.Internal;
 
@@ -188,15 +186,15 @@ internal partial class DefaultHybridCache
                         }
 
                         result = await Cache.GetFromL2DirectAsync(Key.Key, SharedToken).ConfigureAwait(false);
-                        if (eventSourceEnabled)
+                        if (eventSourceEnabled || Cache._options.ReportTagMetrics)
                         {
                             if (result.HasValue)
                             {
-                                HybridCacheEventSource.Log.DistributedCacheHit();
+                                HybridCacheEventSource.Log.DistributedCacheHitWithTags(CacheItem.Tags, Cache._options.ReportTagMetrics);
                             }
                             else
                             {
-                                HybridCacheEventSource.Log.DistributedCacheMiss();
+                                HybridCacheEventSource.Log.DistributedCacheMissWithTags(CacheItem.Tags, Cache._options.ReportTagMetrics);
                             }
                         }
                     }
@@ -367,9 +365,9 @@ internal partial class DefaultHybridCache
                                 {
                                     await Cache.SetL2Async(Key.Key, cacheItem, in buffer, _options, SharedToken).ConfigureAwait(false);
 
-                                    if (eventSourceEnabled)
+                                    if (eventSourceEnabled || Cache._options.ReportTagMetrics)
                                     {
-                                        HybridCacheEventSource.Log.DistributedCacheWrite();
+                                        HybridCacheEventSource.Log.DistributedCacheWriteWithTags(CacheItem.Tags, Cache._options.ReportTagMetrics);
                                     }
                                 }
                                 catch (Exception ex)

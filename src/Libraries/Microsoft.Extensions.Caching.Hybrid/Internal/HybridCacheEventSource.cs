@@ -1,7 +1,9 @@
 ﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Diagnostics.Tracing;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -12,6 +14,16 @@ namespace Microsoft.Extensions.Caching.Hybrid.Internal;
 internal sealed class HybridCacheEventSource : EventSource
 {
     public static readonly HybridCacheEventSource Log = new();
+
+    // System.Diagnostics.Metrics instruments for tag-aware metrics
+    private static readonly Meter _sMeter = new("Microsoft.Extensions.Caching.Hybrid");
+    private static readonly Counter<long> _sLocalCacheHits = _sMeter.CreateCounter<long>("hybrid_cache.local.hits", description: "Total number of local cache hits");
+    private static readonly Counter<long> _sLocalCacheMisses = _sMeter.CreateCounter<long>("hybrid_cache.local.misses", description: "Total number of local cache misses");
+    private static readonly Counter<long> _sDistributedCacheHits = _sMeter.CreateCounter<long>("hybrid_cache.distributed.hits", description: "Total number of distributed cache hits");
+    private static readonly Counter<long> _sDistributedCacheMisses = _sMeter.CreateCounter<long>("hybrid_cache.distributed.misses", description: "Total number of distributed cache misses");
+    private static readonly Counter<long> _sLocalCacheWrites = _sMeter.CreateCounter<long>("hybrid_cache.local.writes", description: "Total number of local cache writes");
+    private static readonly Counter<long> _sDistributedCacheWrites = _sMeter.CreateCounter<long>("hybrid_cache.distributed.writes", description: "Total number of distributed cache writes");
+    private static readonly Counter<long> _sTagInvalidations = _sMeter.CreateCounter<long>("hybrid_cache.tag.invalidations", description: "Total number of tag invalidations");
 
     internal const int EventIdLocalCacheHit = 1;
     internal const int EventIdLocalCacheMiss = 2;
@@ -196,6 +208,264 @@ internal sealed class HybridCacheEventSource : EventSource
         WriteEvent(EventIdTagInvalidated);
     }
 
+    /// <summary>
+    /// Reports a local cache hit with optional tag dimensions for System.Diagnostics.Metrics.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    /// <param name="reportTagMetrics">Whether to emit tag dimensions in System.Diagnostics.Metrics.</param>
+    [NonEvent]
+    public void LocalCacheHitWithTags(TagSet tags, bool reportTagMetrics)
+    {
+        if (IsEnabled())
+        {
+            LocalCacheHit();// Emit EventSource event
+        }
+
+        // Also emit metrics when requested
+        if (reportTagMetrics)
+        {
+            if (tags.Count > 0)
+            {
+                EmitLocalCacheHitMetric(tags);
+            }
+            else
+            {
+                _sLocalCacheHits.Add(1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports a local cache miss with optional tag dimensions for System.Diagnostics.Metrics.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    /// <param name="reportTagMetrics">Whether to emit tag dimensions in System.Diagnostics.Metrics.</param>
+    [NonEvent]
+    public void LocalCacheMissWithTags(TagSet tags, bool reportTagMetrics)
+    {
+        if (IsEnabled())
+        {
+            LocalCacheMiss();// Emit EventSource event
+        }
+
+        // Also emit metrics when requested
+        if (reportTagMetrics)
+        {
+            if (tags.Count > 0)
+            {
+                EmitLocalCacheMissMetric(tags);
+            }
+            else
+            {
+                _sLocalCacheMisses.Add(1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports a distributed cache hit with optional tag dimensions for System.Diagnostics.Metrics.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    /// <param name="reportTagMetrics">Whether to emit tag dimensions in System.Diagnostics.Metrics.</param>
+    [NonEvent]
+    public void DistributedCacheHitWithTags(TagSet tags, bool reportTagMetrics)
+    {
+        if (IsEnabled())
+        {
+            DistributedCacheHit();// Emit EventSource event
+        }
+
+        // Also emit metrics when requested
+        if (reportTagMetrics)
+        {
+            if (tags.Count > 0)
+            {
+                EmitDistributedCacheHitMetric(tags);
+            }
+            else
+            {
+                _sDistributedCacheHits.Add(1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports a distributed cache miss with optional tag dimensions for System.Diagnostics.Metrics.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    /// <param name="reportTagMetrics">Whether to emit tag dimensions in System.Diagnostics.Metrics.</param>
+    [NonEvent]
+    public void DistributedCacheMissWithTags(TagSet tags, bool reportTagMetrics)
+    {
+        if (IsEnabled())
+        {
+            DistributedCacheMiss();// Emit EventSource event
+        }
+
+        // Also emit metrics when requested
+        if (reportTagMetrics)
+        {
+            if (tags.Count > 0)
+            {
+                EmitDistributedCacheMissMetric(tags);
+            }
+            else
+            {
+                _sDistributedCacheMisses.Add(1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports a local cache write with optional tag dimensions for System.Diagnostics.Metrics.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    /// <param name="reportTagMetrics">Whether to emit tag dimensions in System.Diagnostics.Metrics.</param>
+    [NonEvent]
+    public void LocalCacheWriteWithTags(TagSet tags, bool reportTagMetrics)
+    {
+        if (IsEnabled())
+        {
+            LocalCacheWrite();// Emit EventSource event
+        }
+
+        // Also emit metrics when requested
+        if (reportTagMetrics)
+        {
+            if (tags.Count > 0)
+            {
+                EmitLocalCacheWriteMetric(tags);
+            }
+            else
+            {
+                _sLocalCacheWrites.Add(1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports a distributed cache write with optional tag dimensions for System.Diagnostics.Metrics.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    /// <param name="reportTagMetrics">Whether to emit tag dimensions in System.Diagnostics.Metrics.</param>
+    [NonEvent]
+    public void DistributedCacheWriteWithTags(TagSet tags, bool reportTagMetrics)
+    {
+        if (IsEnabled())
+        {
+            DistributedCacheWrite();// Emit EventSource event
+        }
+
+        // Also emit metrics when requested
+        if (reportTagMetrics)
+        {
+            if (tags.Count > 0)
+            {
+                EmitDistributedCacheWriteMetric(tags);
+            }
+            else
+            {
+                _sDistributedCacheWrites.Add(1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports a tag invalidation with optional tag dimensions for System.Diagnostics.Metrics.
+    /// </summary>
+    /// <param name="tag">The specific tag that was invalidated.</param>
+    /// <param name="reportTagMetrics">Whether to emit tag dimensions in System.Diagnostics.Metrics.</param>
+    [NonEvent]
+    public void TagInvalidatedWithTags(string tag, bool reportTagMetrics)
+    {
+        if (IsEnabled())
+        {
+            TagInvalidated();// Emit EventSource event
+        }
+
+        // Also emit metrics when requested
+        if (reportTagMetrics)
+        {
+            _sTagInvalidations.Add(1, new KeyValuePair<string, object?>("tag", tag));
+        }
+    }
+
+    /// <summary>
+    /// Emits a local cache hit metric with tag dimensions.
+    /// </summary>
+    /// <param name="tags">The tags to include as metric dimensions.</param>
+    [NonEvent]
+    private static void EmitLocalCacheHitMetric(TagSet tags)
+    {
+        var tagList = CreateTagList(tags);
+        _sLocalCacheHits.Add(1, tagList);
+    }
+
+    [NonEvent]
+    private static void EmitLocalCacheMissMetric(TagSet tags)
+    {
+        var tagList = CreateTagList(tags);
+        _sLocalCacheMisses.Add(1, tagList);
+    }
+
+    [NonEvent]
+    private static void EmitDistributedCacheHitMetric(TagSet tags)
+    {
+        var tagList = CreateTagList(tags);
+        _sDistributedCacheHits.Add(1, tagList);
+    }
+
+    [NonEvent]
+    private static void EmitDistributedCacheMissMetric(TagSet tags)
+    {
+        var tagList = CreateTagList(tags);
+        _sDistributedCacheMisses.Add(1, tagList);
+    }
+
+    [NonEvent]
+    private static void EmitLocalCacheWriteMetric(TagSet tags)
+    {
+        var tagList = CreateTagList(tags);
+        _sLocalCacheWrites.Add(1, tagList);
+    }
+
+    [NonEvent]
+    private static void EmitDistributedCacheWriteMetric(TagSet tags)
+    {
+        var tagList = CreateTagList(tags);
+        _sDistributedCacheWrites.Add(1, tagList);
+    }
+
+    /// <summary>
+    /// Converts a TagSet to a TagList for use with System.Diagnostics.Metrics instruments.
+    /// Tags are added with keys "tag_0", "tag_1", etc. to maintain order and avoid conflicts.
+    /// </summary>
+    /// <param name="tags">The TagSet to convert.</param>
+    /// <returns>A TagList containing the tag values as dimensions.</returns>
+    [NonEvent]
+    private static TagList CreateTagList(TagSet tags)
+    {
+        var tagList = default(TagList);
+        switch (tags.Count)
+        {
+            case 0:
+                break; // no tags to add
+            case 1:
+                tagList.Add("tag_0", tags.GetSinglePrechecked());
+                break;
+            default:
+                var span = tags.GetSpanPrechecked();
+                for (int i = 0; i < span.Length; i++)
+                {
+                    tagList.Add($"tag_{i}", span[i]);
+                }
+
+                break;
+        }
+
+        return tagList;
+    }
+
 #if !(NETSTANDARD2_0 || NET462)
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Lifetime exceeds obvious scope; handed to event source")]
     [NonEvent]
@@ -220,6 +490,118 @@ internal sealed class HybridCacheEventSource : EventSource
         }
 
         base.OnEventCommand(command);
+    }
+
+    /// <summary>
+    /// Emits only System.Diagnostics.Metrics for local cache hit when ReportTagMetrics is enabled.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    [NonEvent]
+    public static void EmitLocalCacheHitMetrics(TagSet tags)
+    {
+        if (tags.Count > 0)
+        {
+            EmitLocalCacheHitMetric(tags);
+        }
+        else
+        {
+            _sLocalCacheHits.Add(1);
+        }
+    }
+
+    /// <summary>
+    /// Emits only System.Diagnostics.Metrics for local cache miss when ReportTagMetrics is enabled.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    [NonEvent]
+    public static void EmitLocalCacheMissMetrics(TagSet tags)
+    {
+        if (tags.Count > 0)
+        {
+            EmitLocalCacheMissMetric(tags);
+        }
+        else
+        {
+            _sLocalCacheMisses.Add(1);
+        }
+    }
+
+    /// <summary>
+    /// Emits only System.Diagnostics.Metrics for distributed cache hit when ReportTagMetrics is enabled.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    [NonEvent]
+    public static void EmitDistributedCacheHitMetrics(TagSet tags)
+    {
+        if (tags.Count > 0)
+        {
+            EmitDistributedCacheHitMetric(tags);
+        }
+        else
+        {
+            _sDistributedCacheHits.Add(1);
+        }
+    }
+
+    /// <summary>
+    /// Emits only System.Diagnostics.Metrics for distributed cache miss when ReportTagMetrics is enabled.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    [NonEvent]
+    public static void EmitDistributedCacheMissMetrics(TagSet tags)
+    {
+        if (tags.Count > 0)
+        {
+            EmitDistributedCacheMissMetric(tags);
+        }
+        else
+        {
+            _sDistributedCacheMisses.Add(1);
+        }
+    }
+
+    /// <summary>
+    /// Emits only System.Diagnostics.Metrics for local cache write when ReportTagMetrics is enabled.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    [NonEvent]
+    public static void EmitLocalCacheWriteMetrics(TagSet tags)
+    {
+        if (tags.Count > 0)
+        {
+            EmitLocalCacheWriteMetric(tags);
+        }
+        else
+        {
+            _sLocalCacheWrites.Add(1);
+        }
+    }
+
+    /// <summary>
+    /// Emits only System.Diagnostics.Metrics for distributed cache write when ReportTagMetrics is enabled.
+    /// </summary>
+    /// <param name="tags">The cache entry tags to include as metric dimensions.</param>
+    [NonEvent]
+    public static void EmitDistributedCacheWriteMetrics(TagSet tags)
+    {
+        if (tags.Count > 0)
+        {
+            EmitDistributedCacheWriteMetric(tags);
+        }
+        else
+        {
+            _sDistributedCacheWrites.Add(1);
+        }
+    }
+
+    /// <summary>
+    /// Emits only System.Diagnostics.Metrics for tag invalidation when ReportTagMetrics is enabled.
+    /// </summary>
+    /// <param name="tag">The specific tag that was invalidated.</param>
+    [NonEvent]
+    public static void EmitTagInvalidationMetrics(string tag)
+    {
+        _sTagInvalidations.Add(1, new KeyValuePair<string, object?>("tag", tag));
     }
 #endif
 

@@ -211,9 +211,9 @@ internal partial class DefaultHybridCache
             // commit
             cacheEntry.Dispose();
 
-            if (HybridCacheEventSource.Log.IsEnabled())
+            if (HybridCacheEventSource.Log.IsEnabled() || _options.ReportTagMetrics)
             {
-                HybridCacheEventSource.Log.LocalCacheWrite();
+                HybridCacheEventSource.Log.LocalCacheWriteWithTags(value.Tags, _options.ReportTagMetrics);
             }
         }
     }

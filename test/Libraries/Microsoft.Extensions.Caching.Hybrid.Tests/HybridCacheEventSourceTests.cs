@@ -245,4 +245,79 @@ public class HybridCacheEventSourceTests(ITestOutputHelper log, TestEventListene
             Assert.Skip("No counters received");
         }
     }
+
+    [SkippableFact]
+    public void LocalCacheHitWithTags()
+    {
+        AssertEnabled();
+
+        var tags = TagSet.Create(["region", "product"]);
+
+        listener.Reset().Source.LocalCacheHitWithTags(tags, reportTagMetrics: false);
+        listener.AssertSingleEvent(HybridCacheEventSource.EventIdLocalCacheHit, "LocalCacheHit", EventLevel.Verbose);
+    }
+
+    [SkippableFact]
+    public void LocalCacheMissWithTags()
+    {
+        AssertEnabled();
+
+        var tags = TagSet.Create(["region", "product"]);
+
+        listener.Reset().Source.LocalCacheMissWithTags(tags, reportTagMetrics: false);
+        listener.AssertSingleEvent(HybridCacheEventSource.EventIdLocalCacheMiss, "LocalCacheMiss", EventLevel.Verbose);
+    }
+
+    [SkippableFact]
+    public void DistributedCacheHitWithTags()
+    {
+        AssertEnabled();
+
+        var tags = TagSet.Create(["region", "product"]);
+
+        listener.Reset().Source.DistributedCacheHitWithTags(tags, reportTagMetrics: false);
+        listener.AssertSingleEvent(HybridCacheEventSource.EventIdDistributedCacheHit, "DistributedCacheHit", EventLevel.Verbose);
+    }
+
+    [SkippableFact]
+    public void DistributedCacheMissWithTags()
+    {
+        AssertEnabled();
+
+        var tags = TagSet.Create(["region", "product"]);
+
+        listener.Reset().Source.DistributedCacheMissWithTags(tags, reportTagMetrics: false);
+        listener.AssertSingleEvent(HybridCacheEventSource.EventIdDistributedCacheMiss, "DistributedCacheMiss", EventLevel.Verbose);
+    }
+
+    [SkippableFact]
+    public void LocalCacheWriteWithTags()
+    {
+        AssertEnabled();
+
+        var tags = TagSet.Create(["region", "product"]);
+
+        listener.Reset().Source.LocalCacheWriteWithTags(tags, reportTagMetrics: false);
+        listener.AssertSingleEvent(HybridCacheEventSource.EventIdLocalCacheWrite, "LocalCacheWrite", EventLevel.Verbose);
+    }
+
+    [SkippableFact]
+    public void DistributedCacheWriteWithTags()
+    {
+        AssertEnabled();
+
+        var tags = TagSet.Create(["region", "product"]);
+
+        listener.Reset().Source.DistributedCacheWriteWithTags(tags, reportTagMetrics: false);
+        listener.AssertSingleEvent(HybridCacheEventSource.EventIdDistributedCacheWrite, "DistributedCacheWrite", EventLevel.Verbose);
+    }
+
+    [SkippableFact]
+    public void TagInvalidatedWithTags()
+    {
+        AssertEnabled();
+
+        listener.Reset().Source.TagInvalidatedWithTags("test-tag", reportTagMetrics: false);
+        listener.AssertSingleEvent(HybridCacheEventSource.EventIdTagInvalidated, "TagInvalidated", EventLevel.Verbose);
+    }
 }

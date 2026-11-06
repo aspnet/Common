@@ -152,6 +152,7 @@ internal sealed partial class DefaultHybridCache : HybridCache
         }
 
         bool eventSourceEnabled = HybridCacheEventSource.Log.IsEnabled();
+        TagSet tagSet = TagSet.Create(tags);
 
         if ((flags & HybridCacheEntryFlags.DisableLocalCacheRead) == 0)
         {
@@ -159,18 +160,18 @@ internal sealed partial class DefaultHybridCache : HybridCache
                 && typed.TryGetValue(_logger, out T? value))
             {
                 // short-circuit
-                if (eventSourceEnabled)
+                if (eventSourceEnabled || _options.ReportTagMetrics)
                 {
-                    HybridCacheEventSource.Log.LocalCacheHit();
+                    HybridCacheEventSource.Log.LocalCacheHitWithTags(tagSet, _options.ReportTagMetrics);
                 }
 
                 return new(value);
             }
             else
             {
-                if (eventSourceEnabled)
+                if (eventSourceEnabled || _options.ReportTagMetrics)
                 {
-                    HybridCacheEventSource.Log.LocalCacheMiss();
+                    HybridCacheEventSource.Log.LocalCacheMissWithTags(tagSet, _options.ReportTagMetrics);
                 }
             }
         }

@@ -68,8 +68,37 @@ public class HybridCacheOptions
     /// <see langword="true"/> to use "tags" data as dimensions on metric reporting; otherwise, <see langword="false"/>.
     /// </value>
     /// <remarks>
-    /// If enabled, take care to ensure that tags don't contain data that
-    /// should not be visible in metrics systems.
+    /// <para>
+    /// When enabled, cache operations will emit System.Diagnostics.Metrics with tag values as dimensions,
+    /// providing richer telemetry for cache performance analysis by tag categories.
+    /// </para>
+    /// <para>
+    /// <strong>Important PII and Security Considerations:</strong>
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description>
+    /// Ensure that tag values do not contain personally identifiable information (PII), 
+    /// sensitive data, or high-cardinality values that could overwhelm metrics systems.
+    /// </description></item>
+    /// <item><description>
+    /// Tag values will be visible in metrics collection systems, dashboards, and telemetry pipelines.
+    /// Only use tags that are safe for observability purposes.
+    /// </description></item>
+    /// <item><description>
+    /// Consider using categorical values like "region", "service", "environment" rather than 
+    /// user-specific identifiers or sensitive business data.
+    /// </description></item>
+    /// <item><description>
+    /// High-cardinality tags (e.g., user IDs, session IDs) can cause performance issues 
+    /// in metrics systems and should be avoided.
+    /// </description></item>
+    /// </list>
+    /// <para>
+    /// Example of appropriate tags: ["region:us-west", "service:api", "environment:prod"].
+    /// </para>
+    /// <para>
+    /// Example of inappropriate tags: ["user:john.doe@company.com", "session:abc123", "customer-data:sensitive"].
+    /// </para>
     /// </remarks>
     public bool ReportTagMetrics { get; set; }
 
