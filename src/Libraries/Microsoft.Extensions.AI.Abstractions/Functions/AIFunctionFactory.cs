@@ -966,15 +966,22 @@ public static partial class AIFunctionFactory
                 // If the parameter has an argument specified in the dictionary, return that argument.
                 if (arguments.TryGetValue(argumentName, out object? value))
                 {
-                    return value switch
+                    try
                     {
-                        null => null, // Return as-is if null -- if the parameter is a struct this will be handled by MethodInfo.Invoke
-                        _ when parameterType.IsInstanceOfType(value) => value, // Do nothing if value is assignable to parameter type
-                        JsonElement element => JsonSerializer.Deserialize(element, typeInfo),
-                        JsonDocument doc => JsonSerializer.Deserialize(doc, typeInfo),
-                        JsonNode node => JsonSerializer.Deserialize(node, typeInfo),
-                        _ => MarshallViaJsonRoundtrip(value),
-                    };
+                        return value switch
+                        {
+                            null => null, // Return as-is if null -- if the parameter is a struct this will be handled by MethodInfo.Invoke
+                            _ when parameterType.IsInstanceOfType(value) => value, // Do nothing if value is assignable to parameter type
+                            JsonElement element => JsonSerializer.Deserialize(element, typeInfo),
+                            JsonDocument doc => JsonSerializer.Deserialize(doc, typeInfo),
+                            JsonNode node => JsonSerializer.Deserialize(node, typeInfo),
+                            _ => MarshallViaJsonRoundtrip(value),
+                        };
+                    }
+                    catch (JsonException ex)
+                    {
+                        throw CreateArgumentConversionException(argumentName, typeInfo, value!, ex);
+                    }
 
                     object? MarshallViaJsonRoundtrip(object value)
                     {
@@ -1021,6 +1028,38 @@ public static partial class AIFunctionFactory
             // Throws an ArgumentNullException indicating that AIFunctionArguments.Services must be provided.
             static void ThrowNullServices(string parameterName) =>
                 Throw.ArgumentNullException($"arguments.{nameof(AIFunctionArguments.Services)}", $"Services are required for parameter '{parameterName}'.");
+        }
+
+        /// <summary>
+        /// Creates a <see cref="JsonException"/> that identifies the parameter whose argument could not be deserialized.
+        /// </summary>
+        private static JsonException CreateArgumentConversionException(string argumentName, JsonTypeInfo typeInfo, object value, JsonException innerException)
+        {
+            string message = $"The value provided for parameter '{argumentName}' could not be converted to the parameter's type.";
+
+            // Models sometimes JSON-encode a structured argument, e.g. sending "{\"a\":1}" instead of {"a":1}.
+            // Call that out explicitly so the mistake is easy to diagnose and correct.
+            bool isJsonString = value switch
+            {
+                JsonElement element => element.ValueKind is JsonValueKind.String,
+                JsonDocument doc => doc.RootElement.ValueKind is JsonValueKind.String,
+                JsonNode node => node.GetValueKind() is JsonValueKind.String,
+                _ => false,
+            };
+
+            string? expected = typeInfo.Kind switch
+            {
+                JsonTypeInfoKind.Object or JsonTypeInfoKind.Dictionary => "a JSON object",
+                JsonTypeInfoKind.Enumerable => "a JSON array",
+                _ => null,
+            };
+
+            if (isJsonString && expected is not null)
+            {
+                message += $" A JSON string was provided where {expected} was expected; if the string contains serialized JSON, provide the JSON value directly instead of as a string.";
+            }
+
+            return new JsonException($"{message} {innerException.Message}", innerException.Path, innerException.LineNumber, innerException.BytePositionInLine, innerException);
         }
 
         /// <summary>

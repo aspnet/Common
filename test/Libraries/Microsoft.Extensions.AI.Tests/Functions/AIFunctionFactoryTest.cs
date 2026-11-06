@@ -190,6 +190,74 @@ public partial class AIFunctionFactoryTest
         AssertExtensions.EqualFunctionCallResults(expectedResult, result);
     }
 
+    [Theory]
+    [InlineData("element")]
+    [InlineData("document")]
+    [InlineData("node")]
+    public async Task Parameters_JsonStringForObjectParameter_ThrowsDescriptiveJsonException(string argumentKind)
+    {
+        AIFunction func = AIFunctionFactory.Create((DoubleEncodedInput input) => input.A, serializerOptions: JsonContext.Default.Options);
+        const string DoubleEncoded = "\"{\\\"a\\\":\\\"x\\\"}\"";
+        object argument = argumentKind switch
+        {
+            "element" => JsonDocument.Parse(DoubleEncoded).RootElement,
+            "document" => JsonDocument.Parse(DoubleEncoded),
+            _ => JsonNode.Parse(DoubleEncoded)!,
+        };
+
+        JsonException ex = await Assert.ThrowsAsync<JsonException>(() => func.InvokeAsync(new() { ["input"] = argument }).AsTask());
+
+        Assert.Contains("parameter 'input'", ex.Message);
+        Assert.Contains("A JSON string was provided where a JSON object was expected", ex.Message);
+        Assert.IsType<JsonException>(ex.InnerException);
+        Assert.Contains(ex.InnerException!.Message, ex.Message);
+    }
+
+    [Fact]
+    public async Task Parameters_JsonStringForCollectionParameter_ThrowsDescriptiveJsonException()
+    {
+        AIFunction func = AIFunctionFactory.Create((int[] values) => values.Length, serializerOptions: JsonContext.Default.Options);
+
+        JsonException ex = await Assert.ThrowsAsync<JsonException>(() => func.InvokeAsync(new()
+        {
+            ["values"] = JsonDocument.Parse("\"[1,2,3]\"").RootElement
+        }).AsTask());
+
+        Assert.Contains("parameter 'values'", ex.Message);
+        Assert.Contains("A JSON string was provided where a JSON array was expected", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("42")] // not a string: no double-encoding hint
+    [InlineData("[1,2]")]
+    public async Task Parameters_NonStringMismatch_ThrowsJsonExceptionWithoutDoubleEncodingHint(string json)
+    {
+        AIFunction func = AIFunctionFactory.Create((DoubleEncodedInput input) => input.A, serializerOptions: JsonContext.Default.Options);
+
+        JsonException ex = await Assert.ThrowsAsync<JsonException>(() => func.InvokeAsync(new()
+        {
+            ["input"] = JsonDocument.Parse(json).RootElement
+        }).AsTask());
+
+        Assert.Contains("parameter 'input'", ex.Message);
+        Assert.DoesNotContain("A JSON string was provided", ex.Message);
+    }
+
+    [Fact]
+    public async Task Parameters_InvalidStringForScalarParameter_ThrowsJsonExceptionWithoutDoubleEncodingHint()
+    {
+        // Scalars such as Guid legitimately serialize as JSON strings, so no double-encoding hint is given.
+        AIFunction func = AIFunctionFactory.Create((Guid id) => id, serializerOptions: JsonContext.Default.Options);
+
+        JsonException ex = await Assert.ThrowsAsync<JsonException>(() => func.InvokeAsync(new()
+        {
+            ["id"] = JsonDocument.Parse("\"not-a-guid\"").RootElement
+        }).AsTask());
+
+        Assert.Contains("parameter 'id'", ex.Message);
+        Assert.DoesNotContain("A JSON string was provided", ex.Message);
+    }
+
     [Fact]
     public async Task Parameters_MappedByType_Async()
     {
@@ -1821,7 +1889,13 @@ public partial class AIFunctionFactoryTest
     [JsonSerializable(typeof(B))]
     [JsonSerializable(typeof(int?))]
     [JsonSerializable(typeof(DateTime?))]
+    [JsonSerializable(typeof(DoubleEncodedInput))]
     private partial class JsonContext : JsonSerializerContext;
+
+    private sealed class DoubleEncodedInput
+    {
+        public string A { get; set; } = string.Empty;
+    }
 
     private abstract class MyBaseType
     {
