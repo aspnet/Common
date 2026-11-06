@@ -5877,6 +5877,55 @@ public class OpenAIResponseClientTests
     }
 
     [Fact]
+    public async Task StreamingResponseWithIncompleteUpdate_SurfacesFinishReasonAndUsage()
+    {
+        const string Input = """
+            {
+                "model":"gpt-4o-mini",
+                "input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"test"}]}],
+                "stream":true
+            }
+            """;
+
+        const string Output = """
+            event: response.created
+            data: {"type":"response.created","response":{"id":"resp_001","object":"response","created_at":1741892091,"status":"in_progress","model":"gpt-4o-mini","output":[]}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_001","type":"message","status":"in_progress","content":[],"role":"assistant"}}
+
+            event: response.output_text.delta
+            data: {"type":"response.output_text.delta","item_id":"msg_001","output_index":0,"content_index":0,"delta":"Partial"}
+
+            event: response.incomplete
+            data: {"type":"response.incomplete","response":{"id":"resp_001","object":"response","created_at":1741892091,"status":"incomplete","model":"gpt-4o-mini","output":[{"type":"message","id":"msg_001","status":"incomplete","role":"assistant","content":[{"type":"output_text","text":"Partial","annotations":[]}]}],"incomplete_details":{"reason":"max_output_tokens"},"usage":{"input_tokens":12,"input_tokens_details":{"cached_tokens":0},"output_tokens":16,"output_tokens_details":{"reasoning_tokens":10},"total_tokens":28}}}
+
+
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (var update in client.GetStreamingResponseAsync("test"))
+        {
+            updates.Add(update);
+        }
+
+        Assert.Equal(ChatFinishReason.Length, updates[updates.Count - 1].FinishReason);
+
+        ChatResponse response = updates.ToChatResponse();
+        Assert.Equal("Partial", response.Text);
+        Assert.Equal(ChatFinishReason.Length, response.FinishReason);
+        Assert.NotNull(response.Usage);
+        Assert.Equal(12, response.Usage.InputTokenCount);
+        Assert.Equal(16, response.Usage.OutputTokenCount);
+        Assert.Equal(10, response.Usage.ReasoningTokenCount);
+        Assert.Equal(28, response.Usage.TotalTokenCount);
+    }
+
+    [Fact]
     public async Task StreamingResponseWithInProgressUpdate_HandlesCorrectly()
     {
         const string Input = """

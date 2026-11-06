@@ -425,12 +425,18 @@ internal sealed class OpenAIResponsesChatClient : IChatClient
                     goto default;
 
                 case StreamingResponseIncompleteUpdate incompleteUpdate:
+                {
+                    // response.incomplete is a terminal event sent instead of response.completed, so it carries the usage and the reason the response stopped.
                     createdAt = incompleteUpdate.Response.CreatedAt;
                     responseId = incompleteUpdate.Response.Id;
                     UpdateConversationId(responseId, incompleteUpdate.Response);
                     modelId = incompleteUpdate.Response.Model;
                     latestResponseStatus = incompleteUpdate.Response.Status;
-                    goto default;
+                    var update = CreateUpdate(ToUsageDetails(incompleteUpdate.Response) is { } usage ? new UsageContent(usage) : null);
+                    update.FinishReason = AsFinishReason(incompleteUpdate.Response.IncompleteStatusDetails?.Reason);
+                    yield return update;
+                    break;
+                }
 
                 case StreamingResponseFailedUpdate failedUpdate:
                     createdAt = failedUpdate.Response.CreatedAt;
