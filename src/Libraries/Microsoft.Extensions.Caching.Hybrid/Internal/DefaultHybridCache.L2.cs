@@ -225,7 +225,7 @@ internal partial class DefaultHybridCache
         byte[] oversized = ArrayPool<byte>.Shared.Rent(maxLength);
 
         int length = HybridCachePayload.Write(oversized, key, cacheItem.CreationTimestamp, GetL2AbsoluteExpirationRelativeToNow(options),
-            HybridCachePayload.PayloadFlags.None, cacheItem.Tags, payload.AsSequence());
+            HybridCachePayload.PayloadFlags.None, cacheItem.Tags, payload.AsSequence(), localCacheSize: GetLocalSize(options));
 
         await SetDirectL2Async(key, new(oversized, 0, length, true), GetL2DistributedCacheOptions(options), token).ConfigureAwait(false);
 

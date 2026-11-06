@@ -78,6 +78,33 @@ public class FunctionalTests : IClassFixture<TestEventListener>
         Assert.Equal(96, await cache.GetOrCreateAsync(key, _ => new ValueTask<int>(96)));
     }
 
-    private static string Me([CallerMemberName] string caller = "") => caller;
+#if RUNTIME_PACKAGES_11_OR_GREATER
+    [Fact]
+    public async Task GetOrCreateAsync_RejectsNegativeLocalSize()
+    {
+        using var provider = GetDefaultCache(out var cache);
+        var options = new HybridCacheEntryOptions { LocalSize = -1 };
 
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            async () => await cache.GetOrCreateAsync(Me(), _ => new ValueTask<int>(42), options));
+        Assert.Equal("options", ex.ParamName);
+
+        ex = await Assert.ThrowsAsync<ArgumentException>(
+            async () => await cache.GetOrCreateAsync(Me(), 0, (_, _, _) => new ValueTask<int>(42), options));
+        Assert.Equal("options", ex.ParamName);
+    }
+
+    [Fact]
+    public async Task SetAsync_RejectsNegativeLocalSize()
+    {
+        using var provider = GetDefaultCache(out var cache);
+        var options = new HybridCacheEntryOptions { LocalSize = -1 };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => cache.SetAsync(Me(), 42, options).AsTask());
+        Assert.Equal("options", ex.ParamName);
+    }
+#endif
+
+    private static string Me([CallerMemberName] string caller = "") => caller;
 }

@@ -21,7 +21,7 @@ internal partial class DefaultHybridCache
 
     private Task<long> _globalInvalidateTimestamp;
 
-    public override ValueTask RemoveByTagAsync(string tag, CancellationToken token = default)
+    public override ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(tag))
         {
@@ -30,7 +30,7 @@ internal partial class DefaultHybridCache
 
         long now = CurrentTimestamp();
         InvalidateTagLocalCore(tag, now, isNow: true); // isNow to be 100% explicit
-        return InvalidateL2TagAsync(tag, now, token);
+        return InvalidateL2TagAsync(tag, now, cancellationToken);
     }
 
     public bool IsValid(CacheItem cacheItem)
