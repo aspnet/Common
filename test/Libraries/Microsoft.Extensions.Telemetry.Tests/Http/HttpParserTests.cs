@@ -670,6 +670,50 @@ public class HttpParserTests
         ValidateRouteParameter(httpRouteParameters[1], "token", $"{redactedPrefix}secret", isRedacted);
     }
 
+    [Fact]
+    public void ParseRoute_WhenRouteHasEscapedBraces_ReturnsRouteSegments()
+    {
+        HttpRouteParser httpParser = CreateHttpRouteParser();
+
+        string httpRoute = "api/{id:regex(^\\d{{3}}$)}/a{{b}}c/{name}";
+        ParsedRouteSegments routeSegments = httpParser.ParseRoute(httpRoute);
+
+        Assert.Equal(4, routeSegments.Segments.Length);
+        Assert.Equal(httpRoute, routeSegments.RouteTemplate);
+
+        ValidateRouteSegment(routeSegments.Segments[0], ("api/", false, "", "", 0, 4, false));
+        ValidateRouteSegment(routeSegments.Segments[1], ("id:regex(^\\d{{3}}$)", true, "id", "", 4, 25, false));
+        ValidateRouteSegment(routeSegments.Segments[2], ("/a%7Bb%7Dc/", false, "", "", 25, 36, false));
+        ValidateRouteSegment(routeSegments.Segments[3], ("name", true, "name", "", 36, 42, false));
+    }
+
+    [Theory]
+    [CombinatorialData]
+    public void TryExtractParameters_RouteHasEscapedBraces_ReturnsCorrectParameters(HttpRouteParameterRedactionMode redactionMode)
+    {
+        bool isRedacted = redactionMode != HttpRouteParameterRedactionMode.None;
+        string redactedPrefix = isRedacted ? "Redacted:" : string.Empty;
+
+        HttpRouteParser httpParser = CreateHttpRouteParser();
+        Dictionary<string, DataClassification> parametersToRedact = new()
+        {
+            { "id", DataClassification.None },
+            { "token", FakeTaxonomy.PrivateData },
+        };
+
+        var httpRouteParameters = new HttpRouteParameter[2];
+
+        Assert.True(httpParser.TryExtractParameters(
+            "/a/123.secret", httpParser.ParseRoute("/a/{id:regex(^\\d{{3}}$)}.{token}"), redactionMode, parametersToRedact, ref httpRouteParameters));
+        ValidateRouteParameter(httpRouteParameters[0], "id", "123", false);
+        ValidateRouteParameter(httpRouteParameters[1], "token", $"{redactedPrefix}secret", isRedacted);
+
+        Assert.True(httpParser.TryExtractParameters(
+            "/b%7Bc%7D/123/secret", httpParser.ParseRoute("/b{{c}}/{id}/{token}"), redactionMode, parametersToRedact, ref httpRouteParameters));
+        ValidateRouteParameter(httpRouteParameters[0], "id", "123", false);
+        ValidateRouteParameter(httpRouteParameters[1], "token", $"{redactedPrefix}secret", isRedacted);
+    }
+
     [Theory]
     [InlineData("{token}.{format}", "part1.part2.part3.json", "token", "part1.part2.part3")]
     [InlineData("{format}.{token}", "json.secret", "format", "json")]

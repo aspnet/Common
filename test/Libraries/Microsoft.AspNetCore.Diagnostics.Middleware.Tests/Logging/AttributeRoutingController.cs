@@ -3,6 +3,7 @@
 
 #if NET8_0_OR_GREATER
 
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Compliance.Testing;
@@ -27,5 +28,13 @@ public class AttributeRoutingController : Controller
 
     [HttpGet("get-4/{param=all}")]
     public IActionResult GetWithUnclassifiedParam(string param) => Ok(param);
+
+    [HttpGet("get-5/{id}{{x}}{param}")]
+    [SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "For testing")]
+    public IActionResult GetWithEscapedBraces([NoDataClassification] string id, [PrivateData] string param) => Ok(param);
+
+    [HttpGet("get-6/{{c}}/{param}/{id}")]
+    [SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "For testing")]
+    public IActionResult GetWithEscapedBracesSegment([PrivateData] string param, [NoDataClassification] string id) => Ok(param);
 }
 #endif

@@ -106,11 +106,23 @@ internal sealed class HttpRouteParser : IHttpRouteParser
             var start = 0;
             char ch;
 
+            // The path is escaped, e.g. Uri.AbsolutePath, so an escaped brace "{{" or "}}" in a literal is "%7B" or "%7D" there,
+            // one character longer, which shifts the positions of the following segments.
+            var escapedBraces = 0;
+
             var segments = new List<Segment>();
 
             while (pos < len)
             {
                 ch = httpRoute[pos];
+
+                // An escaped brace in a literal.
+                if ((ch == '{' || ch == '}') && pos + 1 < len && httpRoute[pos + 1] == ch)
+                {
+                    escapedBraces++;
+                    pos += 2;
+                    continue;
+                }
 
                 // Start of a parameter segment.
                 if (ch == '{')
@@ -118,14 +130,19 @@ internal sealed class HttpRouteParser : IHttpRouteParser
                     // End of the current text segment.
                     if (pos > start)
                     {
+#if NET
+                        var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "%7B", StringComparison.Ordinal).Replace("}}", "%7D", StringComparison.Ordinal);
+#else
+                        var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "%7B").Replace("}}", "%7D");
+#endif
                         segments.Add(new Segment(
-                            start: start,
-                            end: pos,
-                            content: GetSegmentContent(httpRoute, start, pos),
+                            start: pos + escapedBraces - content.Length,
+                            end: pos + escapedBraces,
+                            content: content,
                             isParam: false));
                     }
 
-                    segments.Add(GetParameterSegment(httpRoute, ref pos));
+                    segments.Add(GetParameterSegment(httpRoute, ref pos, escapedBraces));
                     start = pos + 1;
                 }
 
@@ -143,10 +160,15 @@ internal sealed class HttpRouteParser : IHttpRouteParser
             // End the last text segment if any.
             if (start < pos)
             {
+#if NET
+                var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "%7B", StringComparison.Ordinal).Replace("}}", "%7D", StringComparison.Ordinal);
+#else
+                var content = GetSegmentContent(httpRoute, start, pos).Replace("{{", "%7B").Replace("}}", "%7D");
+#endif
                 segments.Add(new Segment(
-                    start: start,
-                    end: pos,
-                    content: GetSegmentContent(httpRoute, start, pos),
+                    start: pos + escapedBraces - content.Length,
+                    end: pos + escapedBraces,
+                    content: content,
                     isParam: false));
             }
 
@@ -204,7 +226,7 @@ internal sealed class HttpRouteParser : IHttpRouteParser
         return length;
     }
 
-    private static Segment GetParameterSegment(string httpRoute, ref int pos)
+    private static Segment GetParameterSegment(string httpRoute, ref int pos, int escapedBraces)
     {
         const int PositionNotFound = -1;
 
@@ -216,8 +238,15 @@ internal sealed class HttpRouteParser : IHttpRouteParser
 
         char ch;
 
-        while ((ch = httpRoute[pos]) != '}')
+        // "}}" is an escaped brace, e.g. in the regex constraint "{id:regex(^\d{{3}}$)}"; a single '}' ends the parameter.
+        while ((ch = httpRoute[pos]) != '}' || (pos + 1 < httpRoute.Length && httpRoute[pos + 1] == '}'))
         {
+            if (ch == '}')
+            {
+                pos += 2;
+                continue;
+            }
+
             // The segment has a default value '='. The character indicates
             // that we've met the end of the segment's parameter name and
             // the start of the default value.
@@ -284,8 +313,8 @@ internal sealed class HttpRouteParser : IHttpRouteParser
 
         // Remove the opening and closing curly braces when getting content.
         return new Segment(
-            start: start,
-            end: pos + 1,
+            start: start + escapedBraces,
+            end: pos + 1 + escapedBraces,
             content: content,
             isParam: true,
             paramName: paramName,

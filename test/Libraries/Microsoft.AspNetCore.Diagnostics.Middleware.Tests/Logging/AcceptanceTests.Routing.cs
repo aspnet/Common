@@ -109,6 +109,10 @@ public partial class AcceptanceTests
     [InlineData(Loose, "AttributeRouting/get-3/top10", "AttributeRouting/get-3/top10")]
     [InlineData(Strict, "AttributeRouting/get-4/top10", $"AttributeRouting/get-4/{TelemetryConstants.Redacted}")]
     [InlineData(Loose, "AttributeRouting/get-4/top10", "AttributeRouting/get-4/top10")]
+    [InlineData(Strict, "AttributeRouting/get-5/top10{x}12345", "AttributeRouting/get-5/top10%7Bx%7D<redacted:12345>")]
+    [InlineData(Loose, "AttributeRouting/get-5/top10{x}12345", "AttributeRouting/get-5/top10%7Bx%7D<redacted:12345>")]
+    [InlineData(Strict, "AttributeRouting/get-6/{c}/12345/top10", "AttributeRouting/get-6/%7Bc%7D/<redacted:12345>/top10")]
+    [InlineData(Loose, "AttributeRouting/get-6/{c}/12345/top10", "AttributeRouting/get-6/%7Bc%7D/<redacted:12345>/top10")]
 
     // Mixed routing.
     [InlineData(Strict, "mixed/conventional-routing", "mixed/conventional-routing")]
@@ -155,6 +159,8 @@ public partial class AcceptanceTests
     [InlineData("AttributeRouting/get-2/12345", "AttributeRouting/get-2/{param?}", null, null, "<redacted:12345>")]
     [InlineData("AttributeRouting/get-3", "AttributeRouting/get-3/{param=all}", null, null, "all")]
     [InlineData("AttributeRouting/get-3/top10", "AttributeRouting/get-3/{param=all}", null, null, "top10")]
+    [InlineData("AttributeRouting/get-5/top10{x}12345", "AttributeRouting/get-5/{id}{{x}}{param}", null, null, "<redacted:12345>")]
+    [InlineData("AttributeRouting/get-6/{c}/12345/top10", "AttributeRouting/get-6/{{c}}/{param}/{id}", null, null, "<redacted:12345>")]
 
     // Mixed routing.
     [InlineData("mixed/conventional-routing", "mixed/conventional-routing", null, null, null)]

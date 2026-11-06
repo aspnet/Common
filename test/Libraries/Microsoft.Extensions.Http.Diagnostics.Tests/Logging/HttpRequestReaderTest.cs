@@ -918,6 +918,55 @@ public class HttpRequestReaderTest
         logRecord.QueryString.Should().NotContain(queryParamValue);
     }
 
+    [Theory]
+    [InlineData("/a/{id}{{x}}{token}", "https://default-uri.com/a/123{x}secret", "a/123%7Bx%7DREDACTED")]
+    [InlineData("/b{{c}}/{token}/{id}", "https://default-uri.com/b{c}/secret/123", "b%7Bc%7D/REDACTED/123")]
+    public async Task ReadAsync_RouteHasEscapedBraces_RedactsPath(string httpRoute, string requestUri, string expectedPath)
+    {
+        var options = new LoggingOptions();
+        options.RouteParameterDataClasses.Add("id", DataClassification.None);
+        options.RouteParameterDataClasses.Add("token", FakeTaxonomy.PrivateData);
+
+        var headersReader = new HttpHeadersReader(options.ToOptionsMonitor(), Mock.Of<IHttpHeadersRedactor>());
+        using var serviceProvider = GetServiceProvider(headersReader, configureRedaction: x => x.RedactionFormat = Redacted);
+
+        var reader = new HttpRequestReader(serviceProvider, options.ToOptionsMonitor(),
+            serviceProvider.GetRequiredService<IHttpRouteFormatter>(), serviceProvider.GetRequiredService<IHttpRouteParser>(), RequestMetadataContext);
+
+        using var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        httpRequestMessage.SetRequestMetadata(new RequestMetadata { RequestRoute = httpRoute });
+
+        var logRecord = new LogRecord();
+        await reader.ReadRequestAsync(logRecord, httpRequestMessage, requestHeadersBuffer: null, CancellationToken.None);
+
+        logRecord.Path.Should().Be(expectedPath);
+    }
+
+    [Theory]
+    [InlineData("/a/{id}{{x}}{token}", "https://default-uri.com/a/123{x}secret")]
+    [InlineData("/b{{c}}/{token}/{id}", "https://default-uri.com/b{c}/secret/123")]
+    public async Task ReadAsync_RouteHasEscapedBraces_RedactsPathParameters(string httpRoute, string requestUri)
+    {
+        var options = new LoggingOptions { RequestPathLoggingMode = OutgoingPathLoggingMode.Structured };
+        options.RouteParameterDataClasses.Add("id", DataClassification.None);
+        options.RouteParameterDataClasses.Add("token", FakeTaxonomy.PrivateData);
+
+        var headersReader = new HttpHeadersReader(options.ToOptionsMonitor(), Mock.Of<IHttpHeadersRedactor>());
+        using var serviceProvider = GetServiceProvider(headersReader, configureRedaction: x => x.RedactionFormat = Redacted);
+
+        var reader = new HttpRequestReader(serviceProvider, options.ToOptionsMonitor(),
+            serviceProvider.GetRequiredService<IHttpRouteFormatter>(), serviceProvider.GetRequiredService<IHttpRouteParser>(), RequestMetadataContext);
+
+        using var httpRequestMessage = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        httpRequestMessage.SetRequestMetadata(new RequestMetadata { RequestRoute = httpRoute });
+
+        var logRecord = new LogRecord();
+        await reader.ReadRequestAsync(logRecord, httpRequestMessage, requestHeadersBuffer: null, CancellationToken.None);
+
+        HttpRouteParameter[] expectedParameters = [new("id", "123", false), new("token", Redacted, true)];
+        logRecord.PathParameters.Should().NotBeNull().And.Subject.Take(logRecord.PathParametersCount).Should().BeEquivalentTo(expectedParameters);
+    }
+
     private static ServiceProvider GetServiceProvider(
         HttpHeadersReader headersReader,
         string? serviceKey = null,

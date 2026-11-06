@@ -39,12 +39,12 @@ internal readonly struct Segment
     }
 
     /// <summary>
-    /// Gets start index of the segment.
+    /// Gets start index of the segment in the escaped path, in which an escaped brace "{{" or "}}" of a literal is "%7B" or "%7D".
     /// </summary>
     public int Start { get; }
 
     /// <summary>
-    /// Gets end index of the segment.
+    /// Gets end index of the segment in the escaped path, in which an escaped brace "{{" or "}}" of a literal is "%7B" or "%7D".
     /// </summary>
     public int End { get; }
 
