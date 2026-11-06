@@ -20,6 +20,8 @@ Then stop for merge/approval before publish steps.
 2. Confirm the target patch version (`<major>.<minor>.<patch>`).
 3. Create a working branch from `origin/release/<major>.<minor>`.
 
+Use [the canonical checkpoint/approval contract](../../references/workflow.md). Resolve the public remote by URL rather than assuming `origin`. Record old/new patch, intended release date, baseline SHA and selected package scope. Apply the [per-line version guard](stage-2-update-dependencies.md#validate-the-release-premise-before-mutation): patch jumps larger than one need explicit concern/confirmation. Product version properties are manual; check evaluated package/assembly versions and later compare official artifact versions.
+
 ## Step 2: Survey the release branch for existing backport activity
 
 Before building the full candidate list, check for evidence of existing backport work targeting this
@@ -149,6 +151,7 @@ For each cherry-pick, record whether it was:
 
 - Update `eng/Versions.props` patch version for the target release.
 - Commit message format: `Bump version to <major>.<minor>.<patch>`.
+- Review and obtain approval before this separate commit and each backport/touch-up commit; propagate release-owned trailer policy to children and inspect all outgoing messages before push.
 - This matches recent 10.* servicing examples (`10.4.1`, `10.5.1`, `10.5.2`, `10.8.1`).
 
 ## Step 7: Create the servicing-prep PR
@@ -191,7 +194,7 @@ The dependency closure is provisional until recomputed from the official build's
 Notes:
 
 - Use `#<pr-number>` slugs for included PRs; GitHub renders number/title automatically.
-- Keep commit order in the PR aligned with Step 5.
+- Keep commit order in the PR aligned with Step 6.
 - For every conflicted cherry-pick, include one or more indented sub-bullets describing the conflict(s) and resolution(s).
 - If a selected commit has no PR number, use its short SHA in place of `#<pr-number>`.
 - Keep the `DO-NOT-SQUASH` label on the PR from creation through merge.

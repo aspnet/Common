@@ -3,9 +3,7 @@
 
 #if NET8_0_OR_GREATER
 
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Diagnostics.Latency;
-using Microsoft.Shared.DiagnosticIds;
 using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -24,7 +22,6 @@ public static partial class HttpLoggingServiceCollectionExtensions
     /// middleware to the request pipeline with <c>UseRequestCheckpoint</c> and <c>UseRequestLatencyTelemetry</c>, so
     /// that an <see cref="Microsoft.Extensions.Diagnostics.Latency.ILatencyContext"/> is available for each request.
     /// </remarks>
-    [Experimental(diagnosticId: DiagnosticIds.Experiments.HttpLogging, UrlFormat = DiagnosticIds.UrlFormat)]
     public static IServiceCollection AddHttpServerLatencyTelemetry(this IServiceCollection services)
     {
         _ = Throw.IfNull(services);

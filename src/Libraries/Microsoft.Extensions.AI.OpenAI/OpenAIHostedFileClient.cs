@@ -104,7 +104,7 @@ internal sealed class OpenAIHostedFileClient : IHostedFileClient
 
         fileName ??= content is FileStream fs ? Path.GetFileName(fs.Name) : null;
         mediaType ??= fileName is not null ? MediaTypeMap.GetMediaType(fileName) : null;
-        fileName ??= $"{Guid.NewGuid():N}{MediaTypeMap.GetExtension(mediaType)}";
+        fileName ??= $"{Guid.NewGuid():N}{(mediaType is not null ? MediaTypeMap.GetExtension(mediaType) : null)}";
 
         if (ResolveScope(options) is string containerId)
         {

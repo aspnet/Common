@@ -45,6 +45,7 @@ internal static class DiagnosticIds
         internal const string DocumentDb = "EXTEXP0011";
         internal const string AutoActivation = "EXTEXP0012";
         internal const string HttpLogging = "EXTEXP0013";
+        internal const string Documents = "EXTEXP0019";
 
         // All AI experiments share a diagnostic ID but have different
         // constants to manage which experiment each API belongs to.
@@ -77,8 +78,13 @@ internal static class DiagnosticIds
         // constants to manage which experiment each API belongs to.
         internal const string VectorDataProviderServices = VectorDataExperiments;
 
+        // All Document Extraction experiments share a diagnostic ID but have different
+        // constants to manage which experiment each API belongs to.
+        internal const string DocumentExtraction = DocumentExtractionExperiments;
+
         private const string AIExperiments = "MEAI001";
         private const string VectorDataExperiments = "MEVD9001";
+        private const string DocumentExtractionExperiments = "MEDE0001";
     }
 
     internal static class LoggerMessage

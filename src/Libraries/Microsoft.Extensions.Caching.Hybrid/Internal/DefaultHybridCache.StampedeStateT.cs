@@ -420,18 +420,35 @@ internal partial class DefaultHybridCache
         {
             if (_result is not null)
             {
-                Cache.RemoveStampedeState(in Key);
+                Cache.RemoveStampedeState(this);
                 _ = _result.TrySetException(ex);
             }
         }
 
         private void SetDefaultResult()
         {
-            // note we don't store this dummy result in L1 or L2
+            // note we don't store this dummy result in L1 or L2; we complete with our own cache item, because
+            // it already holds one reservation per joined caller, and each caller releases one when unwrapping
             if (_result is not null)
             {
-                Cache.RemoveStampedeState(in Key);
-                _ = _result.TrySetResult(ImmutableCacheItem<T>.GetReservedShared());
+                CacheItem<T> cacheItem;
+                switch (CacheItem)
+                {
+                    case ImmutableCacheItem<T> immutable:
+                        immutable.SetValue(default!, size: -1);
+                        cacheItem = immutable;
+                        break;
+                    case MutableCacheItem<T> mutable:
+                        mutable.SetFallbackValue(default!);
+                        cacheItem = mutable;
+                        break;
+                    default:
+                        cacheItem = ThrowUnexpectedCacheItem();
+                        break;
+                }
+
+                Cache.RemoveStampedeState(this);
+                _ = _result.TrySetResult(cacheItem);
             }
         }
 
@@ -532,7 +549,7 @@ internal partial class DefaultHybridCache
 
             if (_result is not null)
             {
-                Cache.RemoveStampedeState(in Key);
+                Cache.RemoveStampedeState(this);
                 _ = _result.TrySetResult(value);
             }
         }

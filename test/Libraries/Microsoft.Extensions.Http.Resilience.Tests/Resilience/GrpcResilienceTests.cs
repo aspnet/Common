@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience.Test.Grpc;
+using Microsoft.Extensions.Time.Testing;
 using Polly;
 using Xunit;
 
@@ -78,7 +79,11 @@ public class GrpcResilienceTests
     [CombinatorialData]
     public async Task SayHello_CustomResilience_OK(bool asynchronous)
     {
-        var client = CreateClient(builder => builder.AddResilienceHandler("custom", builder => builder.AddTimeout(TimeSpan.FromSeconds(1))));
+        var client = CreateClient(builder => builder.AddResilienceHandler("custom", builder =>
+        {
+            builder.TimeProvider = new FakeTimeProvider();
+            builder.AddTimeout(TimeSpan.FromSeconds(1));
+        }));
         var response = await SendRequest(client, asynchronous);
 
         response.Message.Should().Be("HI!");

@@ -1,8 +1,8 @@
 <Project>
 
- <!-- The items in this ItemGroup are packages coming from aspnetcore and runtime repos. When an asset is not targeting net9.0 version
+ <!-- The items in this ItemGroup are packages coming from aspnetcore and runtime repos. When an asset is not targeting net9.0 or later
   of the framework, we should use the following LTS versions instead -->
-  <ItemGroup Condition="'$(TargetFramework)' != 'net9.0' And '$(TargetFramework)' != 'net10.0' And '$(ForceLatestDotnetVersions)' != 'true'">
+  <ItemGroup Condition="'$(TargetFramework)' != 'net9.0' And '$(TargetFramework)' != 'net10.0' And '$(TargetFramework)' != 'net11.0' And '$(ForceLatestDotnetVersions)' != 'true'">
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="$(MicrosoftBclAsyncInterfacesLTSVersion)" />
     <PackageVersion Include="Microsoft.Bcl.Memory" Version="$(MicrosoftBclMemoryVersion)" /> <!-- Note there is no 8.0 version of Microsoft.Bcl.Memory -->
     <PackageVersion Include="Microsoft.Bcl.TimeProvider" Version="$(MicrosoftBclTimeProviderLTSVersion)" />

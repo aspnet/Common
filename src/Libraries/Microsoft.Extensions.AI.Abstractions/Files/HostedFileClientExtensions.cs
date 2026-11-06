@@ -116,7 +116,8 @@ public static class HostedFileClientExtensions
 
             if (string.IsNullOrEmpty(fileName))
             {
-                fileName = $"{fileId}{MediaTypeMap.GetExtension(downloadStream.MediaType)}";
+                string? extension = downloadStream.MediaType is string mediaType ? MediaTypeMap.GetExtension(mediaType) : null;
+                fileName = $"{fileId}{extension}";
             }
 
             finalPath = destinationPath.Length == 0 ? fileName! : Path.Combine(destinationPath, fileName);

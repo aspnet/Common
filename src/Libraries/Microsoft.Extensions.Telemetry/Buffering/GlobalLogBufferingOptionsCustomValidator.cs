@@ -22,7 +22,11 @@ internal sealed class GlobalLogBufferingOptionsCustomValidator : IValidateOption
             }
 
             int wildcardIndex = rule.CategoryName.IndexOf(WildcardChar, StringComparison.Ordinal);
+#if NET11_0_OR_GREATER
+            if (wildcardIndex >= 0 && rule.CategoryName.IndexOf(WildcardChar, wildcardIndex + 1, StringComparison.Ordinal) >= 0)
+#else
             if (wildcardIndex >= 0 && rule.CategoryName.IndexOf(WildcardChar, wildcardIndex + 1) >= 0)
+#endif
             {
                 resultBuilder.AddError("Only one wildcard character is allowed in category name.", nameof(options.Rules));
             }

@@ -19,12 +19,22 @@ public class ConfigurationBindingQuirkBehaviorTests
     [InlineData("customSection:ambientmetadata:build")]
     public void GivenMetadata_RegistersOptions_HostBuilder(string sectionName)
     {
-        // When configuration is not available, values are initialized to the default value of string?, which is null
+        // .NET 11 binds empty strings for HostBuilder too; earlier runtimes leave these properties null.
+#if NET11_0_OR_GREATER
+        var defaultMetadata = new BuildMetadata
+        {
+            BuildId = string.Empty,
+            BuildNumber = string.Empty,
+            SourceBranchName = string.Empty,
+            SourceVersion = string.Empty
+        };
+#else
         var defaultMetadata = new BuildMetadata();
+#endif
 
         using var host = CreateUsingHostBuilder(sectionName);
 
-        // We get a BuildMetadata instance with null values for all its properties, despite using empty strings in the configuration
+        // Earlier runtimes leave the properties null despite the empty strings in configuration.
         // Related issue: https://github.com/dotnet/runtime/issues/62532
         host.Services.GetRequiredService<IOptions<BuildMetadata>>().Value.Should().BeEquivalentTo(defaultMetadata);
     }

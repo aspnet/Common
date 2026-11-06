@@ -8,12 +8,12 @@ The .NET Extensions repository contains a suite of libraries providing facilitie
 
 ### Prerequisites and Bootstrap
 - **CRITICAL**: Ensure you have access to the appropriate Azure DevOps feeds. If build fails with "Name or service not known" for `pkgs.dev.azure.com`, this indicates network/authentication issues with required internal feeds.
-- Install .NET SDK 9.0.109 (as specified in global.json) if you do not already have it:
+- Install the .NET SDK version pinned in `global.json` (11.0.100-rc.3.26522.148) if you do not already have it:
   ```bash
-  curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version 9.0.109 --install-dir ~/.dotnet
+  curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version 11.0.100-rc.3.26522.148 --install-dir ~/.dotnet
   export PATH="$HOME/.dotnet:$PATH"
   ```
-- Verify installation: `dotnet --version` should show `9.0.109`
+- Verify installation: `dotnet --version` should show `11.0.100-rc.3.26522.148`
 
 ### Essential Build Commands
 - **Restore dependencies**: `./restore.sh` (Linux/Mac) or `restore.cmd` (Windows)
@@ -91,7 +91,7 @@ This repository does NOT contain a single solution file. Instead, use the slngen
 - `artifacts/packages/` - Generated NuGet packages
 
 #### Key Files
-- `global.json` - Specifies required .NET SDK version (9.0.109)
+- `global.json` - Specifies the required .NET SDK version and runtime bands
 - `Directory.Build.props` - MSBuild properties for entire repository
 - `NuGet.config` - Package source configuration (internal Microsoft feeds)
 
@@ -106,7 +106,7 @@ This repository does NOT contain a single solution file. Instead, use the slngen
 2. **Build and test**: `./build.sh --build --test` (remember: NEVER CANCEL, 60+ minute timeout)
 3. **For public API changes**: Run `./scripts/MakeApiBaselines.ps1` to update API baseline manifest files
 4. **Manual verification**: 
-   - Check that your changes compile across target frameworks (net8.0, net9.0)
+   - Check that your changes compile across target frameworks (net8.0, net9.0, net10.0, net11.0)
    - Review generated packages in `artifacts/packages/` if applicable
    - Verify no new build warnings in `artifacts/log/Build.binlog`
 
@@ -140,7 +140,7 @@ This repository does NOT contain a single solution file. Instead, use the slngen
 ### Build Configuration Options
 - `--configuration Debug|Release` - Build configuration
 - `--verbosity minimal|normal|detailed|diagnostic` - MSBuild verbosity
-- `--onlyTfms "net8.0;net9.0"` - Build specific target frameworks only
+- `--onlyTfms "net8.0;net9.0;net10.0;net11.0"` - Build specific target frameworks only
 
 ### Code Coverage
 ```bash

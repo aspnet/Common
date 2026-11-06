@@ -104,4 +104,14 @@ public class HttpStandardResilienceOptionsCustomValidatorTests
 
         Assert.True(validationResult.Failed);
     }
+
+    [Fact]
+    public void Validate_RetryBudget_OnlyAllowedByBudgetAwareValidator()
+    {
+        var options = new HttpStandardResilienceOptions();
+        options.Retry.UseBudgetedRetries();
+
+        Assert.True(new HttpStandardResilienceOptionsValidator().Validate(string.Empty, options).Failed);
+        Assert.True(new HttpStandardResilienceOptionsBudgetAwareValidator().Validate(string.Empty, options).Succeeded);
+    }
 }

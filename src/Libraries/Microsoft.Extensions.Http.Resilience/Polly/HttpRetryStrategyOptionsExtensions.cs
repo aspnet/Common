@@ -23,6 +23,25 @@ public static class HttpRetryStrategyOptionsExtensions
 #endif
 
     /// <summary>
+    /// Enables a retry budget with default values to reduce the extra load that retries put on a degraded dependency.
+    /// </summary>
+    /// <param name="options">The retry strategy options.</param>
+    /// <remarks>
+    /// This method sets <see cref="HttpRetryStrategyOptions.RetryBudget"/> to a new <see cref="HttpRetryBudgetOptions"/> instance
+    /// with default values, overwriting any existing budget. Other retry options are not changed.
+    /// Values set after calling this method take precedence. Use
+    /// <see cref="HttpRetryResiliencePipelineBuilderExtensions.AddRetryWithBudget(ResiliencePipelineBuilder{HttpResponseMessage}, HttpRetryStrategyOptions)"/>
+    /// to apply the retry budget in custom pipelines. Polly's <c>AddRetry</c> can't apply it and throws a
+    /// <see cref="System.ComponentModel.DataAnnotations.ValidationException"/> instead.
+    /// </remarks>
+    public static void UseBudgetedRetries(this HttpRetryStrategyOptions options)
+    {
+        _ = Throw.IfNull(options);
+
+        options.RetryBudget = new HttpRetryBudgetOptions();
+    }
+
+    /// <summary>
     /// Disables retry attempts for POST, PATCH, PUT, DELETE, and CONNECT HTTP methods.
     /// </summary>
     /// <param name="options">The retry strategy options.</param>

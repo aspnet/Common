@@ -28,7 +28,9 @@ internal static partial class JsonUtilities
         internal static JsonTypeInfo<ScenarioRunResult> ScenarioRunResultTypeInfo => Options.GetTypeInfo<ScenarioRunResult>();
     }
 
+#if NET && !NET11_0_OR_GREATER
     private static JsonTypeInfo<T> GetTypeInfo<T>(this JsonSerializerOptions options) => (JsonTypeInfo<T>)options.GetTypeInfo(typeof(T));
+#endif
 
     private static JsonSerializerOptions CreateJsonSerializerOptions(bool writeIndented)
     {

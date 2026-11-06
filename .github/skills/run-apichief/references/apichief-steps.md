@@ -48,14 +48,14 @@ dotnet build src/Libraries/<LibraryName>/<LibraryName>.csproj --nologo --verbosi
 
 ## 5. Run ApiChief
 
-For each matched library, run ApiChief against the compiled DLL. The repo multi-targets libraries across several TFMs (e.g. `net10.0`, `net9.0`, `net8.0`, `net462`, `netstandard2.0`). Use the **highest available `net*` TFM** under `artifacts/bin/$name/Debug/` by default (e.g. prefer `net10.0` over `net9.0`). Do not use `netstandard*` or `net4*` targets unless specifically requested.
+For each matched library, run ApiChief against the compiled DLL. The repo multi-targets libraries across several TFMs (e.g. `net11.0`, `net10.0`, `net9.0`, `net8.0`, `net462`, `netstandard2.0`). Use the **highest available `net*` TFM** under `artifacts/bin/$name/Debug/` by default (e.g. prefer `net11.0` over `net10.0`). Do not use `netstandard*` or `net4*` targets unless specifically requested.
 
 ```powershell
-$chiefDll = "artifacts/bin/ApiChief/Debug/net10.0/ApiChief.dll"
+$chiefDll = "artifacts/bin/ApiChief/Debug/net11.0/ApiChief.dll"
 
 # For each matched library:
 $name = "<LibraryName>"
-# Find the highest net* TFM available (e.g. net10.0, net9.0, net8.0)
+# Find the highest net* TFM available (e.g. net11.0, net10.0, net9.0, net8.0)
 $tfm = Get-ChildItem "artifacts/bin/$name/Debug" -Directory |
     Where-Object { $_.Name -match '^net\d+\.\d+$' } |
     Sort-Object { [version]($_.Name -replace '^net','') } -Descending |
@@ -70,8 +70,8 @@ dotnet $chiefDll $dll <command> [options]
 Before running ApiChief, list the selected TFM for each library so the user can see what will be used:
 
 ```
-  Microsoft.Extensions.AI → net10.0 (available: net10.0, net9.0, net8.0, net462, netstandard2.0)
-  Microsoft.Extensions.AI.Abstractions → net10.0 (available: net10.0, net9.0, net8.0, netstandard2.0)
+  Microsoft.Extensions.AI → net11.0 (available: net11.0, net10.0, net9.0, net8.0, net462, netstandard2.0)
+  Microsoft.Extensions.AI.Abstractions → net11.0 (available: net11.0, net10.0, net9.0, net8.0, netstandard2.0)
 ```
 
 If the user specifies a TFM override (e.g. "use net9.0 for MEAI.Abstractions"), use that target instead of the auto-selected one. The user may also specify a blanket override for all libraries (e.g. "use net9.0").

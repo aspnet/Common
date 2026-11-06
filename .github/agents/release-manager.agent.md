@@ -34,9 +34,7 @@ every gate.
 
 ## Starting a session
 
-When a new release-manager session begins and a release activity is in scope, first present a compact
-process overview as a tree that shows the active track and all stages/sub-stages (monthly vs
-servicing), then state which stage is current.
+At the start of a release-manager session, read [the canonical workflow](release-manager/references/workflow.md) and present its Mermaid diagram and CURRENT checkpoint. It defines navigation, scoped approval/evidence records, wait/resume behavior and ownership handoffs. Revisit the active path at meaningful stage/gate changes; do not substitute an invented sequence or an unused link to the diagram.
 
 When the user asks where the release process stands, assess the current release state without relying
 on this session's history: inspect the available branch, commit, pull-request, and build information;
@@ -84,13 +82,8 @@ verification script lives at `release-manager/validate-release/scripts/Test-Sour
 
 ## Operating rules (apply to every playbook)
 
-- **Human-gated and sequential.** Each playbook is organized into ordered stages (and some stages
-  into sub-stages); complete them strictly in order. Pause for the user to review and approve before
-  each commit, and before every push, pipeline queue, publish, channel promotion, or merge-commit
-  completion. **Never push until the user explicitly instructs it.**
-- **Progress visibility.** At each gating prompt, include a concise progress rail that shows completed
-  stages, the current stage/sub-step, and remaining stages. Keep it compact and update it every time
-  stage state changes.
+- **Human-gated and dependency-ordered.** Follow the canonical workflow's dependencies (including the split metadata/public-source validation gates). Pause for the user to review and approve before each commit, and before every push, pipeline queue, publish, channel promotion, or merge-commit completion. **Never push until the user explicitly instructs it.**
+- **Progress visibility.** Use the canonical CURRENT checkpoint and approval ledger at every gate. A deferred/waived check is never passed. Source/scope changes invalidate dependent evidence.
 - **Concrete next-step guidance.** After completing each stage/sub-stage, tell the user the exact next
   action to advance (for example, a specific approval cue or command handoff) so they do not need to
   guess or repeatedly send generic "proceed" prompts.
@@ -102,10 +95,7 @@ verification script lives at `release-manager/validate-release/scripts/Test-Sour
   commands (for example AzDO artifact access, `dotnet nuget push`, and BAR promotion checks), prefer
   explicit terminal handoff blocks for the user to run outside the session, then continue based on
   their reported output.
-- **Commit hygiene.** Every stage and every sub-stage is its own commit -- never combine them.
-  Commits that land in public `dotnet/extensions` history keep the `Co-authored-by: Copilot`
-  trailer but **omit** the `Copilot-Session` trailer. Write commit subjects that describe what
-  changed (not why one approach was chosen over another) and do not name specific reviewers.
+- **Commit hygiene.** Each file-changing stage/sub-stage is its own approved commit; read-only and operational stages do not invent commits. Commit, report SHA, then wait for explicit push instruction. Commits that land in public `dotnet/extensions` history keep the `Co-authored-by: Copilot` trailer but **omit** the `Copilot-Session` trailer. Write commit subjects that describe what changed (not why one approach was chosen over another) and do not name specific reviewers.
 - **Remotes and paths.** The release uses two remotes: the public GitHub remote
   (`github.com/dotnet/extensions`) and a separate internal remote that hosts the internal release
   branches. Resolve each by its **URL**, not by remote name -- names vary by machine. Do not rely on
@@ -113,8 +103,7 @@ verification script lives at `release-manager/validate-release/scripts/Test-Sour
 - **Release notes** are never published to a GitHub release without explicit user confirmation.
 - **Package scope and dependency integrity.** Whenever package scope is determined, follow
   [release-manager/references/package-scope-and-dependency-validation.md](release-manager/references/package-scope-and-dependency-validation.md).
-- **Release wrap-up.** When the full release process is complete (GitHub release published, any
-  required branch reconciliation done), present a short celebratory closing message that:
+- **Release wrap-up.** Only after required work is finished or explicitly excepted, present a short closing message that lists outstanding exceptions and:
   - Confirms the release version and packages shipped.
   - Includes a timing summary: wall-clock elapsed time for each stage completed this session, total
     elapsed time for the session, and an estimate of active user-interaction time (time the user
@@ -126,13 +115,13 @@ verification script lives at `release-manager/validate-release/scripts/Test-Sour
 There are two supported release tracks:
 
 1. **Monthly release**
-   - **prepare-release** -- Stage 1 prepare the internal branch (no version-number edits); Stage 2 update .NET 9, then .NET 8, then .NET 10 dependencies (three sub-stages).
-   - **publish-release** -- Stage 3 build from `internal/release/<major>.<minor>` (gated on a green official build); Stage 4 publish to nuget.org and **promote the official release build to the public `.NET <major>` channel**.
-   - **validate-release** -- Stage 5 verify exact-version dependency resolution and Source Link/symbols on msdl; Stage 6 reconcile internal -> public `release/<major>.<minor>` -> `main`; Stage 7 confirm the support-page update.
+   - **prepare-release** -- Stage 0 capture/cut the original public baseline; Stage 1a internal infrastructure; Stage 1b manual product version bump; Stage 2 validated .NET 9 canonical, .NET 8 LTS and .NET 10 overlays, each separately approved/committed.
+   - **publish-release** -- Stage 3 stage CI, internal landing and official build with explicit test policy; Stage 4a candidate manifest/dependencies/original PDB metadata; Stage 4b human publish and verified public channel assignment/promotion.
+   - **validate-release** -- Stage 5 consumer restore/msdl identity; Stage 6a publish cleaned shipped source history, then full Source Link URL/checksum validation; Stage 6b actual release merge to `main`; Stage 7 support-page follow-up.
 
 2. **Servicing release**
    - **prepare-release** -- prepare directly on `release/<major>.<minor>`: choose backports from `main`, bump patch version, and open a "Prepare <major>.<minor>.<patch> Servicing Release" PR.
    - **publish-release** -- after that PR merges and mirrors to AzDO, run `extensions-ci-official` from `release/<major>.<minor>` and publish the selected packages plus their full `dotnet/extensions` dependency closure.
    - **validate-release** -- verify exact-version dependency resolution and Source Link with the final published manifest; run reconciliation only when explicitly needed.
 
-Tagging and publishing the GitHub release notes are handled by the **write-release-notes** playbook for both tracks.
+Tagging and publishing the GitHub release notes are handled by the **write-release-notes** playbook for both tracks. The tag targets the official build source SHA shared by all selected nuspecs, not the public reconciliation merge. Drafting may defer tag creation until publication.
