@@ -370,6 +370,9 @@ public class OpenAISpeechToTextClientTests
         // M4A/MP4: ISO BMFF ftyp box
         { new byte[] { 0x00, 0x00, 0x00, 0x20, (byte)'f', (byte)'t', (byte)'y', (byte)'p', (byte)'M', (byte)'4', (byte)'A', (byte)' ' }, "audio.m4a" },
 
+        // Ogg: OggS container header (RFC 3533)
+        { new byte[] { (byte)'O', (byte)'g', (byte)'g', (byte)'S', 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, "audio.ogg" },
+
         // Unknown bytes: defaults to mp3
         { new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C }, "audio.mp3" },
     };
