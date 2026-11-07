@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Primitives;
+using Microsoft.Extensions.ServiceDiscovery.Internal;
 
 namespace Microsoft.Extensions.ServiceDiscovery;
 
@@ -40,7 +41,13 @@ internal sealed class ServiceEndpointBuilder : IServiceEndpointBuilder
     /// <returns>The service endpoint source.</returns>
     public ServiceEndpointSource Build()
     {
-        return new ServiceEndpointSource(_endpoints, new CompositeChangeToken(_changeTokens), _features);
+        // A single change token, which is the common case, is returned as-is: there is nothing to link, and the
+        // consumer's registration on the token is its own to release.
+        var changeToken = _changeTokens.Count == 1
+            ? _changeTokens[0]
+            : new LinkedChangeToken(_changeTokens);
+
+        return new ServiceEndpointSource(_endpoints, changeToken, _features);
     }
 }
 
