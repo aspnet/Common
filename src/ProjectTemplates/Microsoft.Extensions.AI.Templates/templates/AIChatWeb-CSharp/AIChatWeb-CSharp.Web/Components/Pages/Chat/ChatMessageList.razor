@@ -35,8 +35,15 @@
     {
         if (firstRender)
         {
-            // Activates the auto-scrolling behavior
-            await JS.InvokeVoidAsync("import", "./Components/Pages/Chat/ChatMessageList.razor.js");
+            try
+            {
+                // Activates the auto-scrolling behavior
+                await JS.InvokeVoidAsync("import", "./Components/Pages/Chat/ChatMessageList.razor.js");
+            }
+            catch (JSDisconnectedException)
+            {
+                // The circuit disconnected before the module finished loading.
+            }
         }
     }
 }

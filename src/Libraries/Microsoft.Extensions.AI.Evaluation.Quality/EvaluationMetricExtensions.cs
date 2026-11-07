@@ -25,12 +25,25 @@ internal static class EvaluationMetricExtensions
         };
 
         const double MinimumPassingScore = 4.0;
-        return metric.Value is double value && value < MinimumPassingScore
-            ? new EvaluationMetricInterpretation(
-                rating,
-                failed: true,
-                reason: $"{metric.Name} is less than {MinimumPassingScore}.")
-            : new EvaluationMetricInterpretation(rating);
+        return metric.Value switch
+        {
+            null =>
+                new EvaluationMetricInterpretation(
+                    rating,
+                    failed: true,
+                    reason: $"{metric.Name} has no score."),
+            double value when value < MinimumPassingScore =>
+                new EvaluationMetricInterpretation(
+                    rating,
+                    failed: true,
+                    reason: $"{metric.Name} is less than {MinimumPassingScore}."),
+            _ when rating is EvaluationRating.Inconclusive =>
+                new EvaluationMetricInterpretation(
+                    rating,
+                    failed: true,
+                    reason: $"{metric.Name} is outside the valid range."),
+            _ => new EvaluationMetricInterpretation(rating),
+        };
     }
 
     internal static EvaluationMetricInterpretation InterpretScore(

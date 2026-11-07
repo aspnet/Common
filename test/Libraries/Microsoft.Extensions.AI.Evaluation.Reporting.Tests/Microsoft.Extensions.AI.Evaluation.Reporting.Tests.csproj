@@ -3,6 +3,7 @@
   <PropertyGroup>
     <RootNamespace>Microsoft.Extensions.AI.Evaluation.Reporting.Tests</RootNamespace>
     <Description>Unit tests for Microsoft.Extensions.AI.Evaluation.Reporting.</Description>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,7 +17,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.AI.Evaluation.Reporting.Azure\Microsoft.Extensions.AI.Evaluation.Reporting.Azure.csproj" />
-    <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.AI.Evaluation.Reporting\CSharp\Microsoft.Extensions.AI.Evaluation.Reporting.csproj" />
+    <ProjectReference Include="..\..\..\src\Libraries\Microsoft.Extensions.AI.Evaluation.Reporting\CSharp\Microsoft.Extensions.AI.Evaluation.Reporting.csproj">
+      <Aliases>global, Reporting</Aliases>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

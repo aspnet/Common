@@ -23,35 +23,12 @@ parameters:
     default: false
 
 steps:
-  - task: NodeTool@0
-    displayName: Add NodeJS/npm
-    inputs:
-      versionSpec: "20.x"
-      checkLatest: true
-
-  - script: ${{ parameters.buildScript }}
-            -restore
-            -warnAsError ${{ parameters.warnAsError }}
-            /bl:${{ parameters.repoLogPath }}/restore.binlog
-    displayName: Restore
-
-  - pwsh: |
-        $(Build.SourcesDirectory)/scripts/Slngen.ps1 -All -NoLaunch
-    displayName: Create solution
-
-  - script: ${{ parameters.buildScript }}
-            -restore
-            -warnAsError ${{ parameters.warnAsError }}
-            /bl:${{ parameters.repoLogPath }}/restore2.binlog
-    displayName: Restore solution
-
-  - script: ${{ parameters.buildScript }}
-            -build
-            -configuration ${{ parameters.buildConfig }}
-            -warnAsError ${{ parameters.warnAsError }}
-            /bl:${{ parameters.repoLogPath }}/build.binlog
-            $(_OfficialBuildIdArgs)
-    displayName: Build
+  - template: /eng/pipelines/templates/RestoreAndBuild.yml
+    parameters:
+      buildScript: ${{ parameters.buildScript }}
+      buildConfig: ${{ parameters.buildConfig }}
+      repoLogPath: ${{ parameters.repoLogPath }}
+      warnAsError: ${{ parameters.warnAsError }}
 
   - ${{ if ne(parameters.skipTests, 'true') }}:
     - script: $(Build.SourcesDirectory)/.dotnet/dotnet dotnet-coverage collect

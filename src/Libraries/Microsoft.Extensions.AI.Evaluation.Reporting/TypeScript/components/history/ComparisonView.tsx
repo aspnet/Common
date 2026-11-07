@@ -6,7 +6,7 @@ import { makeStyles, mergeClasses, Badge, Card, Dropdown, Option } from '@fluent
 import { ChevronRight20Regular } from '@fluentui/react-icons';
 import { useReportContext } from '../core/ReportContext';
 import { useAnnounce } from '../core/Announcer';
-import { useReportStyles, srOnlyStyle, statusTextVar } from '../styles/reportStyles';
+import { trendTone, useReportStyles, srOnlyStyle } from '../styles/reportStyles';
 import { chronologicalExecutions } from '../core/viewModels';
 import { formatNumber, isDisplayedZero } from '../core/metricModel';
 import {
@@ -103,7 +103,7 @@ const buildCmpRow = (
     const currentGoodness = hasB && currentAgg!.goodnessN > 0 ? currentAgg!.goodnessSum / currentAgg!.goodnessN : undefined;
     const goodnessDelta =
         baselineGoodness !== undefined && currentGoodness !== undefined ? currentGoodness - baselineGoodness : undefined;
-    const status: DeltaJudgment = dir === 0 ? 'neutral' : judgeValueDelta(direction, rawDelta!, goodnessDelta);
+    const status: DeltaJudgment = dir === 0 ? 'unchanged' : judgeValueDelta(direction, rawDelta!, goodnessDelta);
     const baselinePos = baselineAvg !== undefined ? posOn(baselineAvg, domain.min, domain.max) : null;
     const currentPos = currentAvg !== undefined ? posOn(currentAvg, domain.min, domain.max) : null;
     const dumbbell = currentPos !== null
@@ -127,12 +127,15 @@ const buildCmpRow = (
         name: k,
         a: aStr,
         b: bStr,
-        bColor: statusTextVar(status),
+        bColor: `var(--${trendTone[status]}-text)`,
         delta,
         deltaAriaLabel,
         status,
         connector: dumbbell.connector,
-        dotB: dumbbell.dotB,
+        dotB: {
+            ...dumbbell.dotB,
+            borderColor: 'var(--comparison-baseline-identity)',
+        },
         dotA: dumbbell.dotA,
         baselineAvg,
         currentAvg,
@@ -189,16 +192,20 @@ const useLocalStyles = makeStyles({
         textTransform: 'uppercase',
         letterSpacing: '.5px',
     },
-    cmpColumnLabelBaseline: { color: 'var(--neutral-foreground-3)' },
-    cmpColumnLabelCurrent: { color: 'var(--brand-foreground-1)' },
+    cmpColumnLabelBaseline: { color: 'var(--comparison-baseline-identity)' },
+    cmpColumnLabelCurrent: { color: 'var(--comparison-current-identity)' },
     cmpColumnDot: {
         width: '8px',
         height: '8px',
         borderRadius: '50%',
         flex: 'none',
     },
-    cmpColumnDotBaseline: { background: 'var(--neutral-foreground-4)' },
-    cmpColumnDotCurrent: { background: 'var(--brand-background)' },
+    cmpColumnDotBaseline: {
+        boxSizing: 'border-box',
+        background: 'transparent',
+        border: '1.5px solid var(--comparison-baseline-identity)',
+    },
+    cmpColumnDotCurrent: { background: 'var(--comparison-current-identity)' },
     cmpDropdownWrap: { width: '100%' },
     cmpArrowWrap: {
         display: 'flex',
@@ -217,11 +224,30 @@ const useLocalStyles = makeStyles({
         display: 'flex',
         alignItems: 'stretch',
         borderTop: '1px solid var(--neutral-stroke-2)',
+        '@media (max-width: 640px)': {
+            flexDirection: 'column',
+        },
     },
     cmpHeadlineStat: {
         flex: 1,
         minWidth: 0,
         padding: 'var(--spacing-m-nudge) var(--spacing-l)',
+        borderRight: '1px solid var(--neutral-stroke-2)',
+        ':last-child': {
+            borderRight: 'none',
+            '@media (max-width: 640px)': {
+                borderBottom: 'none',
+            },
+        },
+        '@media (max-width: 640px)': {
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) auto',
+            gridTemplateRows: 'auto auto',
+            columnGap: 'var(--spacing-m)',
+            padding: 'var(--spacing-s) var(--spacing-l)',
+            borderRight: 'none',
+            borderBottom: '1px solid var(--neutral-stroke-2)',
+        },
     },
     cmpHeadlineLabel: {
         fontSize: 'var(--font-size-200)',
@@ -230,6 +256,13 @@ const useLocalStyles = makeStyles({
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
+        '@media (max-width: 640px)': {
+            gridColumn: 1,
+            gridRow: 1,
+            whiteSpace: 'normal',
+            overflow: 'visible',
+            textOverflow: 'clip',
+        },
     },
     cmpHeadlineValue: {
         fontSize: 'var(--font-size-600)',
@@ -240,6 +273,14 @@ const useLocalStyles = makeStyles({
         textOverflow: 'ellipsis',
         marginTop: 'var(--spacing-xs)',
         fontVariantNumeric: 'tabular-nums',
+        '@media (max-width: 640px)': {
+            gridColumn: 2,
+            gridRow: '1 / span 2',
+            alignSelf: 'center',
+            marginTop: 0,
+            overflow: 'visible',
+            textOverflow: 'clip',
+        },
     },
     cmpHeadlineSub: {
         fontSize: 'var(--font-size-200)',
@@ -248,6 +289,13 @@ const useLocalStyles = makeStyles({
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
+        '@media (max-width: 640px)': {
+            gridColumn: 1,
+            gridRow: 2,
+            whiteSpace: 'normal',
+            overflow: 'visible',
+            textOverflow: 'clip',
+        },
     },
     cmpCardInner: { margin: '-12px' },
     cmpSectionHeader: {
@@ -288,16 +336,15 @@ const useLocalStyles = makeStyles({
     },
     cmpLegendDotBaseline: {
         background: 'var(--neutral-background-1)',
-        border: '1.5px solid var(--neutral-foreground-3)',
+        border: '1.5px solid var(--comparison-baseline-identity)',
     },
-    cmpLegendDotCurrent: { background: 'var(--status-success-background-3)' },
+    cmpLegendDotCurrent: { background: 'var(--comparison-current-identity)' },
     cmpLegendDivider: {
         width: '1px',
         height: 'var(--spacing-m)',
         background: 'var(--neutral-stroke-2)',
     },
     cmpLegendDirection: { color: 'var(--neutral-foreground-3)' },
-    cmpLegendSep: { color: 'var(--neutral-foreground-4)' },
     sortBtn: {
         display: 'inline-flex',
         alignItems: 'center',
@@ -320,11 +367,6 @@ const useLocalStyles = makeStyles({
         columnGap: 'var(--spacing-l)',
         alignItems: 'center',
         padding: 'var(--spacing-m-nudge) var(--spacing-xl)',
-        fontSize: 'var(--font-size-100)',
-        fontWeight: 'var(--font-weight-semibold)',
-        color: 'var(--neutral-foreground-4)',
-        textTransform: 'uppercase',
-        letterSpacing: '.5px',
         borderBottom: '1px solid var(--neutral-stroke-2)',
     },
     cmpColHeaderName: { display: 'flex' },
@@ -419,7 +461,7 @@ const useLocalStyles = makeStyles({
         height: '1.5px',
         transform: 'translateY(-50%)',
         borderRadius: 'var(--radius-circular)',
-        background: 'var(--neutral-stroke-2)',
+        background: 'var(--chart-track)',
     },
     cmpDeltaCell: {
         width: '64px',
@@ -560,36 +602,31 @@ export const ComparisonView = () => {
         return b;
     }, [allRows]);
 
-    const DIV = '1px solid var(--neutral-stroke-2)';
     const headline = [
         {
             label: 'Metrics increased',
             value: '' + increased,
             valueColor: 'var(--neutral-foreground-1)',
             sub: 'of ' + comparableRows.length + ' comparable metrics',
-            borderRight: DIV,
         },
         {
             label: 'Metrics decreased',
             value: '' + decreased,
             valueColor: 'var(--neutral-foreground-1)',
             sub: 'of ' + comparableRows.length + ' comparable metrics',
-            borderRight: DIV,
         },
         biggest
             ? {
                   label: 'Biggest change',
                   value: biggest.delta,
-                  valueColor: statusTextVar(biggest.status),
+                  valueColor: `var(--${trendTone[biggest.status]}-text)`,
                   sub: biggest.name,
-                  borderRight: 'none',
               }
             : {
                   label: 'Biggest change',
                   value: comparableRows.length > 0 ? 'stable' : 'not comparable',
                   valueColor: 'var(--neutral-foreground-1)',
                   sub: comparableRows.length > 0 ? 'no significant change' : 'no shared metric values',
-                  borderRight: 'none',
               },
     ];
 
@@ -670,7 +707,7 @@ export const ComparisonView = () => {
                 {effectiveA !== effectiveB && allRows.length > 0 && (
                     <div className={local.cmpHeadlineRow}>
                         {headline.map((c) => (
-                            <div key={c.label} className={local.cmpHeadlineStat} style={{ borderRight: c.borderRight }}>
+                            <div key={c.label} className={local.cmpHeadlineStat}>
                                 <div className={local.cmpHeadlineLabel}>
                                     {c.label}
                                 </div>
@@ -707,7 +744,7 @@ export const ComparisonView = () => {
                                 </span>
                                 <span className={local.cmpLegendDivider} />
                                 <span className={local.cmpLegendItem}>
-                                    <span aria-hidden="true" className={local.cmpLegendDirection}>▲</span> increased <span aria-hidden="true" className={local.cmpLegendSep}>·</span> <span aria-hidden="true" className={local.cmpLegendDirection}>▼</span> decreased
+                                    <span aria-hidden="true" className={local.cmpLegendDirection}>▲</span> increased <span aria-hidden="true" className={local.cmpLegendDirection}>▼</span> decreased
                                 </span>
                             </span>
                         </div>
@@ -715,7 +752,7 @@ export const ComparisonView = () => {
                         <div className={s.tscroll} role="table" aria-label="Per-metric comparison" tabIndex={0}>
                             <div
                                 role="row"
-                                className={mergeClasses('eval-grid3', local.cmpTableHeaderRow)}
+                                className={mergeClasses('eval-grid3', s.compactTableHeader, local.cmpTableHeaderRow)}
                             >
                                 <span role="columnheader" aria-sort={ariaSort('name')} className={local.cmpColHeaderName}>
                                     <button type="button" className={mergeClasses(local.sortBtn, local.cmpColHeaderNameBtn)} onClick={() => onSort('name')} aria-label={ariaLabel('name', 'Metric')}>
@@ -791,7 +828,7 @@ export const ComparisonView = () => {
                                                 </span>
                                                 <span
                                                     className={local.cmpDeltaCell}
-                                                    style={{ color: statusTextVar(m.status) }}
+                                                    style={{ color: `var(--${trendTone[m.status]}-text)` }}
                                                 >
                                                     <span aria-hidden="true">{m.delta}</span>
                                                     <span style={srOnlyStyle}>{m.deltaAriaLabel}</span>

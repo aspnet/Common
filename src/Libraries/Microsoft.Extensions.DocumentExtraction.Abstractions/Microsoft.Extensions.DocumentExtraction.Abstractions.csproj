@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TargetFrameworks);netstandard2.0</TargetFrameworks>
+    <RootNamespace>Microsoft.Extensions.DocumentExtraction</RootNamespace>
+    <Description>Contracts for provider-neutral document extraction over shared Documents abstractions.</Description>
+    <Workstream>RAG</Workstream>
+    <PackageTags>documents;extraction;ocr;structured-content</PackageTags>
+    <Stage>dev</Stage>
+    <StageDevDiagnosticId>MEDE0001</StageDevDiagnosticId>
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <MinCodeCoverage>80</MinCodeCoverage>
+    <MinMutationScore>75</MinMutationScore>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CA1307;CA1822;CA1859;IDE0032;IDE0058;SA1402;SA1600</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <InjectExperimentalAttributeOnLegacy>true</InjectExperimentalAttributeOnLegacy>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Microsoft.Extensions.Documents.Abstractions\Microsoft.Extensions.Documents.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

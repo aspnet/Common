@@ -39,7 +39,7 @@
         },
         {
           "Member": "bool Microsoft.Extensions.Caching.Hybrid.HybridCacheOptions.DisableCompression { get; set; }",
-          "Stage": "Stable"
+          "Stage": "Obsolete"
         },
         {
           "Member": "object? Microsoft.Extensions.Caching.Hybrid.HybridCacheOptions.DistributedCacheServiceKey { get; set; }",

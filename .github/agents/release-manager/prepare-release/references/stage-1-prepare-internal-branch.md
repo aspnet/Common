@@ -36,6 +36,11 @@ Remove the entire `<packageSourceMapping>` section. This section looks like:
 ```
 
 **Important**: Do NOT add new internal feed sources to NuGet.config - those are managed by Dependency Flow automation and will be added automatically.
+Confirm that both `eng/common/SetupNugetSources.ps1` and
+`eng/common/SetupNugetSources.sh` recognize `dotnet11` when the public feed
+is present, so the private-feed setup below also adds `dotnet11-internal`
+and `dotnet11-internal-transport`. Check this again after Arcade tooling
+updates, which can replace the checked-in scripts.
 
 ## 3. eng/Versions.props
 
@@ -51,11 +56,13 @@ Change `DotNetFinalVersionKind` from empty to `release`:
 <DotNetFinalVersionKind>release</DotNetFinalVersionKind>
 ```
 
-## 4. eng/pipelines/templates/BuildAndTest.yml
+## 4. Locate the actual restore/build pipeline template
+
+Inspect the selected baseline's pipeline call chain before editing. Authentication may live in `eng/pipelines/templates/RestoreAndBuild.yml`, not `BuildAndTest.yml`; apply setup at the actual restore boundary, not a stale filename/Node task anchor. Capture the complete internal-only file/hunk list and baseline blobs for Stage 6 cleanup, including every auth/private-feed change.
 
 ### Add Private Feeds Credentials Setup
 
-After the Node.js setup task (the `NodeTool@0` task), add these two tasks to authenticate with the private package feeds:
+Before authenticated restore, use the repository's existing credential setup pattern:
 
 ```yaml
   - task: PowerShell@2
@@ -112,7 +119,7 @@ Also remove the `codecoverage` dependency from the post-build validation's `vali
 ## Files NOT to modify
 
 - **eng/Version.Details.xml**: Version updates are managed by Dependency Flow automation
-- **eng/Versions.props version numbers**: Package versions are managed by Dependency Flow automation
+- **eng/Versions.props version numbers in Stage 1a**: product numbers are manual in Stage 1b; dependency versions are updated by darc in Stage 2
 - **NuGet.config feed sources**: Internal darc feeds are added automatically by Dependency Flow
 
 ## Summary
@@ -122,5 +129,5 @@ Also remove the `codecoverage` dependency from the post-build validation's `vali
 | Directory.Build.props | Add `NU1507` to `NoWarn` in new PropertyGroup |
 | NuGet.config | Remove entire `<packageSourceMapping>` section |
 | eng/Versions.props | Set `StabilizePackageVersion=true`, `DotNetFinalVersionKind=release` |
-| eng/pipelines/templates/BuildAndTest.yml | Add private feeds credentials setup tasks, comment out integration tests |
+| Actual restore/build/test template(s) | Add credentials before restore, comment out integration tests; record every internal-only hunk |
 | azure-pipelines.yml | Remove `codecoverage` stage and its post-build dependency |

@@ -24,7 +24,7 @@ Or directly in the C# project file:
 
 These components enable enriching and redacting `HttpClient` request logs. They remove built-it HTTP Client logging.
 
-When using this package, some of the log properties are redacted by default (like full routes), which means that you will need to make sure that a redactor provider is registered in the Dependency Injection container. You can do this by making sure that you call `builder.Services.AddRedaction()` which requires a reference to the `Microsoft.Extensions.Compliance.Redaction` package.
+When using this package, some of the log properties are redacted by default (like full routes). `AddExtendedHttpClientLogging()` registers a default redactor provider by calling `AddRedaction()` from the `Microsoft.Extensions.Compliance.Redaction` package. The default redactor provider erases any data that has a data classification other than `DataClassification.None`. To use specific redactors for your data classifications, call `builder.Services.AddRedaction(...)` and configure them; this can be done before or after calling `AddExtendedHttpClientLogging()`. If you use `AddFakeRedaction()` or a custom `IRedactorProvider` implementation, it must be registered before calling `AddExtendedHttpClientLogging()`.
 
 The http client logging services can be registered using the following methods:
 
@@ -42,9 +42,6 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // Register IHttpClientFactory:
 builder.Services.AddHttpClient();
-
-// Register redaction services:
-builder.Services.AddRedaction();
 
 // Register HttpClient logging enrichment & redaction services:
 builder.Services.AddExtendedHttpClientLogging();
@@ -64,9 +61,6 @@ using Microsoft.Extensions.Logging;
 var services = new ServiceCollection();
 
 services.AddLogging(o => o.SetMinimumLevel(LogLevel.Trace).AddJsonConsole()); // <-- Enable structured logging to the console
-
-// Adding default redactor provider to the DI container. This is required when using the AddExtendedHttpClientLogging() method.
-services.AddRedaction();
 
 services.AddHttpClient("foo")
     .AddExtendedHttpClientLogging(o =>
@@ -109,9 +103,6 @@ For example:
 ```csharp
 var builder = Host.CreateApplicationBuilder(args);
 
-// Register redaction services:
-builder.Services.AddRedaction();
-
 // Register named HttpClient:
 var httpClientBuilder = builder.Services.AddHttpClient("MyNamedClient");
 
@@ -125,7 +116,7 @@ var host = builder.Build();
 
 These components enable tracking and reporting the latency of HTTP Client request processing.
 
-The services can be registered using the following methods:
+The services can be registered using the following methods. They also register the latency context services (see `AddLatencyContext()`) unless those are already registered:
 
 ```csharp
 public static IServiceCollection AddHttpClientLatencyTelemetry(this IServiceCollection services)
@@ -140,12 +131,6 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // Register IHttpClientFactory:
 builder.Services.AddHttpClient();
-
-// Register redaction services:
-builder.Services.AddRedaction();
-
-// Register latency context services:
-builder.Services.AddLatencyContext();
 
 // Register HttpClient logging enrichment & redaction services:
 builder.Services.AddExtendedHttpClientLogging();

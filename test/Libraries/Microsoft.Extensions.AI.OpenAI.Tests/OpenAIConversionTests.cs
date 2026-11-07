@@ -9,7 +9,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using OpenAI.Assistants;
 using OpenAI.Chat;
 using OpenAI.Realtime;
 using OpenAI.Responses;
@@ -380,6 +379,18 @@ public class OpenAIConversionTests
     }
 
     [Fact]
+    public void AsOpenAIResponseTool_WithHostedImageGenerationToolWithoutMediaType_PreservesUnspecifiedOutputFileFormat()
+    {
+        var imageGenTool = new HostedImageGenerationTool();
+
+        var result = imageGenTool.AsOpenAIResponseTool();
+
+        Assert.NotNull(result);
+        var tool = Assert.IsType<ImageGenerationTool>(result);
+        Assert.Null(tool.OutputFileFormat);
+    }
+
+    [Fact]
     public void AsOpenAIResponseTool_WithHostedImageGenerationToolWithOptions_ProducesValidImageGenerationTool()
     {
         var imageGenTool = new HostedImageGenerationTool
@@ -572,8 +583,8 @@ public class OpenAIConversionTests
         Assert.NotNull(result);
         var tool = Assert.IsType<McpTool>(result);
         Assert.NotNull(tool.ToolCallApprovalPolicy);
-        Assert.NotNull(tool.ToolCallApprovalPolicy.GlobalPolicy);
-        Assert.Equal(GlobalMcpToolCallApprovalPolicy.AlwaysRequireApproval, tool.ToolCallApprovalPolicy.GlobalPolicy);
+        Assert.NotNull(tool.ToolCallApprovalPolicy.DefaultPolicy);
+        Assert.Equal(DefaultMcpToolCallApprovalPolicy.AlwaysRequireApproval, tool.ToolCallApprovalPolicy.DefaultPolicy);
     }
 
     [Fact]
@@ -589,8 +600,8 @@ public class OpenAIConversionTests
         Assert.NotNull(result);
         var tool = Assert.IsType<McpTool>(result);
         Assert.NotNull(tool.ToolCallApprovalPolicy);
-        Assert.NotNull(tool.ToolCallApprovalPolicy.GlobalPolicy);
-        Assert.Equal(GlobalMcpToolCallApprovalPolicy.NeverRequireApproval, tool.ToolCallApprovalPolicy.GlobalPolicy);
+        Assert.NotNull(tool.ToolCallApprovalPolicy.DefaultPolicy);
+        Assert.Equal(DefaultMcpToolCallApprovalPolicy.NeverRequireApproval, tool.ToolCallApprovalPolicy.DefaultPolicy);
     }
 
     [Fact]
@@ -686,17 +697,6 @@ public class OpenAIConversionTests
         Assert.Equal("test_function", tool.FunctionName);
         Assert.Equal("A test function for conversion", tool.FunctionDescription);
         ValidateSchemaParameters(tool.FunctionParameters);
-    }
-
-    [Fact]
-    public void AsOpenAIAssistantsFunctionToolDefinition_ProducesValidInstance()
-    {
-        var tool = _testFunction.AsOpenAIAssistantsFunctionToolDefinition();
-
-        Assert.NotNull(tool);
-        Assert.Equal("test_function", tool.FunctionName);
-        Assert.Equal("A test function for conversion", tool.Description);
-        ValidateSchemaParameters(tool.Parameters);
     }
 
     /// <summary>Helper method to validate function parameters match our schema.</summary>

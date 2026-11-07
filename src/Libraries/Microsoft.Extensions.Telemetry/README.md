@@ -113,13 +113,16 @@ public class MyService
 
 The Global Log Buffer supports the `IOptionsMonitor<T>` pattern, allowing for dynamic configuration updates. This means you can change the buffering rules at runtime without needing to restart your application.
 
+To preserve logging scopes in buffered log records, set the experimental `IncludeScopes` option, which adds the scopes' name/value pairs to the records' attributes.
+
 #### Limitations
 
 1. This library does not preserve the order of log records. However, original timestamps are preserved.
 1. The library does not support custom configuration per each logger provider. Same configuration is applied to all logger providers.
-1. Log scopes are not supported. This means that if you use `ILogger.BeginScope()` method, the buffered log records will not be associated with the scope.
+1. Log scopes are only preserved if the `IncludeScopes` option is enabled, and then only as attributes of buffered log records.
 1. When buffering and then flushing buffers, not all information of the original log record is preserved. This is due to serializing/deserializing limitation, but can be
-revisited in future. Namely, this library uses `Microsoft.Extensions.Logging.Abstractions.BufferedLogRecord` class when converting buffered log records to actual log records, but omits following properties:
+revisited in future. Namely, values of log record attributes are converted to strings, and exceptions are preserved as their messages only.
+1. The following `Microsoft.Extensions.Logging.Abstractions.BufferedLogRecord` properties are available only to loggers implementing the `Microsoft.Extensions.Logging.Abstractions.IBufferedLogger` interface:
 
 - `Microsoft.Extensions.Logging.Abstractions.BufferedLogRecord.ActivitySpanId`
 - `Microsoft.Extensions.Logging.Abstractions.BufferedLogRecord.ActivityTraceId`

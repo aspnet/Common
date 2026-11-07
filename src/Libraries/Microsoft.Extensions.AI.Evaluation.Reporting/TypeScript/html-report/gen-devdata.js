@@ -48,6 +48,7 @@ const casesForRun = (cases, tag, grow, execIdx) =>
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const fmtRaw = (v, kind) => (kind === 'fraction' ? v.toFixed(3) : (v % 1 === 0 ? String(v) : v.toFixed(1)));
+const contextNames = { question: 'Evaluation Question', reference: 'Ground Truth', sources: 'Grounding Sources' };
 
 const ratingForScore = (v) => (v >= 4.5 ? 'exceptional' : v >= 4 ? 'good' : v >= 3 ? 'average' : v >= 2 ? 'poor' : 'unacceptable');
 const ratingForFraction = (v, better) => {
@@ -338,6 +339,7 @@ const buildScoreMetric = (def, c, ex, evalMs, judgeModel) => {
     const value = clampScore(def.base, c.q, ex.drift, noise, pen);
     const rating = ratingFor('score', value, def.better);
     const failed = failedFor(rating);
+    const contextValue = def.ctx && c[def.ctx];
     const meta = {};
     if (def.judge) {
         const ks = def.key.charCodeAt(0) + def.key.length;
@@ -354,6 +356,7 @@ const buildScoreMetric = (def, c, ex, evalMs, judgeModel) => {
         $type: 'numeric', name: def.key, value,
         reason: def.def,
         interpretation: { rating, failed, reason: interpFor(def.key, def.kind, value, rating, failed) },
+        ...(contextValue ? { context: { [def.ctx]: { name: contextNames[def.ctx], contents: [{ $type: 'text', text: contextValue }] } } } : {}),
         ...(diags.length ? { diagnostics: diags } : {}), ...(Object.keys(meta).length ? { metadata: meta } : {}),
     };
 };
@@ -410,6 +413,50 @@ for (let e = execs.length - 1; e >= 0; e--) {
                 ? buildScoreMetric(def, c, ex, evalMs, 'gpt-5.4-nano')
                 : buildFracMetric(def, c, ex, { highBiasScale: 0.12, driftScale: 0.4, noiseScale: 0.05 });
         }
+        metrics['Response Label'] = {
+            $type: 'string',
+            name: 'Response Label',
+            value: 'READY_FOR_REVIEW',
+            reason: 'A plain evaluator-provided categorical label without an interpretation.',
+        };
+        metrics['Evidence Trace'] = {
+            $type: 'string',
+            name: 'Evidence Trace',
+            value: `${c.id}-evidence-trace-`.repeat(4),
+            reason: 'An opaque evidence identifier used to exercise long string rendering.',
+            interpretation: {
+                rating: 'good',
+                failed: false,
+                reason: 'The evidence trace is available and valid for this generated case.',
+            },
+        };
+        metrics['Custom Policy Gate'] = {
+            $type: 'boolean',
+            name: 'Custom Policy Gate',
+            value: true,
+            reason: 'A BooleanMetric emitted by a custom evaluator.',
+            interpretation: {
+                rating: 'good',
+                failed: false,
+                reason: 'The custom policy gate passed.',
+            },
+        };
+        metrics['Custom Evaluator Notice'] = {
+            $type: 'none',
+            name: 'Custom Evaluator Notice',
+            reason: 'A custom evaluator completed without producing a scalar value.',
+            interpretation: {
+                rating: 'inconclusive',
+                failed: false,
+                reason: 'No scalar value is available for this custom result.',
+            },
+        };
+        metrics['Raw Confidence'] = {
+            $type: 'numeric',
+            name: 'Raw Confidence',
+            value: 0.82,
+            reason: 'A raw numeric evaluator output without an interpretation.',
+        };
         const outTok = 120 + Math.floor(rng() * 160);
         const inTok = 700 + Math.floor(rng() * 1100);
         const latency = 0.9 + rng() * 2.4;

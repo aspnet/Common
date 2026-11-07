@@ -3,7 +3,6 @@
 
 import type { ReactNode } from 'react';
 import { makeStyles, mergeClasses } from '@fluentui/react-components';
-import { statusSolidVar, statusTextVar, type ReportStatus } from './reportStyles';
 
 const usePillStyles = makeStyles({
     base: {
@@ -23,7 +22,8 @@ const usePillStyles = makeStyles({
 });
 
 export type StatusPillProps = {
-    status: ReportStatus;
+    solid: string;
+    textColor: string;
     appearance?: 'ghost' | 'tint';
     size?: 'small' | 'medium';
     shape?: 'rounded' | 'circular';
@@ -32,7 +32,8 @@ export type StatusPillProps = {
 };
 
 export const StatusPill = ({
-    status,
+    solid,
+    textColor,
     appearance = 'ghost',
     size = 'medium',
     shape = 'rounded',
@@ -40,7 +41,6 @@ export const StatusPill = ({
     children,
 }: StatusPillProps) => {
     const styles = usePillStyles();
-    const base = statusSolidVar(status);
     const tint = appearance === 'tint';
     return (
         <span
@@ -51,9 +51,8 @@ export const StatusPill = ({
                 className,
             )}
             style={{
-                color: statusTextVar(status),
-                border: tint ? `1px solid color-mix(in srgb, ${base} 45%, transparent)` : '1px solid transparent',
-                backgroundColor: tint ? `color-mix(in srgb, ${base} 8%, transparent)` : 'transparent',
+                color: textColor,
+                backgroundColor: tint ? `color-mix(in srgb, ${solid} 8%, transparent)` : 'transparent',
             }}
         >
             {children}

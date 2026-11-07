@@ -1449,6 +1449,63 @@ public class FunctionInvokingChatClientApprovalsTests
         }
     }
 
+    [Fact]
+    public async Task ApprovedResponseThatRequestsTerminationAndThrowsStopsBeforeCallingInnerClientAsync()
+    {
+        var options = new ChatOptions
+        {
+            Tools =
+            [
+                new ApprovalRequiredAIFunction(AIFunctionFactory.Create(string () =>
+                {
+                    FunctionInvokingChatClient.CurrentContext!.Terminate = true;
+                    throw new InvalidOperationException("Oh no!");
+                }, "Func1")),
+            ],
+        };
+
+        List<ChatMessage> input =
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant,
+            [
+                new ToolApprovalRequestContent("ficc_callId1", new FunctionCallContent("callId1", "Func1")),
+            ]) { MessageId = "resp1" },
+            new ChatMessage(ChatRole.User,
+            [
+                new ToolApprovalResponseContent("ficc_callId1", true, new FunctionCallContent("callId1", "Func1")),
+            ]),
+        ];
+
+        List<ChatMessage> expectedOutput =
+        [
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("callId1", "Func1")]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("callId1", result: "Error: Function failed.")]),
+        ];
+
+        using (var innerClient = new TestChatClient
+        {
+            GetResponseAsyncCallback = (_, _, _) =>
+                throw new InvalidOperationException("The inner client must not be called after the approved function requests termination."),
+        })
+        {
+            using var service = new FunctionInvokingChatClient(innerClient);
+            var result = await service.GetResponseAsync(CloneInput(input), options);
+            AssertExtensions.EqualMessageLists(expectedOutput, result.Messages.ToList());
+        }
+
+        using (var innerClient = new TestChatClient
+        {
+            GetStreamingResponseAsyncCallback = (_, _, _) =>
+                throw new InvalidOperationException("The inner client must not be called after the approved function requests termination."),
+        })
+        {
+            using var service = new FunctionInvokingChatClient(innerClient);
+            var result = await service.GetStreamingResponseAsync(CloneInput(input), options).ToChatResponseAsync();
+            AssertExtensions.EqualMessageLists(expectedOutput, result.Messages.ToList());
+        }
+    }
+
     /// for matching FunctionResultContent from server-handled function calls and mark those FCCs as
     /// InformationalOnly. This means FCCs are not yielded immediately, even when no approval is required.
     /// </summary>

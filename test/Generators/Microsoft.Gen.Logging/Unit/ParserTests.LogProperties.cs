@@ -297,6 +297,7 @@ public partial class ParserTests
     [InlineData("System.DateTimeOffset")]
     [InlineData("System.TimeSpan")]
     [InlineData("System.Guid")]
+    [InlineData("System.Type")]
     [InlineData("System.DateTime?")]
     [InlineData("System.DateTimeOffset?")]
     [InlineData("System.TimeSpan?")]
@@ -375,6 +376,134 @@ public partial class ParserTests
             }}";
 
         await RunGenerator(source, DiagDescriptors.LogPropertiesCycleDetected);
+    }
+
+    [Theory]
+    [InlineData("[LogProperties(Transitive = true)]", "")]
+    [InlineData("[LogProperties]", "[LogProperties]")]
+    public async Task PropertyToLogWithTypeCycleThroughBaseType(string parameterAttribute, string propertyAttribute)
+    {
+        string source = @$"
+            public class Node
+            {{
+                {propertyAttribute}
+                public Leaf Next {{ get; set; }}
+            }}
+
+            public sealed class Leaf : Node
+            {{
+            }}
+
+            public class Holder
+            {{
+                {propertyAttribute}
+                public Leaf Child {{ get; set; }}
+            }}
+
+            partial class LoggerClass
+            {{
+                [LoggerMessage(0, LogLevel.Debug, ""No params..."")]
+                static partial void M(ILogger logger, {parameterAttribute} Holder /*0+*/test/*-0*/);
+            }}";
+
+        await RunGenerator(source, DiagDescriptors.LogPropertiesCycleDetected);
+    }
+
+    [Theory]
+    [InlineData("[LogProperties(Transitive = true)]", "")]
+    [InlineData("[LogProperties]", "[LogProperties]")]
+    public async Task PropertyToLogWithTypeCycleAfterAnotherProperty(string parameterAttribute, string propertyAttribute)
+    {
+        string source = @$"
+            public class Inner
+            {{
+                public int Value {{ get; set; }}
+            }}
+
+            public class Holder
+            {{
+                {propertyAttribute}
+                public Inner First {{ get; set; }}
+
+                {propertyAttribute}
+                public Holder Self {{ get; set; }}
+            }}
+
+            partial class LoggerClass
+            {{
+                [LoggerMessage(0, LogLevel.Debug, ""No params..."")]
+                static partial void M(ILogger logger, {parameterAttribute} Holder /*0+*/test/*-0*/);
+            }}";
+
+        await RunGenerator(source, DiagDescriptors.LogPropertiesCycleDetected);
+    }
+
+    [Theory]
+    [InlineData("[LogProperties(Transitive = true)]", "")]
+    [InlineData("[LogProperties]", "[LogProperties]")]
+    public async Task PropertyToLogWithUnboundedGenericType(string parameterAttribute, string propertyAttribute)
+    {
+        string source = @$"
+            public class Node<T>
+            {{
+                {propertyAttribute}
+                public Node<Node<T>> Next {{ get; set; }}
+            }}
+
+            partial class LoggerClass
+            {{
+                [LoggerMessage(0, LogLevel.Debug, ""No params..."")]
+                static partial void M(ILogger logger, {parameterAttribute} Node<int> /*0+*/test/*-0*/);
+            }}";
+
+        await RunGenerator(source, DiagDescriptors.LogPropertiesCycleDetected);
+    }
+
+    [Fact]
+    public async Task PropertyToLogWithSeveralTypeCyclesReportsOneDiagnostic()
+    {
+        const string Source = @"
+            public class A
+            {
+                public B First { get; set; }
+                public C Second { get; set; }
+            }
+
+            public class B
+            {
+                public A Back { get; set; }
+            }
+
+            public class C
+            {
+                public A Back { get; set; }
+            }
+
+            partial class LoggerClass
+            {
+                [LoggerMessage(0, LogLevel.Debug, ""No params..."")]
+                static partial void M(ILogger logger, [LogProperties(Transitive = true)] A /*0+*/test/*-0*/);
+            }";
+
+        await RunGenerator(Source, DiagDescriptors.LogPropertiesCycleDetected);
+    }
+
+    [Fact]
+    public async Task TransitivePropertyOfSystemTypeIsNotExpanded()
+    {
+        const string Source = @"
+            public class MyClass
+            {
+                public System.Type Kind { get; set; }
+            }
+
+            partial class LoggerClass
+            {
+                [LoggerMessage(0, LogLevel.Debug, ""No params..."")]
+                static partial void M(ILogger logger, [LogProperties(Transitive = true)] MyClass test);
+            }";
+
+        await RunGenerator(Source);
     }
 
     [Fact]

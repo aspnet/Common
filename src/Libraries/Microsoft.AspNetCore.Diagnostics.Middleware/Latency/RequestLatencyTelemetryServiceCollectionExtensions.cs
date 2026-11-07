@@ -23,9 +23,16 @@ public static class RequestLatencyTelemetryServiceCollectionExtensions
     /// <returns>The value of <paramref name="services"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="services"/> is <see langword="null"/>.</exception>
     public static IServiceCollection AddRequestCheckpoint(this IServiceCollection services)
-        => Throw.IfNull(services)
-        .AddPipelineEntryCheckpoint()
-        .RegisterCheckpointNames(RequestCheckpointConstants.RequestCheckpointNames);
+    {
+        _ = Throw.IfNull(services);
+
+        _ = services.AddLatencyContext();
+        services.TryAddScoped(p => p.GetRequiredService<ILatencyContextProvider>().CreateContext());
+
+        return services
+            .AddPipelineEntryCheckpoint()
+            .RegisterCheckpointNames(RequestCheckpointConstants.RequestCheckpointNames);
+    }
 
     /// <summary>
     /// Adds request latency telemetry middleware to the specified <see cref="IServiceCollection" />.
@@ -37,6 +44,7 @@ public static class RequestLatencyTelemetryServiceCollectionExtensions
     {
         _ = Throw.IfNull(services);
 
+        _ = services.AddLatencyContext();
         services.TryAddScoped(p => p.GetRequiredService<ILatencyContextProvider>().CreateContext());
 
         _ = services.AddOptionsWithValidateOnStart<RequestLatencyTelemetryOptions, RequestLatencyTelemetryOptionsValidator>();

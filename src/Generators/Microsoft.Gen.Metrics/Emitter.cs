@@ -313,16 +313,19 @@ internal sealed class Emitter : EmitterBase
         {
             foreach (var config in metricMethod.StrongTypeConfigs)
             {
-                if (config.StrongTypeMetricObjectType != StrongTypeMetricObjectType.String &&
-                    config.StrongTypeMetricObjectType != StrongTypeMetricObjectType.Enum)
+                var paramName = GetSanitizedParamName(config.Name);
+                var paramInvoke = config.StrongTypeMetricObjectType switch
+                {
+                    StrongTypeMetricObjectType.String => $"{paramName}!",
+                    StrongTypeMetricObjectType.Enum => $"{paramName}.ToString()",
+                    StrongTypeMetricObjectType.Primitive => paramName,
+                    _ => null,
+                };
+
+                if (paramInvoke is null)
                 {
                     continue;
                 }
-
-                var paramName = GetSanitizedParamName(config.Name);
-                var paramInvoke = config.StrongTypeMetricObjectType == StrongTypeMetricObjectType.Enum
-                    ? $"{paramName}.ToString()"
-                    : $"{paramName}!";
 
                 var access = string.IsNullOrEmpty(config.Path)
                     ? "o." + paramInvoke

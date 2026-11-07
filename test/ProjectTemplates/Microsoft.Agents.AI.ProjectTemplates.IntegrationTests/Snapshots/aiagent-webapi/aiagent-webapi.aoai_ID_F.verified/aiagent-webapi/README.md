@@ -1,4 +1,4 @@
-﻿# AI Agent Web API
+# AI Agent Web API
 
 This is an AI Agent Web API application created from the `aiagent-webapi` template. This template is currently in a preview stage. If you have feedback, please take a [brief survey](https://aka.ms/dotnet/aiagent-webapi/preview1/survey).
 
@@ -99,8 +99,8 @@ dotnet new aiagent-webapi --provider ollama --chat-model llama3.1
 - **`--managed-identity`**: Use managed identity for Azure services (default: `true`)
   - Only applicable when `--provider azureopenai`
 
-- **`--framework`**: Target framework (default: `net10.0`)
-  - Options: `net10.0`, `net9.0`, `net8.0`
+- **`--framework`**: Target framework (default: `net11.0`)
+  - Options: `net11.0`, `net10.0`, `net9.0`, `net8.0`
 
 ## Project Structure
 

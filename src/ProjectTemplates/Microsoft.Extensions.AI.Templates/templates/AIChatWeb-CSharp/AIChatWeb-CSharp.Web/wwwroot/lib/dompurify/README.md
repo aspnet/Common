@@ -1,4 +1,4 @@
-dompurify version 3.2.4
+dompurify version 3.4.13
 https://github.com/cure53/DOMPurify
 License: Apache 2.0 and Mozilla Public License 2.0
 

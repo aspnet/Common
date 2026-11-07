@@ -1,7 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-import { makeStyles, tokens } from "@fluentui/react-components";
+import { makeStyles } from "@fluentui/react-components";
 
 export const useStyles = makeStyles({
     tableContainer: {
@@ -14,8 +14,8 @@ export const useStyles = makeStyles({
     },
     tableHeaderCell: {
         fontWeight: '600',
-        fontSize: tokens.fontSizeBase300,
-        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+        fontSize: 'var(--font-size-300)',
+        borderBottom: '1px solid var(--neutral-stroke-2)',
     },
     tablesContainer: {
         display: 'flex',
@@ -30,39 +30,39 @@ export const useStyles = makeStyles({
         border: 'none',
         cursor: 'pointer',
         padding: '2px',
-        color: tokens.colorNeutralForeground3,
+        color: 'var(--neutral-foreground-3)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: '3px',
         '&:hover': {
-            backgroundColor: tokens.colorNeutralBackground4,
-            color: tokens.colorNeutralForeground1,
+            backgroundColor: 'var(--neutral-background-4)',
+            color: 'var(--neutral-foreground-1)',
         }
     },
     diagnosticErrorCell: {
         display: 'flex',
         alignItems: 'center',
         gap: '0.25rem',
-        color: tokens.colorStatusDangerForeground2,
+        color: 'var(--diagnostic-error-foreground)',
         whiteSpace: 'nowrap',
     },
     diagnosticWarningCell: {
         display: 'flex',
         alignItems: 'center',
         gap: '0.25rem',
-        color: tokens.colorStatusWarningForeground2,
+        color: 'var(--diagnostic-warning-foreground)',
         whiteSpace: 'nowrap',
     },
     diagnosticInfoCell: {
         display: 'flex',
         alignItems: 'center',
         gap: '0.25rem',
-        color: tokens.colorNeutralForeground1,
+        color: 'var(--diagnostic-info-foreground)',
         whiteSpace: 'nowrap',
     },
     diagnosticMessageText: {
-        fontFamily: tokens.fontFamilyBase,
+        fontFamily: 'var(--diagnostic-message-font-family)',
         whiteSpace: 'pre-wrap',
         overflow: 'auto',
         margin: 0,

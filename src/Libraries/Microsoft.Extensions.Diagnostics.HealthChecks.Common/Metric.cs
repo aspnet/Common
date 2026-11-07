@@ -8,10 +8,19 @@ namespace Microsoft.Extensions.Diagnostics.HealthChecks;
 
 internal static partial class Metric
 {
-    [Counter("dotnet.health_check.status", Name = "dotnet.health_check.reports")]
+    [Counter(
+        "dotnet.health_check.status",
+        Name = "dotnet.health_check.reports",
+        Unit = "{report}",
+        Description = "Number of times a health report reported the health status of an application.")]
     public static partial HealthCheckReportCounter CreateHealthCheckReportCounter(Meter meter);
 
-    [Counter("dotnet.health_check.name", "dotnet.health_check.status", Name = "dotnet.health_check.unhealthy_checks")]
+    [Counter(
+        "dotnet.health_check.name",
+        "dotnet.health_check.status",
+        Name = "dotnet.health_check.unhealthy_checks",
+        Unit = "{unhealthy_check}",
+        Description = "Number of times a health check reported the health status of an application as Degraded or Unhealthy.")]
     public static partial UnhealthyHealthCheckCounter CreateUnhealthyHealthCheckCounter(Meter meter);
 
     public static void RecordMetric(this HealthCheckReportCounter counterMetric, HealthStatus status)

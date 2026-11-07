@@ -7,7 +7,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Latency;
+using Microsoft.Extensions.Diagnostics.Latency.Internal;
 using Microsoft.Extensions.Options;
+using Moq;
 using Xunit;
 
 namespace Microsoft.AspNetCore.Diagnostics.Latency.Test;
@@ -44,6 +46,36 @@ public class RequestLatencyTelemetryExtensionsTests
             scope1.ServiceProvider.GetService<ILatencyContext>());
         Assert.NotEqual(scope1.ServiceProvider.GetService<ILatencyContext>(),
             scope2.ServiceProvider.GetService<ILatencyContext>());
+    }
+
+    [Fact]
+    public void AddRequestLatencyTelemetry_LatencyContextNotRegistered_RegistersLatencyContext()
+    {
+        using var serviceProvider = new ServiceCollection()
+            .AddRequestLatencyTelemetry()
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        Assert.IsType<LatencyContextTokenIssuer>(serviceProvider.GetRequiredService<ILatencyContextTokenIssuer>());
+        Assert.IsType<LatencyContextProvider>(serviceProvider.GetRequiredService<ILatencyContextProvider>());
+
+        using var scope = serviceProvider.CreateScope();
+        Assert.NotNull(scope.ServiceProvider.GetService<ILatencyContext>());
+    }
+
+    [Fact]
+    public void AddRequestLatencyTelemetry_CustomLatencyContextRegisteredFirst_KeepsCustomLatencyContext()
+    {
+        var tokenIssuer = Mock.Of<ILatencyContextTokenIssuer>();
+        var latencyContextProvider = Mock.Of<ILatencyContextProvider>();
+
+        using var serviceProvider = new ServiceCollection()
+            .AddSingleton(tokenIssuer)
+            .AddSingleton(latencyContextProvider)
+            .AddRequestLatencyTelemetry()
+            .BuildServiceProvider();
+
+        Assert.Same(tokenIssuer, serviceProvider.GetRequiredService<ILatencyContextTokenIssuer>());
+        Assert.Same(latencyContextProvider, serviceProvider.GetRequiredService<ILatencyContextProvider>());
     }
 
     [Fact]

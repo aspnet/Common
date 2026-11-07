@@ -1,0 +1,10 @@
+﻿{
+  Type: InvalidOperationException,
+  Message: Could not split contents. We expected every line to contain more than 4 elements, but it has only 2 elements.,
+  StackTrace:
+at Microsoft.Shared.Diagnostics.Throw.InvalidOperationException(String message)
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Network.LinuxNetworkUtilizationParser.UpdateTcpStateInfo(ReadOnlySpan`1 buffer, TcpStateInfo tcpStateInfo)
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Network.LinuxNetworkUtilizationParser.GetTcpStateInfo(FileInfo file)
+at Microsoft.Extensions.Diagnostics.ResourceMonitoring.Linux.Network.LinuxNetworkUtilizationParser.GetTcpIPv4StateInfo()
+at Xunit.Record.Exception(Func`1 testCode)
+}

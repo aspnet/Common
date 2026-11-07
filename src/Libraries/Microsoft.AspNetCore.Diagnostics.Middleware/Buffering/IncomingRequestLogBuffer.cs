@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Diagnostics.Buffering;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
@@ -16,19 +17,18 @@ using Microsoft.Shared.Pools;
 
 namespace Microsoft.AspNetCore.Diagnostics.Buffering;
 
-internal sealed class IncomingRequestLogBuffer : IDisposable
+internal sealed class IncomingRequestLogBuffer
 {
     private const int MaxBatchSize = 256;
-    private static readonly ObjectPool<List<DeserializedLogRecord>> _recordsToEmitListPool =
-        PoolFactory.CreateListPoolWithCapacity<DeserializedLogRecord>(MaxBatchSize);
+    private static readonly ObjectPool<List<SerializedLogRecord>> _recordsToEmitListPool =
+        PoolFactory.CreateListPoolWithCapacity<SerializedLogRecord>(MaxBatchSize);
 
     private readonly IBufferedLogger _bufferedLogger;
-    private readonly LogBufferingFilterRuleSelector _ruleSelector;
+    private readonly IExternalScopeProvider _scopeProvider;
     private readonly IOptionsMonitor<PerRequestLogBufferingOptions> _options;
     private readonly TimeProvider _timeProvider = TimeProvider.System;
     private readonly LogBufferingFilterRule[] _filterRules;
     private readonly Lock _bufferSwapLock = new();
-    private volatile bool _disposed;
     private ConcurrentQueue<SerializedLogRecord> _activeBuffer = new();
     private ConcurrentQueue<SerializedLogRecord> _standbyBuffer = new();
     private int _activeBufferSize;
@@ -37,11 +37,11 @@ internal sealed class IncomingRequestLogBuffer : IDisposable
     public IncomingRequestLogBuffer(
         IBufferedLogger bufferedLogger,
         string category,
-        LogBufferingFilterRuleSelector ruleSelector,
-        IOptionsMonitor<PerRequestLogBufferingOptions> options)
+        IOptionsMonitor<PerRequestLogBufferingOptions> options,
+        IExternalScopeProvider scopeProvider)
     {
         _bufferedLogger = bufferedLogger;
-        _ruleSelector = ruleSelector;
+        _scopeProvider = scopeProvider;
         _options = options;
         _filterRules = LogBufferingFilterRuleSelector.SelectByCategory(_options.CurrentValue.Rules.ToArray(), category);
     }
@@ -63,7 +63,7 @@ internal sealed class IncomingRequestLogBuffer : IDisposable
                 $"Unsupported type of log state detected: {typeof(TState)}, expected IReadOnlyList<KeyValuePair<string, object?>>");
         }
 
-        if (_ruleSelector.Select(_filterRules, logEntry.LogLevel, logEntry.EventId, attributes) is null)
+        if (LogBufferingFilterRuleSelector.Select(_filterRules, logEntry.LogLevel, logEntry.EventId, attributes) is null)
         {
             // buffering is not enabled for this log entry,
             // return false to indicate that the log entry should be logged normally.
@@ -76,7 +76,8 @@ internal sealed class IncomingRequestLogBuffer : IDisposable
             _timeProvider.GetUtcNow(),
             attributes,
             logEntry.Exception,
-            logEntry.Formatter(logEntry.State, logEntry.Exception));
+            logEntry.Formatter(logEntry.State, logEntry.Exception),
+            _options.CurrentValue.IncludeScopes ? _scopeProvider : null);
 
         if (serializedLogRecord.SizeInBytes > _options.CurrentValue.MaxLogRecordSizeInBytes)
         {
@@ -116,18 +117,12 @@ internal sealed class IncomingRequestLogBuffer : IDisposable
         for (int offset = 0; offset < numItemsToEmit && !tempBuffer.IsEmpty; offset += MaxBatchSize)
         {
             int currentBatchSize = Math.Min(MaxBatchSize, numItemsToEmit - offset);
-            List<DeserializedLogRecord> recordsToEmit = _recordsToEmitListPool.Get();
+            List<SerializedLogRecord> recordsToEmit = _recordsToEmitListPool.Get();
             try
             {
-                for (int i = 0; i < currentBatchSize && tempBuffer.TryDequeue(out SerializedLogRecord bufferedRecord); i++)
+                for (int i = 0; i < currentBatchSize && tempBuffer.TryDequeue(out SerializedLogRecord? bufferedRecord); i++)
                 {
-                    recordsToEmit.Add(new DeserializedLogRecord(
-                        bufferedRecord.Timestamp,
-                        bufferedRecord.LogLevel,
-                        bufferedRecord.EventId,
-                        bufferedRecord.Exception,
-                        bufferedRecord.FormattedMessage,
-                        bufferedRecord.Attributes));
+                    recordsToEmit.Add(bufferedRecord);
                 }
 
                 _bufferedLogger.LogRecords(recordsToEmit);
@@ -139,22 +134,10 @@ internal sealed class IncomingRequestLogBuffer : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-
-        _ruleSelector.InvalidateCache();
-    }
-
     private void TrimExcessRecords()
     {
         while (_activeBufferSize > _options.CurrentValue.MaxPerRequestBufferSizeInBytes &&
-               _activeBuffer.TryDequeue(out SerializedLogRecord item))
+               _activeBuffer.TryDequeue(out SerializedLogRecord? item))
         {
             _ = Interlocked.Add(ref _activeBufferSize, -item.SizeInBytes);
             SerializedLogRecordFactory.Return(item);

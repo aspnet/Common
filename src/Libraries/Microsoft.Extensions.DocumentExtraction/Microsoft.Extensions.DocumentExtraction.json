@@ -1,0 +1,73 @@
+{
+  "Name": "Microsoft.Extensions.DocumentExtraction, Version=10.10.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+  "Types": [
+    {
+      "Type": "sealed class Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.DocumentExtractionClientBuilder(Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient innerClient);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.DocumentExtractionClientBuilder(System.Func<System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient> innerClientFactory);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.Build(System.IServiceProvider? services = null);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.Use(System.Func<Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient, System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient> factory);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder.Use(System.Func<Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient> factory);",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
+      "Type": "static class Microsoft.Extensions.DependencyInjection.DocumentExtractionClientBuilderServiceCollectionExtensions",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DependencyInjection.DocumentExtractionClientBuilderServiceCollectionExtensions.AddDocumentExtractionClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient innerClient, Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime.Singleton);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DependencyInjection.DocumentExtractionClientBuilderServiceCollectionExtensions.AddDocumentExtractionClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Func<System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient> innerClientFactory, Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime.Singleton);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DependencyInjection.DocumentExtractionClientBuilderServiceCollectionExtensions.AddKeyedDocumentExtractionClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, object? serviceKey, System.Func<System.IServiceProvider, Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient> innerClientFactory, Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime.Singleton);",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
+      "Type": "class Microsoft.Extensions.DocumentExtraction.LoggingDocumentExtractionClient : Microsoft.Extensions.DocumentExtraction.DelegatingDocumentExtractionClient",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "Microsoft.Extensions.DocumentExtraction.LoggingDocumentExtractionClient.LoggingDocumentExtractionClient(Microsoft.Extensions.DocumentExtraction.DocumentExtractionClient innerClient, Microsoft.Extensions.Logging.ILogger logger);",
+          "Stage": "Experimental"
+        },
+        {
+          "Member": "override System.Threading.Tasks.Task<Microsoft.Extensions.Documents.ExtractionDocument> Microsoft.Extensions.DocumentExtraction.LoggingDocumentExtractionClient.ExtractAsync(System.IO.Stream document, string identifier, string mediaType, Microsoft.Extensions.DocumentExtraction.DocumentExtractionOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));",
+          "Stage": "Experimental"
+        }
+      ]
+    },
+    {
+      "Type": "static class Microsoft.Extensions.DocumentExtraction.LoggingDocumentExtractionClientBuilderExtensions",
+      "Stage": "Experimental",
+      "Methods": [
+        {
+          "Member": "static Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder Microsoft.Extensions.DocumentExtraction.LoggingDocumentExtractionClientBuilderExtensions.UseLogging(this Microsoft.Extensions.DocumentExtraction.DocumentExtractionClientBuilder builder, Microsoft.Extensions.Logging.ILoggerFactory? loggerFactory = null);",
+          "Stage": "Experimental"
+        }
+      ]
+    }
+  ]
+}

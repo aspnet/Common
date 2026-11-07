@@ -17,7 +17,7 @@
     <PackageVersion Include="Microsoft.Extensions.VectorData.Abstractions" Version="$(MicrosoftExtensionsVectorDataAbstractionsVersion)" />
     <PackageVersion Include="Microsoft.ML.Tokenizers" Version="$(MicrosoftMLTokenizersVersion)" />
     <PackageVersion Include="ModelContextProtocol.Core" Version="1.2.0" />
-    <PackageVersion Include="OpenAI" Version="2.12.0" />
+    <PackageVersion Include="OpenAI" Version="2.14.0" />
     <PackageVersion Include="Polly" Version="8.4.2" />
     <PackageVersion Include="Polly.Core" Version="8.4.2" />
     <PackageVersion Include="Polly.Extensions" Version="8.4.2" />
@@ -52,5 +52,6 @@
   <Import Project="General-LTS.props" />
   <Import Project="General-net9.props" />
   <Import Project="General-net10.props" />
+  <Import Project="General-net11.props" />
 
 </Project>

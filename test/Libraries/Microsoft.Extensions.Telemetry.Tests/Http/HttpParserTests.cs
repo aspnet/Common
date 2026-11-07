@@ -638,6 +638,74 @@ public class HttpParserTests
         ValidateRouteSegment(routeSegments.Segments[5], ("url:regex(^(web|shared*)$)", true, "url", "", start, end, true));
     }
 
+    [Theory]
+    [CombinatorialData]
+    public void TryExtractParameters_ParameterValueContainsFollowingLiteral_ReturnsCorrectParameters(HttpRouteParameterRedactionMode redactionMode)
+    {
+        bool isRedacted = redactionMode != HttpRouteParameterRedactionMode.None;
+        string redactedPrefix = isRedacted ? "Redacted:" : string.Empty;
+
+        HttpRouteParser httpParser = CreateHttpRouteParser();
+        Dictionary<string, DataClassification> parametersToRedact = new()
+        {
+            { "token", FakeTaxonomy.PrivateData },
+            { "format", DataClassification.None },
+        };
+
+        var httpRouteParameters = new HttpRouteParameter[2];
+
+        Assert.True(httpParser.TryExtractParameters(
+            "/b/json.secret", httpParser.ParseRoute("/b/{format}.{token}"), redactionMode, parametersToRedact, ref httpRouteParameters));
+        ValidateRouteParameter(httpRouteParameters[0], "format", "json", false);
+        ValidateRouteParameter(httpRouteParameters[1], "token", $"{redactedPrefix}secret", isRedacted);
+
+        Assert.True(httpParser.TryExtractParameters(
+            "/a/part1.part2.part3.json", httpParser.ParseRoute("/a/{token}.{format}"), redactionMode, parametersToRedact, ref httpRouteParameters));
+        ValidateRouteParameter(httpRouteParameters[0], "token", $"{redactedPrefix}part1.part2.part3", isRedacted);
+        ValidateRouteParameter(httpRouteParameters[1], "format", "json", false);
+
+        Assert.True(httpParser.TryExtractParameters(
+            "/c/json.secret.ZIP", httpParser.ParseRoute("/c/{format}.{token}.zip"), redactionMode, parametersToRedact, ref httpRouteParameters));
+        ValidateRouteParameter(httpRouteParameters[0], "format", "json", false);
+        ValidateRouteParameter(httpRouteParameters[1], "token", $"{redactedPrefix}secret", isRedacted);
+    }
+
+    [Theory]
+    [InlineData("{token}.{format}", "part1.part2.part3.json", "token", "part1.part2.part3")]
+    [InlineData("{format}.{token}", "json.secret", "format", "json")]
+    [InlineData("{token}.json", "part1.part2.json", "token", "part1.part2")]
+    [InlineData("{token}.json", "part1.part2.JSON", "token", "part1.part2")]
+    [InlineData("{token}.{format}.zip", "part1.part2.json.zip", "token", "part1.part2")]
+    [InlineData("{token}.json/{format}", "part1.part2.json/xml", "token", "part1.part2")]
+    [InlineData("{token}.{format}/rest", "part1.part2.json/rest", "token", "part1.part2")]
+    [InlineData("{a}.{b}.{c}", "p.q.r.s", "a", "p.q")]
+    [InlineData("{a}.{b}.{c}", "r.s", "b", "r")]
+    public void GetParameterLength_ParameterFollowedByLiteral_ReturnsLengthOfValue(string httpRoute, string httpPath, string parameterName, string expectedValue)
+    {
+        var segments = CreateHttpRouteParser().ParseRoute(httpRoute).Segments;
+        var index = Array.FindIndex(segments, segment => segment.ParamName == parameterName);
+
+        var length = HttpRouteParser.GetParameterLength(httpPath.AsSpan(), segments, index);
+
+        Assert.Equal(expectedValue, length >= 0 ? httpPath.Substring(0, length) : null);
+    }
+
+    // -1 means the helper doesn't apply or the literals don't match, and the callers use their existing logic,
+    // e.g. "{id}/rest" with "5/rest" still gives id = "5".
+    [Theory]
+    [InlineData("{token}.{format}", "json", "format")] // Last segment.
+    [InlineData("{a}{b}", "xy", "a")] // Followed by a parameter.
+    [InlineData("{id}/rest", "5/rest", "id")] // The parameter is the whole path segment.
+    [InlineData("{token}.{format}", "abc", "token")] // Literal not found.
+    [InlineData("{id}.{format?}", "5", "id")] // No room for the literal and the following value.
+    public void GetParameterLength_NotApplicableOrNotMatched_ReturnsMinusOne(string httpRoute, string httpPath, string parameterName)
+    {
+        var segments = CreateHttpRouteParser().ParseRoute(httpRoute).Segments;
+        var index = Array.FindIndex(segments, segment => segment.ParamName == parameterName);
+
+        Assert.Equal(-1, HttpRouteParser.GetParameterLength(httpPath.AsSpan(), segments, index));
+    }
+
     [Fact]
     public void AddHttpRouteProcessor_ParserAndFormatterInstanceAdded()
     {

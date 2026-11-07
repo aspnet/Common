@@ -4,7 +4,7 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Card, makeStyles, mergeClasses, useArrowNavigationGroup } from '@fluentui/react-components';
 import { useReportContext } from '../core/ReportContext';
-import { useReportStyles, srOnlyStyle, statusTextVar } from '../styles/reportStyles';
+import { trendTone, useReportStyles, srOnlyStyle } from '../styles/reportStyles';
 import { metricHistoryForScenario, chronologicalExecutions } from '../core/viewModels';
 import { inferBetterDirections, judgeValueDelta, judgmentWord, ratingGoodness, type DeltaJudgment } from '../core/metricDirection';
 import { TrendChart, type BandPoint } from './TrendChart';
@@ -132,6 +132,7 @@ const useLocalStyles = makeStyles({
         fontWeight: 'var(--font-weight-semibold)',
         lineHeight: 1,
         fontVariantNumeric: 'tabular-nums',
+        overflowWrap: 'anywhere',
     },
     chartWrap: {
         marginBottom: 'var(--spacing-s-nudge)',
@@ -139,11 +140,19 @@ const useLocalStyles = makeStyles({
     historySection: {
         marginTop: 'var(--spacing-xxl)',
     },
+    historySectionHeader: {
+        display: 'flex',
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+        gap: 'var(--spacing-l)',
+        marginBottom: 'var(--spacing-m)',
+        flexWrap: 'wrap',
+    },
     historyHeading: {
         fontSize: 'var(--font-size-400)',
         fontWeight: 'var(--font-weight-semibold)',
         color: 'var(--neutral-foreground-1)',
-        margin: '0 0 var(--spacing-m)',
+        margin: 0,
     },
     histLegend: {
         display: 'inline-flex',
@@ -153,12 +162,20 @@ const useLocalStyles = makeStyles({
         color: 'var(--neutral-foreground-3)',
         whiteSpace: 'nowrap',
         flexWrap: 'wrap',
-        margin: '0 0 var(--spacing-m)',
+        margin: 0,
+        marginLeft: 'auto',
+        maxWidth: '100%',
+        justifyContent: 'flex-start',
     },
     histLegendItem: {
         display: 'inline-flex',
         alignItems: 'center',
         gap: 'var(--spacing-xs)',
+    },
+    histLegendGroup: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 'var(--spacing-m)',
     },
     histLegendDot: {
         width: '8px',
@@ -172,14 +189,18 @@ const useLocalStyles = makeStyles({
         background: 'var(--neutral-background-1)',
         border: '1.5px solid var(--neutral-foreground-3)',
     },
-    histLegendDotCurr: { background: 'var(--neutral-foreground-3)' },
+    histLegendDotCurr: { background: 'var(--brand-foreground-1)' },
     histLegendGlyph: { color: 'var(--neutral-foreground-3)' },
-    histLegendSep: { color: 'var(--neutral-foreground-4)' },
+    histLegendDivider: {
+        width: '1px',
+        height: 'var(--spacing-m)',
+        background: 'var(--neutral-stroke-2)',
+    },
     histLegendSpread: {
         width: '18px',
         height: '6px',
         borderRadius: 'var(--radius-circular)',
-        background: 'var(--neutral-stroke-2)',
+        background: 'var(--chart-track)',
         display: 'inline-block',
         flex: 'none',
     },
@@ -188,11 +209,6 @@ const useLocalStyles = makeStyles({
         gridTemplateColumns: '1.6fr 1.4fr 2fr',
         columnGap: 'var(--spacing-l)',
         padding: 'var(--spacing-m-nudge) 0',
-        fontSize: 'var(--font-size-100)',
-        fontWeight: 'var(--font-weight-semibold)',
-        color: 'var(--neutral-foreground-4)',
-        textTransform: 'uppercase',
-        letterSpacing: '.5px',
         borderBottom: '1px solid var(--neutral-stroke-2)',
     },
     colCenter: {
@@ -231,7 +247,7 @@ const useLocalStyles = makeStyles({
         height: '1.5px',
         transform: 'translateY(-50%)',
         borderRadius: 'var(--radius-circular)',
-        background: 'var(--neutral-stroke-2)',
+        background: 'var(--chart-track)',
     },
     changeValueBase: {
         flex: 'none',
@@ -427,8 +443,8 @@ export const HistoryView = () => {
     const firstGoodness = validWithExec[0]?.exec ? goodnessMean.get(validWithExec[0].exec!) : undefined;
     const lastGoodness = validWithExec[validWithExec.length - 1]?.exec ? goodnessMean.get(validWithExec[validWithExec.length - 1].exec!) : undefined;
     const netGoodnessDelta = firstGoodness !== undefined && lastGoodness !== undefined ? lastGoodness - firstGoodness : undefined;
-    const netStatus: DeltaJudgment = netFlat ? 'neutral' : judgeValueDelta(activeDirection, dMean, netGoodnessDelta);
-    const netColor = netFlat ? 'var(--neutral-foreground-4)' : statusTextVar(netStatus);
+    const netStatus: DeltaJudgment = netFlat ? 'unchanged' : judgeValueDelta(activeDirection, dMean, netGoodnessDelta);
+    const netColor = netFlat ? 'var(--neutral-solid)' : `var(--${trendTone[netStatus]}-text)`;
     const netWord = judgmentWord(netStatus);
     const netDirWord = netFlat ? undefined : dMean > 0 ? 'increased' : 'decreased';
     const netStr = netFlat ? 'stable' : (dMean > 0 ? '▲ ' : '▼ ') + formatNumber(Math.abs(dMean));
@@ -457,7 +473,7 @@ export const HistoryView = () => {
         let changeStr = '—';
         let dirWord: string | undefined;
         let prevPos: number | null = null;
-        let rowStatus: DeltaJudgment = 'neutral';
+        let rowStatus: DeltaJudgment = 'unchanged';
         const curPos = p ? posOn(p.mean, domain.min, domain.max) : 50;
         if (p && prev) {
             prevPos = posOn(prev.mean, domain.min, domain.max);
@@ -467,7 +483,7 @@ export const HistoryView = () => {
             const currGoodness = exec ? goodnessMean.get(exec) : undefined;
             const prevGoodness = prevExec ? goodnessMean.get(prevExec) : undefined;
             const goodnessDelta = currGoodness !== undefined && prevGoodness !== undefined ? currGoodness - prevGoodness : undefined;
-            rowStatus = flat ? 'neutral' : judgeValueDelta(activeDirection, d, goodnessDelta);
+            rowStatus = flat ? 'unchanged' : judgeValueDelta(activeDirection, d, goodnessDelta);
             const word = judgmentWord(rowStatus);
             changeStr = flat ? '—' : (d > 0 ? '▲ ' : '▼ ') + magnitude;
             dirWord = flat ? undefined : `${d > 0 ? 'increased' : 'decreased'} by ${magnitude}${word ? `, ${word}` : ''}`;
@@ -478,9 +494,9 @@ export const HistoryView = () => {
         const spR = p ? posOn(p.hi, domain.min, domain.max) : 50;
         const spread: React.CSSProperties =
             p && spR - spL > 0.5
-                ? { position: 'absolute', top: '50%', left: `${spL}%`, width: `${spR - spL}%`, height: '3px', transform: 'translateY(-50%)', borderRadius: 'var(--radius-circular)', background: 'var(--neutral-stroke-2)', pointerEvents: 'none' }
+                ? { position: 'absolute', top: '50%', left: `${spL}%`, width: `${spR - spL}%`, height: '3px', transform: 'translateY(-50%)', borderRadius: 'var(--radius-circular)', background: 'var(--chart-track)', pointerEvents: 'none' }
                 : { display: 'none' };
-        return { key: `${date}-${i}`, date, scoreStr, changeStr, dirWord, numColor: statusTextVar(db.sk), spread, connector: db.connector, dotB: db.dotB, dotA: db.dotA };
+        return { key: `${date}-${i}`, date, scoreStr, changeStr, dirWord, numColor: `var(--${trendTone[db.sk]}-text)`, spread, connector: db.connector, dotB: db.dotB, dotA: db.dotA };
     });
 
     return (
@@ -550,25 +566,33 @@ export const HistoryView = () => {
                         </div>
 
                         <div className={local.historySection}>
-                            <h2 className={local.historyHeading}>
-                                Run history
-                            </h2>
-                            <div className={local.histLegend}>
-                                <span className={local.histLegendItem}>
-                                    <span aria-hidden="true" className={mergeClasses(local.histLegendDot, local.histLegendDotPrev)} /> previous
-                                </span>
-                                <span className={local.histLegendItem}>
-                                    <span aria-hidden="true" className={mergeClasses(local.histLegendDot, local.histLegendDotCurr)} /> current
-                                </span>
-                                <span className={local.histLegendItem}>
-                                    <span aria-hidden="true" className={local.histLegendGlyph}>▲</span> increased <span aria-hidden="true" className={local.histLegendSep}>·</span> <span aria-hidden="true" className={local.histLegendGlyph}>▼</span> decreased
-                                </span>
-                                <span className={local.histLegendItem}>
-                                    <span aria-hidden="true" className={local.histLegendSpread} /> min–max
-                                </span>
+                            <div className={local.historySectionHeader}>
+                                <h2 className={local.historyHeading}>
+                                    Run history
+                                </h2>
+                                <div className={local.histLegend}>
+                                    <span className={local.histLegendItem}>
+                                        <span aria-hidden="true" className={mergeClasses(local.histLegendDot, local.histLegendDotPrev)} /> previous
+                                    </span>
+                                    <span className={local.histLegendItem}>
+                                        <span aria-hidden="true" className={mergeClasses(local.histLegendDot, local.histLegendDotCurr)} /> current
+                                    </span>
+                                    <span className={local.histLegendGroup}>
+                                        <span aria-hidden="true" className={local.histLegendDivider} />
+                                        <span className={local.histLegendItem}>
+                                            <span aria-hidden="true" className={local.histLegendGlyph}>▲</span> increased <span aria-hidden="true" className={local.histLegendGlyph}>▼</span> decreased
+                                        </span>
+                                    </span>
+                                    <span className={local.histLegendGroup}>
+                                        <span aria-hidden="true" className={local.histLegendDivider} />
+                                        <span className={local.histLegendItem}>
+                                            <span aria-hidden="true" className={local.histLegendSpread} /> min–max
+                                        </span>
+                                    </span>
+                                </div>
                             </div>
                             <div className={s.tscroll} role="table" aria-label="Run history" tabIndex={0}>
-                                <div className={mergeClasses('eval-grid4', local.historyHeaderRow)} role="row">
+                                <div className={mergeClasses('eval-grid4', s.compactTableHeader, local.historyHeaderRow)} role="row">
                                     <span role="columnheader">Execution</span>
                                     <span role="columnheader" className={local.colCenter}>Metric score</span>
                                     <span role="columnheader" className={local.colRight}>Δ run</span>

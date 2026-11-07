@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Collections.Generic;
 using Microsoft.Shared.Diagnostics;
 
 namespace Microsoft.Extensions.AI.Evaluation.NLP.Common;
@@ -28,7 +27,10 @@ internal static class GLEUAlgorithm
         MatchCounter<NGram<string>> hypNGrams = new(hypothesis.CreateAllNGrams(minN, maxN));
         int truePosFalsePos = hypNGrams.Sum();
 
-        List<(int, int)> hypCounts = [];
+        int bestTruePos = 0;
+        int bestNAll = 0;
+        bool hasBest = false;
+
         foreach (var reference in references)
         {
             MatchCounter<NGram<string>> refNGrams = new(reference.CreateAllNGrams(minN, maxN));
@@ -39,28 +41,21 @@ internal static class GLEUAlgorithm
 
             int nAll = Math.Max(truePosFalsePos, truePosFalseNeg);
 
-            if (nAll > 0)
+            if (nAll > 0 && (!hasBest || (long)truePos * bestNAll > (long)bestTruePos * nAll))
             {
-                hypCounts.Add((truePos, nAll));
+                bestTruePos = truePos;
+                bestNAll = nAll;
+                hasBest = true;
             }
         }
 
-        int corpusNMatch = 0;
-        int corpusNAll = 0;
-
-        foreach (var (truePos, nAll) in hypCounts)
-        {
-            corpusNMatch += truePos;
-            corpusNAll += nAll;
-        }
-
-        if (corpusNAll == 0)
+        if (!hasBest)
         {
             return 0.0;
         }
         else
         {
-            return (double)corpusNMatch / corpusNAll;
+            return (double)bestTruePos / bestNAll;
         }
     }
 }

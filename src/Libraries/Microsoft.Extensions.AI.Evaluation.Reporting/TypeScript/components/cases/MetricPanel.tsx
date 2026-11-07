@@ -2,13 +2,15 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 import { useId, useState } from 'react';
-import { makeStyles, mergeClasses } from '@fluentui/react-components';
+import { Body1Strong, Card, makeStyles, mergeClasses } from '@fluentui/react-components';
 import { ChevronRight16Regular } from '@fluentui/react-icons';
-import { useReportStyles, statusSolidVar, statusTextVar, type ReportStatus } from '../styles/reportStyles';
+import { useReportStyles } from '../styles/reportStyles';
 import { formatValue } from '../core/metricModel';
+import { ratingBucket } from '../core/viewModels';
 import { DiagnosticsContent } from './DiagnosticsContent';
 import { MetadataContent } from './MetadataContent';
 import { type MetricType } from './metricTypes';
+import { TextNode } from './TranscriptBlock';
 
 // The 5-segment meter fills to the rating ordinal.
 const RATING_PIP: Partial<Record<EvaluationRating, number>> = {
@@ -17,21 +19,6 @@ const RATING_PIP: Partial<Record<EvaluationRating, number>> = {
     average: 3,
     poor: 2,
     unacceptable: 1,
-};
-
-const statusKeyOf = (rating: EvaluationRating | undefined): ReportStatus => {
-    switch (rating) {
-        case 'exceptional':
-        case 'good':
-            return 'success';
-        case 'average':
-            return 'caution';
-        case 'poor':
-        case 'unacceptable':
-            return 'danger';
-        default:
-            return 'neutral';
-    }
 };
 
 const ratingWord = (rating: EvaluationRating | undefined): string => {
@@ -136,13 +123,24 @@ const useStyles = makeStyles({
         flex: 'none',
         display: 'flex',
         alignItems: 'stretch',
-        width: '96px',
+        width: '144px',
         height: '16px',
         gap: '4px',
     },
     seg: { flex: '1 1 0', minWidth: 0, borderRadius: '2px' },
     segCenter: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
     segIcon: { fontSize: '11px', lineHeight: 1, fontWeight: 700 },
+    valuePreview: {
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        padding: '0 var(--spacing-xs)',
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
+        textOverflow: 'ellipsis',
+        textAlign: 'center',
+        color: 'var(--neutral-foreground-3)',
+    },
 
     panel: {
         padding: '0 var(--spacing-l) var(--spacing-l) var(--spacing-xxxl)',
@@ -156,13 +154,15 @@ const useStyles = makeStyles({
         gap: 'var(--spacing-s)',
         padding: 'var(--spacing-m) 0 var(--spacing-l)',
     },
-    heroLine: { display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-s-nudge)' },
+    heroLine: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-m)' },
     heroWord: {
         fontSize: 'var(--font-size-500)',
         fontWeight: 'var(--font-weight-semibold)',
         lineHeight: 1.2,
     },
     heroNum: {
+        minWidth: 0,
+        overflowWrap: 'anywhere',
         fontSize: 'var(--font-size-400)',
         color: 'var(--neutral-foreground-3)',
         fontVariantNumeric: 'tabular-nums',
@@ -193,6 +193,24 @@ const useStyles = makeStyles({
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
     },
+    contextList: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--spacing-m)',
+    },
+    contextGroup: {
+        minWidth: 0,
+    },
+    contextContents: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--spacing-s)',
+    },
+    contextItem: {
+        minWidth: 0,
+        maxWidth: '100%',
+        overflowWrap: 'anywhere',
+    },
     empty: {
         fontSize: 'var(--font-size-200)',
         color: 'var(--neutral-foreground-3)',
@@ -201,59 +219,58 @@ const useStyles = makeStyles({
     },
 });
 
-const SegmentTrack = ({ metric, sk }: { metric: MetricType; sk: ReportStatus }) => {
+const SegmentTrack = ({ metric, solid, showRatingGlyph, positive, value }: {
+    metric: MetricType;
+    solid: string;
+    showRatingGlyph: boolean;
+    positive: boolean;
+    value?: string;
+}) => {
     const classes = useStyles();
-    const solid = statusSolidVar(sk);
     const aura = `0 0 0 3px color-mix(in srgb, ${solid} 18%, transparent)`;
 
-    const neutralTrack = (
-        <span className={classes.track} aria-hidden="true">
-            <span className={mergeClasses(classes.seg, classes.segCenter)} style={{ backgroundColor: 'var(--eval-seg-empty)' }}>
-                <span className={classes.segIcon} style={{ color: 'var(--neutral-foreground-3)' }}>?</span>
-            </span>
-        </span>
-    );
-
-    if (sk === 'neutral') {
-        return neutralTrack;
-    }
-
-    if (metric.$type === 'boolean') {
-        const good = sk === 'success';
+    if (showRatingGlyph && metric.$type === 'boolean') {
         return (
             <span className={classes.track} aria-hidden="true">
                 <span className={mergeClasses(classes.seg, classes.segCenter)} style={{ backgroundColor: solid, boxShadow: aura }}>
-                    <span className={classes.segIcon} style={{ color: 'var(--neutral-foreground-on-brand)' }}>{good ? '✓' : '✗'}</span>
+                    <span className={classes.segIcon} style={{ color: 'var(--neutral-foreground-on-brand)' }}>{positive ? '✓' : '✗'}</span>
                 </span>
             </span>
         );
     }
 
-    // string/none metrics carry no scale to plot — no meter, matching real-data rendering.
-    if (metric.$type !== 'numeric') {
-        return null;
-    }
-
-    const pip = RATING_PIP[metric.interpretation?.rating as EvaluationRating];
-    if (pip === undefined) {
-        return neutralTrack;
+    if (metric.$type === 'numeric') {
+        const pip = RATING_PIP[metric.interpretation?.rating as EvaluationRating];
+        if (pip !== undefined) {
+            return (
+                <span className={classes.track} aria-hidden="true">
+                    {Array.from({ length: 5 }, (_, i) => {
+                        const on = i < pip;
+                        return (
+                            <span
+                                key={i}
+                                className={classes.seg}
+                                style={{ backgroundColor: on ? solid : 'var(--eval-seg-empty)', boxShadow: on ? aura : undefined }}
+                            />
+                        );
+                    })}
+                </span>
+            );
+        }
     }
 
     return (
         <span className={classes.track} aria-hidden="true">
-            {Array.from({ length: 5 }, (_, i) => {
-                const on = i < pip;
-                return (
-                    <span
-                        key={i}
-                        className={classes.seg}
-                        style={{ backgroundColor: on ? solid : 'var(--eval-seg-empty)', boxShadow: on ? aura : undefined }}
-                    />
-                );
-            })}
+            <span className={mergeClasses(classes.seg, classes.segCenter)} style={{ backgroundColor: 'var(--eval-seg-empty)' }}>
+                {value !== undefined
+                    ? <span className={mergeClasses(classes.segIcon, classes.valuePreview)}>{value}</span>
+                    : <span className={classes.segIcon} style={{ color: 'var(--neutral-foreground-3)' }}>?</span>}
+            </span>
         </span>
     );
 };
+
+const ratingTone = { good: 'positive', fair: 'caution', weak: 'negative', unknown: 'neutral' } as const;
 
 const MetricRow = ({ metric }: { metric: MetricType }) => {
     const classes = useStyles();
@@ -262,13 +279,15 @@ const MetricRow = ({ metric }: { metric: MetricType }) => {
 
     const rating = metric.interpretation?.rating;
     const failed = metricFailed(metric);
-    const sk: ReportStatus = failed ? 'danger' : statusKeyOf(rating);
-    const solid = statusSolidVar(sk);
-    const textColor = statusTextVar(sk);
+    const bucket = ratingBucket(rating);
+    const tone = failed ? 'negative' : ratingTone[bucket];
+    const solid = `var(--${tone}-solid)`;
+    const textColor = `var(--${tone}-text)`;
+    const unknown = !failed && bucket === 'unknown';
 
     const dotStyle =
-        sk === 'neutral'
-            ? { backgroundColor: 'transparent', boxShadow: 'inset 0 0 0 1.5px var(--neutral-foreground-4)' }
+        unknown
+            ? { backgroundColor: 'transparent', boxShadow: `inset 0 0 0 1.5px ${solid}` }
             : { backgroundColor: solid, boxShadow: `0 0 0 3px color-mix(in srgb, ${solid} 18%, transparent)` };
 
     const reason = metric.reason;
@@ -276,6 +295,7 @@ const MetricRow = ({ metric }: { metric: MetricType }) => {
     const diagnostics = metric.diagnostics ?? [];
     const metadata = metric.metadata ?? {};
     const hasMetadata = Object.keys(metadata).length > 0;
+    const contextGroups = Object.values(metric.context ?? {}).filter((context) => context.contents.length > 0);
 
     const heroNum = formatValue(metric);
     const pip = metric.$type === 'numeric' ? RATING_PIP[rating as EvaluationRating] : undefined;
@@ -297,7 +317,13 @@ const MetricRow = ({ metric }: { metric: MetricType }) => {
                     <span className={classes.dot} style={dotStyle} />
                 </span>
                 <span className={classes.rowName}>{metric.name}</span>
-                <SegmentTrack metric={metric} sk={sk} />
+                <SegmentTrack
+                    metric={metric}
+                    solid={solid}
+                    showRatingGlyph={failed || !unknown}
+                    positive={!failed && bucket === 'good'}
+                    value={metric.$type !== 'none' && metric.value !== undefined ? heroNum : undefined}
+                />
             </button>
 
             {open && (
@@ -327,6 +353,26 @@ const MetricRow = ({ metric }: { metric: MetricType }) => {
                         <div className={classes.subSection}>
                             <div className={classes.subHeader}>What this measures?</div>
                             <div className={classes.subBody} style={{ color: 'var(--neutral-foreground-3)' }}>{reason}</div>
+                        </div>
+                    )}
+
+                    {contextGroups.length > 0 && (
+                        <div className={classes.subSection}>
+                            <div className={classes.subHeader}>Evaluation context</div>
+                            <div className={classes.contextList}>
+                                {contextGroups.map((context, contextIndex) => (
+                                    <Card key={`${context.name}-${contextIndex}`} appearance="outline" size="small" className={classes.contextGroup}>
+                                        <Body1Strong block>{context.name}</Body1Strong>
+                                        <div className={classes.contextContents}>
+                                            {context.contents.map((content, contentIndex) => (
+                                                <div key={contentIndex} className={classes.contextItem}>
+                                                    <TextNode content={content} altHint={`Image from ${context.name}`} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Card>
+                                ))}
+                            </div>
                         </div>
                     )}
 

@@ -5,8 +5,10 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Diagnostics.Buffering;
 using Microsoft.Shared.Data.Validation;
+using Microsoft.Shared.DiagnosticIds;
 
 namespace Microsoft.AspNetCore.Diagnostics.Buffering;
 
@@ -57,6 +59,16 @@ public class PerRequestLogBufferingOptions
     /// </remarks>
     [Range(MinimumPerRequestBufferSizeInBytes, MaximumPerRequestBufferSizeInBytes)]
     public int MaxPerRequestBufferSizeInBytes { get; set; } = DefaultPerRequestBufferSizeInBytes;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether logging scopes are added to the attributes of log records when they're buffered.
+    /// </summary>
+    /// <remarks>
+    /// Only scopes that implement <c>IEnumerable&lt;KeyValuePair&lt;string, object?&gt;&gt;</c> are added, without their "{OriginalFormat}" pairs.
+    /// Scope values are converted to strings and count toward <see cref="MaxLogRecordSizeInBytes"/> and <see cref="MaxPerRequestBufferSizeInBytes"/>.
+    /// </remarks>
+    [Experimental(diagnosticId: DiagnosticIds.Experiments.Telemetry, UrlFormat = DiagnosticIds.UrlFormat)]
+    public bool IncludeScopes { get; set; }
 
     /// <summary>
     /// Gets or sets the collection of <see cref="LogBufferingFilterRule"/> used for filtering log messages for the purpose of further buffering.

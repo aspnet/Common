@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TargetFrameworks);netstandard2.0</TargetFrameworks>
+    <RootNamespace>Microsoft.Extensions.DocumentExtraction</RootNamespace>
+    <Description>Middleware and dependency-injection utilities for document extraction.</Description>
+    <Workstream>RAG</Workstream>
+    <PackageTags>documents;extraction;middleware;logging</PackageTags>
+    <Stage>dev</Stage>
+    <StageDevDiagnosticId>MEDE0001</StageDevDiagnosticId>
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <MinCodeCoverage>80</MinCodeCoverage>
+    <MinMutationScore>75</MinMutationScore>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CA1307;CA1822;IDE0058;SA1402;SA1600</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <InjectExperimentalAttributeOnLegacy>true</InjectExperimentalAttributeOnLegacy>
+    <DisableMicrosoftExtensionsLoggingSourceGenerator>false</DisableMicrosoftExtensionsLoggingSourceGenerator>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Microsoft.Extensions.DocumentExtraction.Abstractions\Microsoft.Extensions.DocumentExtraction.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+</Project>

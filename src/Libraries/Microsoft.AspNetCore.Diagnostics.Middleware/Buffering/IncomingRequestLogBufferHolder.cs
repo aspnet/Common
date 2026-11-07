@@ -6,10 +6,9 @@ using System.Collections.Concurrent;
 
 namespace Microsoft.AspNetCore.Diagnostics.Buffering;
 
-internal sealed class IncomingRequestLogBufferHolder : IDisposable
+internal sealed class IncomingRequestLogBufferHolder
 {
     private readonly ConcurrentDictionary<string, IncomingRequestLogBuffer> _buffers = new();
-    private bool _disposed;
 
     public IncomingRequestLogBuffer GetOrAdd(string category, Func<string, IncomingRequestLogBuffer> valueFactory) =>
         _buffers.GetOrAdd(category, valueFactory);
@@ -19,21 +18,6 @@ internal sealed class IncomingRequestLogBufferHolder : IDisposable
         foreach (IncomingRequestLogBuffer buffer in _buffers.Values)
         {
             buffer.Flush();
-        }
-    }
-
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-
-        foreach (IncomingRequestLogBuffer buffer in _buffers.Values)
-        {
-            buffer.Dispose();
         }
     }
 }

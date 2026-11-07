@@ -50,8 +50,9 @@ internal sealed class HttpRouteParser : IHttpRouteParser
             int offset = 0;
             int index = 0;
 
-            foreach (Segment segment in routeSegments.Segments)
+            for (int i = 0; i < routeSegments.Segments.Length; i++)
             {
+                var segment = routeSegments.Segments[i];
                 if (segment.IsParam)
                 {
                     var startIndex = segment.Start + offset;
@@ -69,7 +70,12 @@ internal sealed class HttpRouteParser : IHttpRouteParser
                         var parameterContent = segment.Content;
                         var parameterTemplateLength = parameterContent.Length + 2;
 
-                        var length = httpPathAsSpan.Slice(startIndex).IndexOf(ForwardSlash);
+                        var length = GetParameterLength(httpPathAsSpan.Slice(startIndex), routeSegments.Segments, i);
+
+                        if (length == -1)
+                        {
+                            length = httpPathAsSpan.Slice(startIndex).IndexOf(ForwardSlash);
+                        }
 
                         if (segment.IsCatchAll || length == -1)
                         {
@@ -146,6 +152,56 @@ internal sealed class HttpRouteParser : IHttpRouteParser
 
             return new ParsedRouteSegments(httpRoute, segments.ToArray());
         });
+    }
+
+    // Returns the length of the value of the parameter segments[index] (httpPath starts at the value) when the parameter
+    // is followed by literals in the same path segment. Like ASP.NET Core routing, the literals are matched from right
+    // to left, ignoring case, e.g. route "{token}.{format}" with path "a.b.json" gives token = "a.b" and format = "json".
+    // Returns -1 when not applicable or not matched.
+    internal static int GetParameterLength(ReadOnlySpan<char> httpPath, Segment[] segments, int index)
+    {
+        var last = index + 1;
+        if (last == segments.Length || segments[last].IsParam || segments[last].Content[0] == '/')
+        {
+            return -1;
+        }
+
+        while (last < segments.Length - 1 && (segments[last].IsParam || segments[last].Content.AsSpan().IndexOf('/') < 0))
+        {
+            last++;
+        }
+
+        var length = httpPath.IndexOf('/');
+        if (length == -1)
+        {
+            length = httpPath.Length;
+        }
+
+        for (var i = last; i > index; i--)
+        {
+            var literal = segments[i].Content.AsSpan();
+            var slashIndex = literal.IndexOf('/');
+            if (segments[i].IsParam || slashIndex == 0)
+            {
+                continue;
+            }
+
+            // Leave at least one character for the parameter value that follows the literal.
+            var end = i < last ? length - 1 : length;
+            var value = slashIndex > 0 ? literal.Slice(0, slashIndex) : literal;
+#if NET
+            length = end > 0 ? httpPath.Slice(0, end).LastIndexOf(value, StringComparison.OrdinalIgnoreCase) : -1;
+#else
+            length = end > 0 ? httpPath.Slice(0, end).ToString().LastIndexOf(value.ToString(), StringComparison.OrdinalIgnoreCase) : -1;
+#endif
+
+            if (length == -1)
+            {
+                return -1;
+            }
+        }
+
+        return length;
     }
 
     private static Segment GetParameterSegment(string httpRoute, ref int pos)

@@ -92,7 +92,9 @@ public static class GlobalBufferLoggingBuilderExtensions
     {
         _ = builder.Services.AddExtendedLoggerFeactory();
 
-        builder.Services.TryAddSingleton<LogBufferingFilterRuleSelector>();
+        builder.Services.TryAddSingleton<IExternalScopeProvider>(static sp =>
+            new LoggerFactoryScopeProvider(sp.GetRequiredService<IOptions<LoggerFactoryOptions>>().Value.ActivityTrackingOptions));
+
         builder.Services.TryAddSingleton<GlobalLogBufferManager>();
         builder.Services.TryAddSingleton<GlobalLogBuffer>(static sp => sp.GetRequiredService<GlobalLogBufferManager>());
         builder.Services.TryAddSingleton<LogBuffer>(static sp => sp.GetRequiredService<GlobalLogBufferManager>());

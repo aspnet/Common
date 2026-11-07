@@ -101,6 +101,26 @@ public abstract class ResultStoreTester
     }
 
     [Fact]
+    public async Task IterationNamesAreOrderedNumerically()
+    {
+        SkipIfNotConfigured();
+
+        IEvaluationResultStore resultStore = CreateResultStore();
+        Assert.NotNull(resultStore);
+
+        string newExecutionName = $"Test Execution {Path.GetRandomFileName()}";
+        string[] iterationNames = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"];
+
+        await resultStore.WriteResultsAsync(
+            iterationNames.Select(iterationName => CreateTestResult(ScenarioName(0), iterationName, newExecutionName)));
+
+        string[] readIterationNames =
+            [.. (await LoadResultsAsync(1, resultStore)).Select(r => r.iterationName)];
+
+        Assert.Equal(iterationNames, readIterationNames);
+    }
+
+    [Fact]
     public async Task WriteAndReadHistoricalResults()
     {
         SkipIfNotConfigured();

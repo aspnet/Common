@@ -477,6 +477,112 @@ public class OpenAIResponseClientTests
     }
 
     [Fact]
+    public async Task ReasoningItemNullStatus_Streaming()
+    {
+        // Some OpenAI-compatible endpoints serialize the optional "status" property of a reasoning item
+        // as null rather than omitting it. Regression test for the SSE stream being torn down with
+        // ArgumentOutOfRangeException ("Unknown ReasoningStatus value") when deserializing such items.
+        const string Input = """
+            {
+              "input":[{
+                "type":"message",
+                "role":"user",
+                "content":[{
+                  "type":"input_text",
+                  "text":"Solve this problem step by step."
+                }]
+              }],
+              "reasoning": {
+                "effort": "medium"
+              },
+              "model": "o4-mini",
+              "stream": true
+            }
+            """;
+
+        const string Output = """
+            event: response.created
+            data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_reasoning123","object":"response","created_at":1756752900,"status":"in_progress","model":"o4-mini-2025-04-16","output":[],"reasoning":{"effort":"medium"}}}
+
+            event: response.in_progress
+            data: {"type":"response.in_progress","sequence_number":1,"response":{"id":"resp_reasoning123","object":"response","created_at":1756752900,"status":"in_progress","model":"o4-mini-2025-04-16","output":[]}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","sequence_number":2,"output_index":0,"item":{"id":"rs_reasoning123","type":"reasoning","status":null,"text":""}}
+
+            event: response.reasoning_text.delta
+            data: {"type":"response.reasoning_text.delta","sequence_number":3,"item_id":"rs_reasoning123","output_index":0,"delta":"First, ","status":null}
+
+            event: response.reasoning_text.delta
+            data: {"type":"response.reasoning_text.delta","sequence_number":4,"item_id":"rs_reasoning123","output_index":0,"delta":"let's analyze "}
+
+            event: response.reasoning_text.delta
+            data: {"type":"response.reasoning_text.delta","sequence_number":5,"item_id":"rs_reasoning123","output_index":0,"delta":"the problem."}
+
+            event: response.reasoning_text.done
+            data: {"type":"response.reasoning_text.done","sequence_number":6,"item_id":"rs_reasoning123","output_index":0,"text":"First, let's analyze the problem."}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","sequence_number":7,"output_index":0,"item":{"id":"rs_reasoning123","type":"reasoning","status":null,"text":"First, let's analyze the problem."}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","sequence_number":8,"output_index":1,"item":{"id":"msg_reasoning123","type":"message","status":null,"content":[],"role":"assistant"}}
+
+            event: response.content_part.added
+            data: {"type":"response.content_part.added","sequence_number":9,"item_id":"msg_reasoning123","output_index":1,"content_index":0,"part":{"type":"output_text","annotations":[],"text":""}}
+
+            event: response.output_text.delta
+            data: {"type":"response.output_text.delta","sequence_number":10,"item_id":"msg_reasoning123","output_index":1,"content_index":0,"delta":"The solution is 42."}
+
+            event: response.output_text.done
+            data: {"type":"response.output_text.done","sequence_number":11,"item_id":"msg_reasoning123","output_index":1,"content_index":0,"text":"The solution is 42."}
+
+            event: response.content_part.done
+            data: {"type":"response.content_part.done","sequence_number":12,"item_id":"msg_reasoning123","output_index":1,"content_index":0,"part":{"type":"output_text","annotations":[],"text":"The solution is 42."}}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","sequence_number":13,"output_index":1,"item":{"id":"msg_reasoning123","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"text":"The solution is 42."}],"role":"assistant"}}
+
+            event: response.completed
+            data: {"type":"response.completed","sequence_number":14,"response":{"id":"resp_reasoning123","object":"response","created_at":1756752900,"status":"completed","model":"o4-mini-2025-04-16","output":[{"id":"rs_reasoning123","type":"reasoning","status":null,"text":"First, let's analyze the problem."},{"id":"msg_reasoning123","type":"message","status":"completed","content":[{"type":"output_text","annotations":[],"text":"The solution is 42."}],"role":"assistant"}],"usage":{"input_tokens":10,"output_tokens":25,"total_tokens":35}}}
+
+
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "o4-mini");
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (var update in client.GetStreamingResponseAsync("Solve this problem step by step.", new()
+        {
+            RawRepresentationFactory = options => new CreateResponseOptions
+            {
+                ReasoningOptions = new()
+                {
+                    ReasoningEffortLevel = ResponseReasoningEffortLevel.Medium
+                }
+            }
+        }))
+        {
+            updates.Add(update);
+        }
+
+        Assert.Equal(15, updates.Count);
+
+        // Verify reasoning text delta updates (sequence 3-5) survived the null-status items
+        var reasoningUpdates = updates.Where((u, idx) => idx >= 3 && idx <= 5).ToList();
+        Assert.Equal(3, reasoningUpdates.Count);
+        Assert.All(reasoningUpdates, u =>
+        {
+            Assert.Single(u.Contents);
+            Assert.Null(u.Role);
+            var reasoning = Assert.IsType<TextReasoningContent>(u.Contents.Single());
+            Assert.NotNull(reasoning.Text);
+        });
+    }
+
+    [Fact]
     public async Task ReasoningTextDelta_Streaming_PreservesEncryptedContent()
     {
         const string Input = """
@@ -1981,7 +2087,7 @@ public class OpenAIResponseClientTests
         using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
 
         AITool mcpTool = rawTool ?
-            ResponseTool.CreateMcpTool("deepwiki", serverUri: new("https://mcp.deepwiki.com/mcp"), toolCallApprovalPolicy: new McpToolCallApprovalPolicy(GlobalMcpToolCallApprovalPolicy.NeverRequireApproval)).AsAITool() :
+            ResponseTool.CreateMcpTool("deepwiki", serverUri: new("https://mcp.deepwiki.com/mcp"), toolCallApprovalPolicy: new McpToolCallApprovalPolicy(DefaultMcpToolCallApprovalPolicy.NeverRequireApproval)).AsAITool() :
             new HostedMcpServerTool("deepwiki", new Uri("https://mcp.deepwiki.com/mcp"))
             {
                 ApprovalMode = HostedMcpServerToolApprovalMode.NeverRequire,
@@ -2601,7 +2707,7 @@ public class OpenAIResponseClientTests
         using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
 
         AITool mcpTool = rawTool ?
-            ResponseTool.CreateMcpTool("mymcp", serverUri: new("https://mcp.example.com/mcp"), toolCallApprovalPolicy: new McpToolCallApprovalPolicy(GlobalMcpToolCallApprovalPolicy.NeverRequireApproval)).AsAITool() :
+            ResponseTool.CreateMcpTool("mymcp", serverUri: new("https://mcp.example.com/mcp"), toolCallApprovalPolicy: new McpToolCallApprovalPolicy(DefaultMcpToolCallApprovalPolicy.NeverRequireApproval)).AsAITool() :
             new HostedMcpServerTool("mymcp", new Uri("https://mcp.example.com/mcp"))
             {
                 ApprovalMode = HostedMcpServerToolApprovalMode.NeverRequire,
@@ -5585,6 +5691,51 @@ public class OpenAIResponseClientTests
     }
 
     [Fact]
+    public async Task UserMessageWithInvalidImageDetail_OmitsDetail()
+    {
+        const string Input = """
+            {
+                "model":"gpt-4o-mini",
+                "input":[
+                    {
+                        "type":"message",
+                        "role":"user",
+                        "content":[
+                            {"type":"input_image","image_url":"data:image/png;base64,iVBORw0KGgo="}
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            {
+              "id":"resp_001",
+              "object":"response",
+              "created_at":1741892091,
+              "status":"completed",
+              "model":"gpt-4o-mini",
+              "output":[{"type":"message","id":"msg_001","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Done","annotations":[]}]}]
+            }
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o-mini");
+
+        var response = await client.GetResponseAsync([
+            new ChatMessage(ChatRole.User, [
+                new DataContent(Convert.FromBase64String("iVBORw0KGgo="), "image/png")
+                {
+                    AdditionalProperties = new AdditionalPropertiesDictionary { ["detail"] = 42 }
+                }
+            ])
+        ]);
+
+        Assert.Equal("Done", response.Text);
+    }
+
+    [Fact]
     public async Task NonStreamingResponseWithIncompleteReason_MapsFinishReason()
     {
         const string Input = """
@@ -6444,10 +6595,10 @@ public class OpenAIResponseClientTests
             data: {"type":"response.image_generation_call.partial_image","item_id":"img_call_def456","output_index":0,"partial_image_index":0,"partial_image_b64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}
 
             event: response.output_item.done
-            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_def456","image_result_b64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}}
+            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_def456","result":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}}
 
             event: response.completed
-            data: {"type":"response.completed","response":{"id":"resp_def456","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_def456","image_result_b64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}],"usage":{"input_tokens":15,"output_tokens":0,"total_tokens":15}}}
+            data: {"type":"response.completed","response":{"id":"resp_def456","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_def456","result":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}],"usage":{"input_tokens":15,"output_tokens":0,"total_tokens":15}}}
 
 
             """;
@@ -6561,10 +6712,10 @@ public class OpenAIResponseClientTests
             data: {"type":"response.image_generation_call.partial_image","item_id":"img_call_ghi789","output_index":0,"partial_image_index":2,"partial_image_b64":"SGVsbG8z"}
 
             event: response.output_item.done
-            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_ghi789","image_result_b64":"SGVsbG8z"}}
+            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_ghi789","result":"SGVsbG8z"}}
 
             event: response.completed
-            data: {"type":"response.completed","response":{"id":"resp_ghi789","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_ghi789","image_result_b64":"SGVsbG8z"}],"usage":{"input_tokens":18,"output_tokens":0,"total_tokens":18}}}
+            data: {"type":"response.completed","response":{"id":"resp_ghi789","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_ghi789","result":"SGVsbG8z"}],"usage":{"input_tokens":18,"output_tokens":0,"total_tokens":18}}}
 
 
             """;
@@ -6646,6 +6797,341 @@ public class OpenAIResponseClientTests
         Assert.NotNull(toolCallUpdate);
         var toolCall = toolCallUpdate.Contents.OfType<ImageGenerationToolCallContent>().First();
         Assert.Equal("img_call_ghi789", toolCall.CallId);
+    }
+
+    [Fact]
+    public async Task HostedImageGenerationTool_Streaming_YieldsFinalImageAfterPartialImages()
+    {
+        const string Input = """
+            {
+                "model": "gpt-4o",
+                "tools": [
+                    {
+                        "type": "image_generation",
+                        "model": "gpt-image-1",
+                        "size": "1024x1024",
+                        "output_format": "png",
+                        "partial_images": 3
+                    }
+                ],
+                "stream": true,
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Generate an image of a lake"
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        // Partial images are "Partial1", "Partial2" and "Partial3"; the final image is "Final".
+        const string Output = """
+            event: response.created
+            data: {"type":"response.created","response":{"id":"resp_final1","object":"response","created_at":1741892091,"status":"in_progress","model":"gpt-4o-2024-11-20","output":[]}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","output_index":0,"item":{"type":"image_generation_call","id":"img_call_final1","status":"in_progress"}}
+
+            event: response.image_generation_call.in_progress
+            data: {"type":"response.image_generation_call.in_progress","item_id":"img_call_final1","output_index":0}
+
+            event: response.image_generation_call.partial_image
+            data: {"type":"response.image_generation_call.partial_image","item_id":"img_call_final1","output_index":0,"partial_image_index":0,"partial_image_b64":"UGFydGlhbDE="}
+
+            event: response.image_generation_call.partial_image
+            data: {"type":"response.image_generation_call.partial_image","item_id":"img_call_final1","output_index":0,"partial_image_index":1,"partial_image_b64":"UGFydGlhbDI="}
+
+            event: response.image_generation_call.partial_image
+            data: {"type":"response.image_generation_call.partial_image","item_id":"img_call_final1","output_index":0,"partial_image_index":2,"partial_image_b64":"UGFydGlhbDM="}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_final1","status":"completed","result":"RmluYWw="}}
+
+            event: response.completed
+            data: {"type":"response.completed","response":{"id":"resp_final1","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_final1","status":"completed","result":"RmluYWw="}],"usage":{"input_tokens":15,"output_tokens":0,"total_tokens":15}}}
+
+
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o");
+
+        var imageTool = new HostedImageGenerationTool
+        {
+            Options = new ImageGenerationOptions
+            {
+                ModelId = "gpt-image-1",
+                ImageSize = new(1024, 1024),
+                MediaType = "image/png",
+                StreamingCount = 3
+            }
+        };
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (var update in client.GetStreamingResponseAsync("Generate an image of a lake", new ChatOptions
+        {
+            Tools = [imageTool]
+        }))
+        {
+            updates.Add(update);
+        }
+
+        // The three partial images and the final image should each be yielded, in that order.
+        var results = updates.SelectMany(u => u.Contents).OfType<ImageGenerationToolResultContent>().ToList();
+        Assert.Equal(4, results.Count);
+        Assert.All(results, r => Assert.Equal("img_call_final1", r.CallId));
+        for (int i = 0; i < 3; i++)
+        {
+            var partialImage = Assert.IsType<DataContent>(Assert.Single(results[i].Outputs!));
+            Assert.Equal($"Partial{i + 1}", Encoding.UTF8.GetString(partialImage.Data.ToArray()));
+            Assert.Equal(i, partialImage.AdditionalProperties?["PartialImageIndex"]);
+        }
+
+        // The final image comes from the completed ImageGenerationCallResponseItem, not from a partial image.
+        var finalResult = results[3];
+        Assert.IsType<ImageGenerationCallResponseItem>(finalResult.RawRepresentation);
+        var finalImage = Assert.IsType<DataContent>(Assert.Single(finalResult.Outputs!));
+        Assert.Equal("image/png", finalImage.MediaType);
+        Assert.Equal("Final", Encoding.UTF8.GetString(finalImage.Data.ToArray()));
+        Assert.False(finalImage.AdditionalProperties?.ContainsKey("PartialImageIndex") ?? false);
+
+        // Coalescing into a ChatResponse should keep only the final image.
+        var response = updates.ToChatResponse();
+        var coalescedResult = Assert.Single(response.Messages.SelectMany(m => m.Contents).OfType<ImageGenerationToolResultContent>());
+        Assert.Equal("Final", Encoding.UTF8.GetString(Assert.IsType<DataContent>(Assert.Single(coalescedResult.Outputs!)).Data.ToArray()));
+    }
+
+    [Fact]
+    public async Task HostedImageGenerationTool_Streaming_WithoutPartialImages_YieldsFinalImage()
+    {
+        const string Input = """
+            {
+                "model": "gpt-4o",
+                "tools": [
+                    {
+                        "type": "image_generation",
+                        "model": "gpt-image-1",
+                        "output_format": "jpeg"
+                    }
+                ],
+                "stream": true,
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Generate an image of a tree"
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        const string Output = """
+            event: response.created
+            data: {"type":"response.created","response":{"id":"resp_final2","object":"response","created_at":1741892091,"status":"in_progress","model":"gpt-4o-2024-11-20","output":[]}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","output_index":0,"item":{"type":"image_generation_call","id":"img_call_final2","status":"in_progress"}}
+
+            event: response.image_generation_call.in_progress
+            data: {"type":"response.image_generation_call.in_progress","item_id":"img_call_final2","output_index":0}
+
+            event: response.image_generation_call.generating
+            data: {"type":"response.image_generation_call.generating","item_id":"img_call_final2","output_index":0}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"image_generation_call","id":"img_call_final2","status":"completed","result":"RmluYWw="}}
+
+            event: response.completed
+            data: {"type":"response.completed","response":{"id":"resp_final2","object":"response","created_at":1741892091,"status":"completed","model":"gpt-4o-2024-11-20","output":[{"type":"image_generation_call","id":"img_call_final2","status":"completed","result":"RmluYWw="}],"usage":{"input_tokens":15,"output_tokens":0,"total_tokens":15}}}
+
+
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateResponseClient(httpClient, "gpt-4o");
+
+        var imageTool = new HostedImageGenerationTool
+        {
+            Options = new ImageGenerationOptions
+            {
+                ModelId = "gpt-image-1",
+                MediaType = "image/jpeg"
+            }
+        };
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (var update in client.GetStreamingResponseAsync("Generate an image of a tree", new ChatOptions
+        {
+            Tools = [imageTool]
+        }))
+        {
+            updates.Add(update);
+        }
+
+        // Exactly one image result should be yielded: the final image.
+        var streamedResult = Assert.Single(updates.SelectMany(u => u.Contents).OfType<ImageGenerationToolResultContent>());
+        Assert.IsType<ImageGenerationCallResponseItem>(streamedResult.RawRepresentation);
+
+        var response = updates.ToChatResponse();
+        var contents = response.Messages.SelectMany(m => m.Contents).ToList();
+
+        var toolCall = Assert.Single(contents.OfType<ImageGenerationToolCallContent>());
+        Assert.Equal("img_call_final2", toolCall.CallId);
+
+        var toolResult = Assert.Single(contents.OfType<ImageGenerationToolResultContent>());
+        Assert.Equal("img_call_final2", toolResult.CallId);
+        var image = Assert.IsType<DataContent>(Assert.Single(toolResult.Outputs!));
+        Assert.Equal("image/jpeg", image.MediaType);
+        Assert.Equal("Final", Encoding.UTF8.GetString(image.Data.ToArray()));
+    }
+
+    [Theory]
+    [InlineData("""{"type":"image_generation_call","id":"img_call_same1","status":"completed","result":"RmluYWw="}""")]
+    [InlineData("""{"type":"image_generation_call","id":"img_call_same1","status":"failed"}""")]
+    public async Task HostedImageGenerationTool_StreamingAndNonStreaming_ProduceSameImageContents(string imageGenerationCall)
+    {
+        const string NonStreamingInput = """
+            {
+                "model": "gpt-4o",
+                "tools": [
+                    {
+                        "type": "image_generation",
+                        "model": "gpt-image-1",
+                        "output_format": "png"
+                    }
+                ],
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Generate an image of a house"
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        string nonStreamingOutput = $$"""
+            {
+              "id": "resp_same1",
+              "object": "response",
+              "created_at": 1741891428,
+              "status": "completed",
+              "model": "gpt-4o-2024-11-20",
+              "output": [{{imageGenerationCall}}],
+              "usage": {
+                "input_tokens": 15,
+                "output_tokens": 0,
+                "total_tokens": 15
+              }
+            }
+            """;
+
+        const string StreamingInput = """
+            {
+                "model": "gpt-4o",
+                "tools": [
+                    {
+                        "type": "image_generation",
+                        "model": "gpt-image-1",
+                        "output_format": "png"
+                    }
+                ],
+                "stream": true,
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Generate an image of a house"
+                            }
+                        ]
+                    }
+                ]
+            }
+            """;
+
+        string streamingOutput = $$$$"""
+            event: response.created
+            data: {"type":"response.created","response":{"id":"resp_same1","object":"response","created_at":1741891428,"status":"in_progress","model":"gpt-4o-2024-11-20","output":[]}}
+
+            event: response.output_item.added
+            data: {"type":"response.output_item.added","output_index":0,"item":{"type":"image_generation_call","id":"img_call_same1","status":"in_progress"}}
+
+            event: response.image_generation_call.in_progress
+            data: {"type":"response.image_generation_call.in_progress","item_id":"img_call_same1","output_index":0}
+
+            event: response.output_item.done
+            data: {"type":"response.output_item.done","output_index":0,"item":{{{{imageGenerationCall}}}}}
+
+            event: response.completed
+            data: {"type":"response.completed","response":{"id":"resp_same1","object":"response","created_at":1741891428,"status":"completed","model":"gpt-4o-2024-11-20","output":[{{{{imageGenerationCall}}}}],"usage":{"input_tokens":15,"output_tokens":0,"total_tokens":15}}}
+
+
+            """;
+
+        static ChatOptions CreateOptions() => new()
+        {
+            Tools = [new HostedImageGenerationTool { Options = new ImageGenerationOptions { ModelId = "gpt-image-1", MediaType = "image/png" } }]
+        };
+
+        ChatResponse nonStreamingResponse;
+        using (VerbatimHttpHandler handler = new(NonStreamingInput, nonStreamingOutput))
+        using (HttpClient httpClient = new(handler))
+        using (IChatClient client = CreateResponseClient(httpClient, "gpt-4o"))
+        {
+            nonStreamingResponse = await client.GetResponseAsync("Generate an image of a house", CreateOptions());
+        }
+
+        ChatResponse streamingResponse;
+        using (VerbatimHttpHandler handler = new(StreamingInput, streamingOutput))
+        using (HttpClient httpClient = new(handler))
+        using (IChatClient client = CreateResponseClient(httpClient, "gpt-4o"))
+        {
+            streamingResponse = await client.GetStreamingResponseAsync("Generate an image of a house", CreateOptions()).ToChatResponseAsync();
+        }
+
+        var nonStreamingContents = nonStreamingResponse.Messages.SelectMany(m => m.Contents)
+            .Where(c => c is ImageGenerationToolCallContent or ImageGenerationToolResultContent).ToList();
+        var streamingContents = streamingResponse.Messages.SelectMany(m => m.Contents)
+            .Where(c => c is ImageGenerationToolCallContent or ImageGenerationToolResultContent).ToList();
+
+        // Both paths should produce a tool call followed by a tool result carrying the same final image,
+        // including when the completed item carries no image bytes.
+        Assert.Equal(nonStreamingContents.Select(c => c.GetType()), streamingContents.Select(c => c.GetType()));
+        Assert.Equal(
+            nonStreamingContents.OfType<ImageGenerationToolCallContent>().Single().CallId,
+            streamingContents.OfType<ImageGenerationToolCallContent>().Single().CallId);
+
+        var nonStreamingResult = nonStreamingContents.OfType<ImageGenerationToolResultContent>().Single();
+        var streamingResult = streamingContents.OfType<ImageGenerationToolResultContent>().Single();
+        Assert.Equal(nonStreamingResult.CallId, streamingResult.CallId);
+        Assert.IsType<ImageGenerationCallResponseItem>(nonStreamingResult.RawRepresentation);
+        Assert.IsType<ImageGenerationCallResponseItem>(streamingResult.RawRepresentation);
+
+        var nonStreamingImage = Assert.IsType<DataContent>(Assert.Single(nonStreamingResult.Outputs!));
+        var streamingImage = Assert.IsType<DataContent>(Assert.Single(streamingResult.Outputs!));
+        Assert.Equal(nonStreamingImage.MediaType, streamingImage.MediaType);
+        Assert.Equal(nonStreamingImage.Data.ToArray(), streamingImage.Data.ToArray());
     }
 
     [Theory]

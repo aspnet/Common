@@ -191,7 +191,8 @@ internal static class SimpleWordTokenizer
                     continue;
                 }
 
-                while (!text.IsEmpty && (char.IsNumber(text.Span[0]) || char.IsPunctuation(text.Span[0])))
+                // Keep punctuation that sits between digits ("1,000.50"), but leave trailing punctuation ("42.") as its own token.
+                while (!text.IsEmpty && (char.IsNumber(text.Span[0]) || IsPunctuationFollowedByNumber(text.Span)))
                 {
                     _ = sb.Append(text.Span[0]);
                     text = text.Slice(1);
@@ -207,4 +208,7 @@ internal static class SimpleWordTokenizer
         }
 
     }
+
+    private static bool IsPunctuationFollowedByNumber(ReadOnlySpan<char> text) =>
+        text.Length > 1 && char.IsPunctuation(text[0]) && char.IsNumber(text[1]);
 }

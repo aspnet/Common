@@ -97,7 +97,7 @@ A compact table of the convention changes this PR actually implements, with the 
 |---|---|---|---|
 | `gen-ai` | `gen_ai.example.attribute` | [semantic-conventions-genai#NNN](https://github.com/open-telemetry/semantic-conventions-genai/pull/NNN) | Emit on chat spans in `OpenTelemetryChatClient`. |
 
-Validation: build clean (net8.0/net9.0/net10.0, 0 warnings); N tests pass. No public API surface change; doc-comment version reference left at `vX.Y`.
+Validation: build clean (net8.0/net9.0/net10.0/net11.0, 0 warnings); N tests pass. No public API surface change; doc-comment version reference left at `vX.Y`.
 ```
 
 ### 4. Upstream scan tracking tables

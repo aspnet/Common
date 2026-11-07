@@ -6,6 +6,8 @@ Unlike the monthly release flow, there is no `stage-release-*` -> `internal/rele
 
 ## Prerequisites
 
+- Load [candidate identity, build/test and retry gates](../../references/candidate-validation.md).
+
 - The servicing-prep PR into `release/<major>.<minor>` is merged.
 - You know the selected package roots and provisional closure from that PR description.
 - You have access to Azure DevOps and the `extensions-ci-official` pipeline.
@@ -14,7 +16,7 @@ Unlike the monthly release flow, there is no `stage-release-*` -> `internal/rele
 
 1. Confirm the merged commit on `release/<major>.<minor>`.
 2. Wait for that commit to mirror into AzDO's `dotnet-extensions` repository.
-3. Trigger `extensions-ci-official` from `refs/heads/release/<major>.<minor>` (or the mirrored equivalent branch ref).
+3. Verify the mirror's exact SHA; obtain queue approval with explicit `runTests` policy and exclusions, then trigger `extensions-ci-official` from that pinned release ref.
 4. Wait for a successful official run producing release `PackageArtifacts`.
 5. Record and share with the user:
    - AzDO build run URL
@@ -22,7 +24,7 @@ Unlike the monthly release flow, there is no `stage-release-*` -> `internal/rele
    - BAR build ID for the official release build
 6. Derive the authoritative artifact manifest from the official `PackageArtifacts` `.nuspec` files
    by following [package scope and dependency validation](../../references/package-scope-and-dependency-validation.md).
-7. Reconcile it with the PR's provisional manifest and obtain explicit approval before Stage 4.
+7. Reconcile it with the PR's provisional manifest and obtain explicit approval before Stage 4. Check actual test counts/failures, jobs and logs, not only exit code/green run. Tests disabled, blocked restore and skipped integrations remain explicit limitations.
 
 ## Notes
 

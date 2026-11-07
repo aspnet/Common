@@ -50,7 +50,7 @@ internal sealed class HttpLatencyLogEnricher : IHttpLogEnricher
     {
         if (request.Headers.TryGetValue(TelemetryConstants.ClientApplicationNameHeader, out var values))
         {
-            _ = stringBuilder.Append(values[0]);
+            AppendEscaped(stringBuilder, values[0].AsSpan());
         }
     }
 
@@ -59,19 +59,19 @@ internal sealed class HttpLatencyLogEnricher : IHttpLogEnricher
         const int MillisecondsPerSecond = 1000;
 
         // Append tags
-        AppendSpanEscapingSlash(sb, latencyData.Tags, a => a.Name);
+        AppendSpanEscapingDelimiters(sb, latencyData.Tags, a => a.Name);
         _ = sb.Append(',');
-        AppendSpanEscapingSlash(sb, latencyData.Tags, a => a.Value);
+        AppendSpanEscapingDelimiters(sb, latencyData.Tags, a => a.Value);
         _ = sb.Append(',');
 
         // Append checkpoints
-        AppendSpanEscapingSlash(sb, latencyData.Checkpoints, a => a.Name);
+        AppendSpanEscapingDelimiters(sb, latencyData.Checkpoints, a => a.Name);
         _ = sb.Append(',');
         AppendSpan(sb, latencyData.Checkpoints, a => (long)Math.Round(((double)a.Elapsed / a.Frequency) * MillisecondsPerSecond));
         _ = sb.Append(',');
 
         // Append measures
-        AppendSpanEscapingSlash(sb, latencyData.Measures, a => a.Name);
+        AppendSpanEscapingDelimiters(sb, latencyData.Measures, a => a.Name);
         _ = sb.Append(',');
         AppendSpan(sb, latencyData.Measures, a => a.Value);
         _ = sb.Append(',');
@@ -80,17 +80,21 @@ internal sealed class HttpLatencyLogEnricher : IHttpLogEnricher
         _ = sb.Append((long)Math.Round(((double)latencyData.DurationTimestamp / latencyData.DurationTimestampFrequency) * MillisecondsPerSecond));
     }
 
-    private static void AppendSpanEscapingSlash<TX>(StringBuilder sb, ReadOnlySpan<TX> span, Func<TX, string> select)
+    private static void AppendSpanEscapingDelimiters<TX>(StringBuilder sb, ReadOnlySpan<TX> span, Func<TX, string> select)
     {
         for (int i = 0; i < span.Length; i++)
         {
-            var selectedValue = select(span[i]).AsSpan();
-            for (int s = 0; s < selectedValue.Length; s++)
-            {
-                _ = sb.Append(selectedValue[s] == '/' ? '_' : selectedValue[s]);
-            }
-
+            AppendEscaped(sb, select(span[i]).AsSpan());
             _ = sb.Append('/');
+        }
+    }
+
+    private static void AppendEscaped(StringBuilder sb, ReadOnlySpan<char> value)
+    {
+        for (int i = 0; i < value.Length; i++)
+        {
+            char c = value[i];
+            _ = sb.Append(c is '/' or ',' ? '_' : c);
         }
     }
 

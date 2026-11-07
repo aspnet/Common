@@ -71,6 +71,7 @@ public class ChatResponseUpdate
             AdditionalProperties = AdditionalProperties,
             AuthorName = AuthorName,
             Contents = Contents,
+            ContinuationToken = ContinuationToken,
             CreatedAt = CreatedAt,
             ConversationId = ConversationId,
             FinishReason = FinishReason,

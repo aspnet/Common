@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -14,23 +15,21 @@ internal sealed class GlobalLogBufferManager : GlobalLogBuffer
     internal readonly ConcurrentDictionary<string, GlobalBuffer> Buffers = [];
     private readonly IOptionsMonitor<GlobalLogBufferingOptions> _options;
     private readonly TimeProvider _timeProvider;
-    private readonly LogBufferingFilterRuleSelector _ruleSelector;
+    private readonly IExternalScopeProvider _scopeProvider;
 
-    public GlobalLogBufferManager(
-        LogBufferingFilterRuleSelector ruleSelector,
-        IOptionsMonitor<GlobalLogBufferingOptions> options)
-        : this(ruleSelector, options, TimeProvider.System)
+    public GlobalLogBufferManager(IOptionsMonitor<GlobalLogBufferingOptions> options, IExternalScopeProvider scopeProvider)
+        : this(options, TimeProvider.System, scopeProvider)
     {
     }
 
     internal GlobalLogBufferManager(
-        LogBufferingFilterRuleSelector ruleSelector,
         IOptionsMonitor<GlobalLogBufferingOptions> options,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IExternalScopeProvider scopeProvider)
     {
-        _ruleSelector = ruleSelector;
         _options = options;
         _timeProvider = timeProvider;
+        _scopeProvider = scopeProvider;
     }
 
     public override void Flush()
@@ -48,17 +47,17 @@ internal sealed class GlobalLogBufferManager : GlobalLogBuffer
         GlobalBuffer buffer = Buffers.GetOrAdd(category, static (category, state) => new GlobalBuffer(
             state.bufferedLogger,
             category,
-            state._ruleSelector,
             state._options,
-            state._timeProvider),
-            (bufferedLogger, _ruleSelector, _options, _timeProvider));
+            state._timeProvider,
+            state._scopeProvider),
+            (bufferedLogger, _options, _timeProvider, _scopeProvider));
 #else
         GlobalBuffer buffer = Buffers.GetOrAdd(category, category => new GlobalBuffer(
             bufferedLogger,
             category,
-            _ruleSelector,
             _options,
-            _timeProvider));
+            _timeProvider,
+            _scopeProvider));
 #endif
         return buffer.TryEnqueue(logEntry);
     }

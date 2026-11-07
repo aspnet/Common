@@ -4,17 +4,17 @@ The `dotnet/extensions` repository makes heavy use of the `[Experimental]` attri
 
 ## Diagnostic ID conventions
 
-Experimental APIs in this repository use diagnostic IDs documented in [`docs/list-of-diagnostics.md`](../../../docs/list-of-diagnostics.md) under the "Experiments" section. Consult that file for the current list of experimental diagnostic IDs and their descriptions. New diagnostic IDs may be added as new experimental features are introduced.
+Experimental APIs in this repository use diagnostic IDs documented in [`docs/list-of-diagnostics.md`](../../../../../docs/list-of-diagnostics.md) under the "Experiments" section. Consult that file for the current list of experimental diagnostic IDs and their descriptions. New diagnostic IDs may be added as new experimental features are introduced.
 
 ## Types of experimental changes
 
 ### Now Stable
 
-An experimental API has its `[Experimental]` attribute removed, making it a stable part of the public API. This is a positive signal — the API has been validated through preview usage and feedback.
+An experimental API has its `[Experimental]` attribute removed, making it a stable part of the public API. This is a positive signal — the API has been validated through preview usage and feedback, and any required formal API Review has been completed.
 
 **How to detect:**
 - PR removes `[Experimental("...")]` attribute from types or members
-- PR updates the project's experimental diagnostic staging properties (for example, removing the ID from `StageDevDiagnosticId` or related MSBuild properties) in line with [`docs/list-of-diagnostics.md`](../../../docs/list-of-diagnostics.md)
+- PR updates the project's experimental diagnostic staging properties (for example, removing the ID from `StageDevDiagnosticId` or related MSBuild properties) in line with [`docs/list-of-diagnostics.md`](../../../../../docs/list-of-diagnostics.md)
 - PR description or title mentions "promote", "graduate", "stabilize", or "remove experimental"
 - The corresponding `.json` API baseline file changes a type's `"Stage"` from `"Experimental"` to `"Stable"`
 
@@ -26,7 +26,7 @@ Reference the feature by a conceptual name, not individual type names. Do not at
 
 ### Removed
 
-An experimental API is removed entirely. This is acceptable under the experimental API contract — consumers who suppressed the diagnostic accepted this possibility.
+An experimental API is removed entirely. This is permitted by its lack of compatibility guarantees, but consumers may still be affected, particularly when the API is widely adopted or used transitively. Report the removal and assess whether migration guidance is warranted.
 
 **How to detect:**
 - PR deletes types or members that were annotated with `[Experimental]`
@@ -41,7 +41,7 @@ Reference the feature by a conceptual name, not individual type names. Do not at
 
 ### Breaking changes to experimental APIs
 
-An experimental API changes its signature, behavior, or contracts. These changes are acceptable under the experimental API policy but consumers need to know.
+An experimental API changes its signature, behavior, or contracts. The API has no compatibility guarantee, but breaking changes can still affect consumers, especially for widely adopted or transitive APIs. Report the change and assess whether migration guidance is warranted.
 
 **How to detect:**
 - PR modifies the signature of types/members annotated with `[Experimental]`
@@ -89,6 +89,8 @@ For each candidate PR, detect experimental API changes using the **PR diff** and
 5. **Cross-reference `docs/list-of-diagnostics.md`** — check if the PR modifies the diagnostics list, which signals addition or removal of experimental diagnostic IDs.
 
 Store detected changes in the `experimental_changes` SQL table (see [sql-storage.md](sql-storage.md)). The `description` column must reflect the actual types/members found in the diff, not a summary derived from the PR title.
+
+Use the **final merged diff and shipped/published API**, not an initial description claiming an API graduated. Check member-level diagnostic IDs as well as enclosing type stages. If ApiChief delta/check fails on an existing enum-deserialization or FindAdditions defect, bound retries and use emitted baselines plus an in-memory signature/stage comparison. Record fallback limitations; do not repair unrelated tools during a release or assert unsupported graduation.
 
 ## Presentation in release notes
 

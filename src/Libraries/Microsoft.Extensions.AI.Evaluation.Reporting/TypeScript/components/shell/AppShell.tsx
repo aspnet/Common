@@ -1,7 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-import { useEffect, useId, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
     FluentProvider,
     makeStyles,
@@ -28,6 +28,7 @@ import {
     WeatherSunnyRegular,
 } from '@fluentui/react-icons';
 import { useReportContext, type ReportView } from '../core/ReportContext';
+import type { ScoreNode } from '../core/Summary';
 import { useAnnounce } from '../core/Announcer';
 import { srOnlyStyle } from '../styles/reportStyles';
 import { resolveTheme, detectHostDarkMode } from './theme';
@@ -103,21 +104,27 @@ const useStyles = makeStyles({
         display: 'grid',
         gridTemplateColumns: 'auto 1fr auto',
         alignItems: 'center',
-        gap: 'var(--spacing-l)',
+        gap: 'var(--spacing-s)',
         flex: 'none',
         height: TOPBAR_HEIGHT,
-        padding: '0 var(--spacing-xl)',
+        padding: '0 var(--spacing-m)',
         position: 'sticky',
         top: 0,
         zIndex: 30,
         backgroundColor: 'transparent',
+        '@media (min-width: 901px)': {
+            gap: 'var(--spacing-l)',
+            padding: '0 var(--spacing-xl)',
+        },
     },
     brand: {
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: 'var(--spacing-m)',
         flex: 'none',
-        minWidth: 0,
+        width: '44px',
+        height: '44px',
         border: 'none',
         backgroundColor: 'transparent',
         padding: 0,
@@ -134,9 +141,16 @@ const useStyles = makeStyles({
             outline: '2px solid var(--brand-80)',
             outlineOffset: '2px',
         },
+        '@media (min-width: 901px)': {
+            justifyContent: 'flex-start',
+            width: 'auto',
+            height: 'auto',
+            minWidth: 0,
+        },
     },
     brandLogo: { alignSelf: 'center', flex: 'none', color: 'var(--brand-80)' },
     brandText: {
+        display: 'none',
         fontSize: 'var(--font-size-300)',
         fontWeight: 'var(--font-weight-bold)',
         whiteSpace: 'nowrap',
@@ -145,6 +159,7 @@ const useStyles = makeStyles({
         backgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
         color: 'transparent',
+        '@media (min-width: 901px)': { display: 'inline' },
     },
     topbarActions: {
         gridColumn: 3,
@@ -152,6 +167,14 @@ const useStyles = makeStyles({
         display: 'flex',
         alignItems: 'center',
         gap: 'var(--spacing-s)',
+    },
+    topbarAction: {
+        minWidth: 'var(--interactive-size-compact)',
+        minHeight: 'var(--interactive-size-compact)',
+        '@media (max-width: 900px), (pointer: coarse)': {
+            minWidth: 'var(--interactive-size-touch)',
+            minHeight: 'var(--interactive-size-touch)',
+        },
     },
 
     shell: {
@@ -212,7 +235,7 @@ const useStyles = makeStyles({
         display: 'flex',
         flexDirection: 'column',
         overflowY: 'auto',
-        backgroundColor: 'var(--neutral-background-1)',
+        backgroundColor: 'var(--report-surface-canvas)',
         borderTopLeftRadius: 'var(--radius-xxlarge)',
         position: 'relative',
         zIndex: 2,
@@ -229,7 +252,7 @@ const useStyles = makeStyles({
         position: 'sticky',
         top: 0,
         zIndex: 25,
-        backgroundColor: 'var(--neutral-background-1)',
+        backgroundColor: 'var(--report-surface-canvas)',
         padding: 'var(--spacing-xs) var(--page-padding) 0',
         borderBottom: '1px solid var(--neutral-stroke-2)',
     },
@@ -237,6 +260,9 @@ const useStyles = makeStyles({
         display: 'flex',
         gap: 'var(--spacing-xs)',
         position: 'relative',
+        justifyContent: 'space-around',
+        '@media (min-width: 768px)': { justifyContent: 'space-evenly' },
+        '@media (min-width: 901px)': { justifyContent: 'flex-start' },
         '@media (max-width: 640px)': {
             overflowX: 'auto',
             paddingTop: '2px',
@@ -268,7 +294,7 @@ const useStyles = makeStyles({
         cursor: 'pointer',
         fontFamily: 'inherit',
         fontSize: 'var(--font-size-300)',
-        padding: 'var(--spacing-m) var(--spacing-s)',
+        padding: 'var(--spacing-m) 0',
         color: 'var(--neutral-foreground-2)',
         fontWeight: 'var(--font-weight-regular)',
         transition: 'color var(--duration-faster) var(--curve-easy-ease)',
@@ -285,7 +311,8 @@ const useStyles = makeStyles({
         },
         ':hover': { color: 'var(--neutral-foreground-1)' },
         '&:hover::before': { background: 'var(--neutral-stroke-1-hover)' },
-        '@media (max-width: 640px)': { flexShrink: 0 },
+        flexShrink: 0,
+        '@media (min-width: 768px)': { padding: 'var(--spacing-m) var(--spacing-s)' },
     },
     pivotActive: {
         color: 'var(--neutral-foreground-1)',
@@ -315,8 +342,65 @@ const useStyles = makeStyles({
         color: 'var(--neutral-foreground-3)',
         fontSize: 'var(--font-size-100)',
         borderTop: '1px solid var(--neutral-stroke-2)',
-        backgroundColor: 'var(--neutral-background-1)',
+        backgroundColor: 'var(--report-surface-canvas)',
         borderBottomLeftRadius: 'var(--radius-xxlarge)',
+    },
+
+    scopeTrigger: {
+        boxSizing: 'border-box',
+        width: '100%',
+        minWidth: 0,
+        minHeight: '44px',
+        display: 'flex',
+        alignItems: 'center',
+        overflow: 'hidden',
+        border: 'none',
+        padding: '0 var(--spacing-xxs)',
+        backgroundColor: 'transparent',
+        color: 'var(--brand-foreground-1)',
+        font: 'inherit',
+        fontSize: 'var(--font-size-300)',
+        fontWeight: 'var(--font-weight-semibold)',
+        textAlign: 'left',
+        cursor: 'pointer',
+        ':focus-visible': {
+            outline: '2px solid var(--focus-stroke-outer)',
+            outlineOffset: '-2px',
+        },
+        '@media (min-width: 901px)': { display: 'none' },
+    },
+    scopeLabel: {
+        minWidth: 0,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        textDecorationLine: 'underline',
+        textUnderlineOffset: '3px',
+    },
+    scopeDrawerBody: {
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        paddingTop: 'var(--spacing-s)',
+    },
+    scopeDrawerTree: {
+        flex: '1 1 auto',
+        minHeight: 0,
+        overflowY: 'auto',
+        paddingBottom: 'var(--spacing-m)',
+    },
+    scopeDrawerFooter: {
+        flex: 'none',
+        minWidth: 0,
+        padding: 'var(--spacing-m) 0',
+        borderTop: '1px solid var(--neutral-stroke-2)',
+    },
+    scopeCloseButton: {
+        position: 'absolute',
+        top: 'var(--spacing-m)',
+        right: 'var(--spacing-m)',
+        minWidth: '44px',
+        minHeight: '44px',
     },
 
     switchLabel: { fontSize: 'var(--font-size-300)', paddingTop: 'var(--spacing-l)' },
@@ -357,11 +441,13 @@ const BrandMark = () => (
 );
 
 const ThemeToggle = () => {
+    const classes = useStyles();
     const { darkMode, setDarkMode } = useReportContext();
     const announce = useAnnounce();
     return (
         <Tooltip content={darkMode ? 'Switch to light theme' : 'Switch to dark theme'} relationship="label">
             <Button
+                className={classes.topbarAction}
                 appearance="subtle"
                 icon={darkMode ? <WeatherSunnyRegular /> : <WeatherMoonRegular />}
                 onClick={() => { const next = !darkMode; setDarkMode(next); announce(next ? 'Dark theme enabled' : 'Light theme enabled'); }}
@@ -473,41 +559,118 @@ const PivotBar = ({ casesCount }: { casesCount: number }) => {
     );
 };
 
-const Sidebar = () => {
+const Sidebar = ({
+    expanded,
+    onToggle,
+}: {
+    expanded: ReadonlySet<string>;
+    onToggle: (key: string) => void;
+}) => {
     const classes = useStyles();
-    const { scoreSummary, setExec, activeExecution } = useReportContext();
     const scenariosLabelId = useId();
     const executionLabelId = useId();
-
-    const executions = useMemo(
-        () => [...scoreSummary.executionHistory.keys()],
-        [scoreSummary],
-    );
-    const selectedExec = activeExecution;
+    const executionControlId = useId();
 
     return (
         <nav aria-label="Scenarios" className={mergeClasses(classes.sidebar, 'eval-sidebar')}>
             <div className={mergeClasses(classes.sidebarTree, 'eval-sidebar-tree')}>
                 <div id={scenariosLabelId} className={classes.sidebarSectionLabel}>Scenarios</div>
-                <SidebarTree labelledBy={scenariosLabelId} />
+                <SidebarTree labelledBy={scenariosLabelId} expanded={expanded} onToggle={onToggle} />
             </div>
             <div className={classes.sidebarFooter}>
                 <span id={executionLabelId} className={classes.sidebarSectionLabel} style={{ padding: '0 var(--spacing-xxs)' }}>Execution</span>
-                <Dropdown
-                    aria-labelledby={executionLabelId}
-                    className="eval-exec-drop"
-                    positioning={{ position: 'above', align: 'start', matchTargetSize: 'width' }}
-                    value={selectedExec}
-                    selectedOptions={[selectedExec]}
-                    onOptionSelect={(_ev, data) => setExec(data.optionValue)}
-                    button={{ children: <span className="eval-exec-text">{selectedExec}</span> }}
-                >
-                    {executions.map((name) => (
-                        <Option key={name} value={name}>{name}</Option>
-                    ))}
-                </Dropdown>
+                <ExecutionSelector labelId={executionLabelId} controlId={executionControlId} />
             </div>
         </nav>
+    );
+};
+
+const ExecutionSelector = ({ labelId, controlId }: { labelId: string; controlId: string }) => {
+    const { scoreSummary, setExec, activeExecution } = useReportContext();
+    const executions = useMemo(
+        () => [...scoreSummary.executionHistory.keys()],
+        [scoreSummary],
+    );
+
+    return (
+        <Dropdown
+            id={controlId}
+            aria-labelledby={labelId}
+            className="eval-exec-drop"
+            positioning={{ position: 'above', align: 'start', matchTargetSize: 'width' }}
+            value={activeExecution}
+            selectedOptions={[activeExecution]}
+            onOptionSelect={(_ev, data) => setExec(data.optionValue)}
+            button={{ children: <span className="eval-exec-text">{activeExecution}</span> }}
+        >
+            {executions.map((name) => (
+                <Option key={name} value={name}>{name}</Option>
+            ))}
+        </Dropdown>
+    );
+};
+
+const ScopeDrawer = ({
+    open,
+    onOpenChange,
+    expanded,
+    onToggle,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    expanded: ReadonlySet<string>;
+    onToggle: (key: string) => void;
+}) => {
+    const classes = useStyles();
+    const restoreFocusSourceAttrs = useRestoreFocusSource();
+    const scenariosLabelId = useId();
+    const executionLabelId = useId();
+    const executionControlId = useId();
+    const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const frame = requestAnimationFrame(() => closeButtonRef.current?.focus());
+        return () => cancelAnimationFrame(frame);
+    }, [open]);
+
+    return (
+        <Drawer
+            className="eval-scope-drawer"
+            open={open}
+            onOpenChange={(_ev, data) => onOpenChange(data.open)}
+            position="start"
+            size="small"
+            aria-label="Report scope"
+            {...restoreFocusSourceAttrs}
+        >
+            <DrawerHeader>
+                <Button
+                    autoFocus
+                    ref={closeButtonRef}
+                    className={classes.scopeCloseButton}
+                    icon={<DismissRegular />}
+                    appearance="subtle"
+                    onClick={() => onOpenChange(false)}
+                    aria-label="Close report scope"
+                />
+            </DrawerHeader>
+            <DrawerBody className={classes.scopeDrawerBody}>
+                <nav aria-label="Scenarios" className={classes.scopeDrawerTree}>
+                    <div id={scenariosLabelId} className={classes.sidebarSectionLabel}>Scenarios</div>
+                    <SidebarTree
+                        labelledBy={scenariosLabelId}
+                        expanded={expanded}
+                        onToggle={onToggle}
+                        onSelect={() => onOpenChange(false)}
+                    />
+                </nav>
+                <div className={classes.scopeDrawerFooter}>
+                    <span id={executionLabelId} className={classes.sidebarSectionLabel}>Execution</span>
+                    <ExecutionSelector labelId={executionLabelId} controlId={executionControlId} />
+                </div>
+            </DrawerBody>
+        </Drawer>
     );
 };
 
@@ -588,6 +751,16 @@ const useHostTheme = (themeSource: ThemeSource, setDarkMode: (v: boolean) => voi
     }, [themeSource, setDarkMode]);
 };
 
+const findNodePath = (nodes: ScoreNode[], key: string, path: ScoreNode[] = []): ScoreNode[] | undefined => {
+    for (const node of nodes) {
+        const nextPath = [...path, node];
+        if (node.nodeKey === key) return nextPath;
+        const match = findNodePath(node.childNodes, key, nextPath);
+        if (match) return match;
+    }
+    return undefined;
+};
+
 export const AppShell = ({
     heightStrategy,
     themeSource,
@@ -602,8 +775,23 @@ export const AppShell = ({
         dataset, scopedNode, setIsSettingsOpen,
         darkMode, setDarkMode,
         view, setView, clearScenarioLevel,
+        activeNode, selectedScenarioLevel,
     } = useReportContext();
     const restoreFocusTargetAttrs = useRestoreFocusTarget();
+    const scopeRestoreFocusTargetAttrs = useRestoreFocusTarget();
+    const [isScopeOpen, setIsScopeOpen] = useState(false);
+    const [expanded, setExpanded] = useState<ReadonlySet<string>>(
+        () => new Set(activeNode.childNodes.filter((node) => node.hasChildNodes).map((node) => node.nodeKey)),
+    );
+    const scopeFocusTimerRef = useRef<number | undefined>(undefined);
+
+    const toggleExpanded = useCallback((key: string) => {
+        setExpanded((previous) => {
+            const next = new Set(previous);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+    }, []);
 
     const goHome = () => {
         setView('overview');
@@ -620,6 +808,57 @@ export const AppShell = ({
         () => new Set((dataset.scenarioRunResults ?? []).map((r) => r.executionName)).size,
         [dataset.scenarioRunResults],
     );
+
+    const selectedPath = useMemo(
+        () => selectedScenarioLevel ? findNodePath(activeNode.childNodes, selectedScenarioLevel) ?? [] : [],
+        [activeNode, selectedScenarioLevel],
+    );
+    const selectedScope = selectedPath.map((node) => node.name).join('.') || 'All scenarios';
+
+    useEffect(() => {
+        const ancestors = selectedPath.slice(0, -1);
+        if (ancestors.length === 0) return;
+        setExpanded((previous) => {
+            if (ancestors.every((node) => previous.has(node.nodeKey))) return previous;
+            return new Set([...previous, ...ancestors.map((node) => node.nodeKey)]);
+        });
+    }, [selectedPath]);
+
+    const restoreScopeFocus = useCallback((target: 'mobile' | 'desktop') => {
+        window.clearTimeout(scopeFocusTimerRef.current);
+        scopeFocusTimerRef.current = window.setTimeout(() => {
+            const element = target === 'desktop'
+                ? document.querySelector<HTMLElement>('.eval-sidebar [role="treeitem"][aria-selected="true"]')
+                    ?? document.querySelector<HTMLElement>('.eval-sidebar [role="treeitem"]')
+                : document.querySelector<HTMLElement>('.eval-scope-trigger');
+            element?.focus();
+        }, 300);
+    }, []);
+
+    const closeScope = useCallback((target: 'mobile' | 'desktop' = 'mobile') => {
+        setIsScopeOpen(false);
+        restoreScopeFocus(target);
+    }, [restoreScopeFocus]);
+
+    const setScopeOpen = useCallback((open: boolean) => {
+        if (open) {
+            window.clearTimeout(scopeFocusTimerRef.current);
+            setIsScopeOpen(true);
+        } else {
+            closeScope();
+        }
+    }, [closeScope]);
+
+    useEffect(() => {
+        const desktop = window.matchMedia('(min-width: 901px)');
+        const handleDesktop = (event: MediaQueryListEvent) => {
+            if (event.matches && isScopeOpen) closeScope('desktop');
+        };
+        desktop.addEventListener('change', handleDesktop);
+        return () => desktop.removeEventListener('change', handleDesktop);
+    }, [closeScope, isScopeOpen]);
+
+    useEffect(() => () => window.clearTimeout(scopeFocusTimerRef.current), []);
 
     useHostTheme(themeSource, setDarkMode);
 
@@ -641,16 +880,25 @@ export const AppShell = ({
                     <BrandMark />
                     <span className={classes.brandText}>AI Evaluation Report</span>
                 </button>
+                <button
+                    type="button"
+                    className={mergeClasses(classes.scopeTrigger, 'eval-scope-trigger')}
+                    onClick={() => setScopeOpen(true)}
+                    aria-label={`Change report scope. Current scenario: ${selectedScope}.`}
+                    {...scopeRestoreFocusTargetAttrs}
+                >
+                    <span className={classes.scopeLabel} aria-hidden="true">{selectedScope}</span>
+                </button>
                 <div className={classes.topbarActions}>
                     {themeSource === 'toggle' && <ThemeToggle />}
                     <Tooltip content="Settings" relationship="label">
-                        <Button icon={<Settings28Regular />} appearance="subtle" onClick={() => setIsSettingsOpen(true)} aria-label="Settings" {...restoreFocusTargetAttrs} />
+                        <Button className={classes.topbarAction} icon={<Settings28Regular />} appearance="subtle" onClick={() => setIsSettingsOpen(true)} aria-label="Settings" {...restoreFocusTargetAttrs} />
                     </Tooltip>
                 </div>
             </header>
 
             <div className={mergeClasses(classes.shell, 'eval-shell')}>
-                <Sidebar />
+                <Sidebar expanded={expanded} onToggle={toggleExpanded} />
                 <main id="eval-main" tabIndex={-1} className={mergeClasses(classes.main, 'eval-main')}>
                     <h1 style={srOnlyStyle}>
                         AI Evaluation Report
@@ -672,6 +920,12 @@ export const AppShell = ({
             </div>
 
             <SettingsDrawer />
+            <ScopeDrawer
+                open={isScopeOpen}
+                onOpenChange={setScopeOpen}
+                expanded={expanded}
+                onToggle={toggleExpanded}
+            />
             </div>
         </FluentProvider>
     );

@@ -47,10 +47,10 @@ export const MetadataContent = ({ metadata }: { metadata: { [K: string]: string 
                             </TableHeader>
                             <TableBody>
                                 {tableData.map(([key, value], index) => (
-                                    <TableRow key={`metadata-${tableIndex}-${index}`}>
+                                    <tr key={`metadata-${tableIndex}-${index}`}>
                                         <TableCell>{key}</TableCell>
                                         <TableCell>{value}</TableCell>
-                                    </TableRow>
+                                    </tr>
                                 ))}
                             </TableBody>
                         </Table>

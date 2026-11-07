@@ -59,12 +59,12 @@ describe('posOn — value → 0..100 with clamping', () => {
 });
 
 describe('dumbbellStyles — connector/dot geometry', () => {
-    const NEUTRAL_SOLID = 'var(--neutral-foreground-4)';
+    const UNCHANGED_SOLID = 'var(--neutral-solid)';
 
     it('renders the full connector + both dots when there is a prev, a delta, and a gap > connEpsilon', () => {
         const db = dumbbellStyles(20, 80, true);
         expect(db).toMatchObject({
-            sk: 'neutral',
+            sk: 'unchanged',
             connector: { left: '20%', width: '60%' },
             dotB: { left: '20%' },
             dotA: { left: '80%' },
@@ -76,23 +76,23 @@ describe('dumbbellStyles — connector/dot geometry', () => {
 
     it('hides the connector AND dotB when prevPos is null (first point / no baseline)', () => {
         const db = dumbbellStyles(null, 60, true);
-        expect(db.sk).toBe('neutral');
+        expect(db.sk).toBe('unchanged');
         expect(db.connector).toStrictEqual({ display: 'none' });
         expect(db.dotB).toStrictEqual({ display: 'none' });
-        // dotA still renders at the current position with the neutral color.
+        // dotA still renders at the current position with the unchanged color.
         expect(db.dotA.display).toBeUndefined();
         expect(db.dotA.left).toBe('60%');
-        expect(db.dotA.background).toBe(NEUTRAL_SOLID);
+        expect(db.dotA.background).toBe(UNCHANGED_SOLID);
     });
 
     it('hides the connector when hasDelta is false, but keeps dotB visible (prev exists)', () => {
         const db = dumbbellStyles(20, 80, false);
-        expect(db.sk).toBe('neutral');
+        expect(db.sk).toBe('unchanged');
         expect(db.connector).toStrictEqual({ display: 'none' });
         expect(db.dotB.display).toBeUndefined();
         expect(db.dotB.left).toBe('20%');
         expect(db.dotA.left).toBe('80%');
-        expect(db.dotA.background).toBe(NEUTRAL_SOLID);
+        expect(db.dotA.background).toBe(UNCHANGED_SOLID);
     });
 
     it('hides the connector when the gap is within connEpsilon (dots still shown)', () => {
@@ -104,8 +104,8 @@ describe('dumbbellStyles — connector/dot geometry', () => {
     });
 
     it('honours a connEpsilon of 0 (ComparisonView passes 0): equal positions hide, any gap shows', () => {
-        expect(dumbbellStyles(50, 50, true, 'neutral', 0).connector).toStrictEqual({ display: 'none' });
-        const shown = dumbbellStyles(50, 51, true, 'neutral', 0).connector;
+        expect(dumbbellStyles(50, 50, true, 'unchanged', 0).connector).toStrictEqual({ display: 'none' });
+        const shown = dumbbellStyles(50, 51, true, 'unchanged', 0).connector;
         expect(shown.display).toBeUndefined();
         expect(shown.left).toBe('50%');
         expect(shown.width).toBe('1%');

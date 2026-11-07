@@ -13,7 +13,6 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Microsoft.Shared.DiagnosticIds;
 using OpenAI;
-using OpenAI.Assistants;
 using OpenAI.Audio;
 using OpenAI.Chat;
 using OpenAI.Containers;
@@ -128,37 +127,6 @@ public static class OpenAIClientExtensions
     [Experimental(DiagnosticIds.Experiments.AIOpenAIResponses)]
     public static IChatClient AsIChatClient(this ResponsesClient responseClient, string? defaultModelId = null) =>
         new OpenAIResponsesChatClient(responseClient, defaultModelId);
-
-    /// <summary>Gets an <see cref="IChatClient"/> for use with this <see cref="AssistantClient"/>.</summary>
-    /// <param name="assistantClient">The <see cref="AssistantClient"/> instance to be accessed as an <see cref="IChatClient"/>.</param>
-    /// <param name="assistantId">The unique identifier of the assistant with which to interact.</param>
-    /// <param name="threadId">
-    /// An optional existing thread identifier for the chat session. This serves as a default, and may be overridden per call to
-    /// <see cref="IChatClient.GetResponseAsync"/> or <see cref="IChatClient.GetStreamingResponseAsync"/> via the <see cref="ChatOptions.ConversationId"/>
-    /// property. If no thread ID is provided via either mechanism, a new thread will be created for the request.
-    /// </param>
-    /// <returns>An <see cref="IChatClient"/> instance configured to interact with the specified agent and thread.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="assistantClient"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentNullException"><paramref name="assistantId"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="assistantId"/> is empty or composed entirely of whitespace.</exception>
-    [Experimental(DiagnosticIds.Experiments.AIOpenAIAssistants)]
-    public static IChatClient AsIChatClient(this AssistantClient assistantClient, string assistantId, string? threadId = null) =>
-        new OpenAIAssistantsChatClient(assistantClient, assistantId, threadId);
-
-    /// <summary>Gets an <see cref="IChatClient"/> for use with this <see cref="AssistantClient"/>.</summary>
-    /// <param name="assistantClient">The <see cref="AssistantClient"/> instance to be accessed as an <see cref="IChatClient"/>.</param>
-    /// <param name="assistant">The <see cref="Assistant"/> with which to interact.</param>
-    /// <param name="threadId">
-    /// An optional existing thread identifier for the chat session. This serves as a default, and may be overridden per call to
-    /// <see cref="IChatClient.GetResponseAsync"/> or <see cref="IChatClient.GetStreamingResponseAsync"/> via the <see cref="ChatOptions.ConversationId"/>
-    /// property. If no thread ID is provided via either mechanism, a new thread will be created for the request.
-    /// </param>
-    /// <returns>An <see cref="IChatClient"/> instance configured to interact with the specified agent and thread.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="assistantClient"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentNullException"><paramref name="assistant"/> is <see langword="null"/>.</exception>
-    [Experimental(DiagnosticIds.Experiments.AIOpenAIAssistants)]
-    public static IChatClient AsIChatClient(this AssistantClient assistantClient, Assistant assistant, string? threadId = null) =>
-        new OpenAIAssistantsChatClient(assistantClient, assistant, threadId);
 
     /// <summary>Gets an <see cref="ISpeechToTextClient"/> for use with this <see cref="AudioClient"/>.</summary>
     /// <param name="audioClient">The client.</param>

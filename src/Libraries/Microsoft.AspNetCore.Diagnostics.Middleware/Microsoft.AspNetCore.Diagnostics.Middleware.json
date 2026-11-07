@@ -1,16 +1,6 @@
 {
-  "Name": "Microsoft.AspNetCore.Diagnostics.Middleware, Version=10.5.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+  "Name": "Microsoft.AspNetCore.Diagnostics.Middleware, Version=10.10.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
   "Types": [
-    {
-      "Type": "static class Microsoft.Extensions.DependencyInjection.HttpLatencyTelemetryServiceCollectionExtensions",
-      "Stage": "Experimental",
-      "Methods": [
-        {
-          "Member": "static Microsoft.Extensions.DependencyInjection.IServiceCollection Microsoft.Extensions.DependencyInjection.HttpLatencyTelemetryServiceCollectionExtensions.AddHttpLatencyTelemetry(this Microsoft.Extensions.DependencyInjection.IServiceCollection services);",
-          "Stage": "Experimental"
-        }
-      ]
-    },
     {
       "Type": "static class Microsoft.Extensions.DependencyInjection.HttpLoggingServiceCollectionExtensions",
       "Stage": "Stable",
@@ -26,6 +16,10 @@
         {
           "Member": "static Microsoft.Extensions.DependencyInjection.IServiceCollection Microsoft.Extensions.DependencyInjection.HttpLoggingServiceCollectionExtensions.AddHttpLoggingRedaction(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.Configuration.IConfigurationSection section);",
           "Stage": "Experimental"
+        },
+        {
+          "Member": "static Microsoft.Extensions.DependencyInjection.IServiceCollection Microsoft.Extensions.DependencyInjection.HttpLoggingServiceCollectionExtensions.AddHttpServerLatencyTelemetry(this Microsoft.Extensions.DependencyInjection.IServiceCollection services);",
+          "Stage": "Stable"
         }
       ]
     },
@@ -191,6 +185,10 @@
           "Stage": "Stable"
         },
         {
+          "Member": "bool Microsoft.AspNetCore.Diagnostics.Buffering.PerRequestLogBufferingOptions.IncludeScopes { get; set; }",
+          "Stage": "Experimental"
+        },
+        {
           "Member": "int Microsoft.AspNetCore.Diagnostics.Buffering.PerRequestLogBufferingOptions.MaxLogRecordSizeInBytes { get; set; }",
           "Stage": "Stable"
         },
@@ -199,7 +197,7 @@
           "Stage": "Stable"
         },
         {
-          "Member": "System.Collections.Generic.IList<Microsoft.Extensions.Diagnostics.Buffering.LogBufferingFilterRule> Microsoft.AspNetCore.Diagnostics.Buffering.PerRequestLogBufferingOptions.Rules { get; set; }",     
+          "Member": "System.Collections.Generic.IList<Microsoft.Extensions.Diagnostics.Buffering.LogBufferingFilterRule> Microsoft.AspNetCore.Diagnostics.Buffering.PerRequestLogBufferingOptions.Rules { get; set; }",
           "Stage": "Stable"
         }
       ]

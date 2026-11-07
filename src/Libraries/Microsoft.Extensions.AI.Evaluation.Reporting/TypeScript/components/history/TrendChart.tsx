@@ -52,7 +52,7 @@ const useLocalStyles = makeStyles({
         display: 'inline-block',
         width: '22px',
         height: '2px',
-        background: 'var(--brand-foreground-1)',
+        background: 'var(--chart-primary)',
         borderRadius: '2px',
     },
     medianSwatch: {
@@ -67,7 +67,7 @@ const useLocalStyles = makeStyles({
         right: 0,
         top: '50%',
         height: 0,
-        borderTop: '1.5px dashed var(--neutral-foreground-3)',
+        borderTop: '1.5px dashed var(--chart-median-series)',
         transform: 'translateY(-50%)',
     },
     spreadSwatch: {
@@ -75,8 +75,8 @@ const useLocalStyles = makeStyles({
         width: '22px',
         height: '13px',
         borderRadius: '3px',
-        background: 'color-mix(in srgb, var(--brand-foreground-1) 13%, transparent)',
-        border: '1px solid color-mix(in srgb, var(--brand-foreground-1) 32%, transparent)',
+        background: 'color-mix(in srgb, var(--chart-primary) 13%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--chart-primary) 32%, transparent)',
         boxSizing: 'border-box',
     },
     donutMean: {
@@ -86,8 +86,8 @@ const useLocalStyles = makeStyles({
         width: '8px',
         height: '8px',
         borderRadius: '50%',
-        background: 'var(--neutral-background-1)',
-        border: '1.5px solid var(--brand-foreground-1)',
+        background: 'var(--chart-marker-fill)',
+        border: '1.5px solid var(--chart-primary)',
         transform: 'translate(-50%,-50%)',
         boxSizing: 'border-box',
     },
@@ -98,8 +98,8 @@ const useLocalStyles = makeStyles({
         width: '8px',
         height: '8px',
         borderRadius: '50%',
-        background: 'var(--neutral-background-1)',
-        border: '1.5px solid var(--neutral-foreground-3)',
+        background: 'var(--chart-marker-fill)',
+        border: '1.5px solid var(--chart-median-series)',
         transform: 'translate(-50%,-50%)',
         boxSizing: 'border-box',
     },
@@ -127,8 +127,9 @@ export const TrendChart = ({ points, domain, ariaLabel, showLegend = true }: Tre
 
     const W = measuredW && measuredW > 0 ? measuredW : W_FALLBACK;
 
-    const color = 'var(--brand-foreground-1)';
-    const medColor = 'var(--neutral-foreground-3)';
+    const color = 'var(--chart-primary)';
+    const medColor = 'var(--chart-median-series)';
+    const rangeColor = 'var(--chart-primary)';
 
     const dom = domain;
     const n = points.length;
@@ -144,10 +145,10 @@ export const TrendChart = ({ points, domain, ariaLabel, showLegend = true }: Tre
         const v = dom.min + ((dom.max - dom.min) * g) / dom.ticks;
         const y = yOf(v);
         gridEls.push(
-            <line key={`g${g}`} x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} strokeWidth={1} style={{ stroke: 'var(--neutral-stroke-2)' }} />,
+            <line key={`g${g}`} x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} strokeWidth={1} style={{ stroke: 'var(--chart-gridline)' }} />,
         );
         gridEls.push(
-            <text key={`gl${g}`} x={PAD_L - 6} y={y + 3} textAnchor="end" fontSize={10} style={{ fill: 'var(--neutral-foreground-4)' }}>
+            <text key={`gl${g}`} x={PAD_L - 6} y={y + 3} textAnchor="end" fontSize={10} style={{ fill: 'var(--chart-tick-text)' }}>
                 {dom.fmt(v)}
             </text>,
         );
@@ -163,13 +164,13 @@ export const TrendChart = ({ points, domain, ariaLabel, showLegend = true }: Tre
             <polygon
                 key="band"
                 points={up.concat(dn).join(' ')}
-                style={{ fill: color, fillOpacity: darkMode ? 0.2 : 0.13, stroke: color, strokeOpacity: 0.32, strokeWidth: 1 }}
+                style={{ fill: rangeColor, fillOpacity: darkMode ? 0.2 : 0.13, stroke: rangeColor, strokeOpacity: 0.32, strokeWidth: 1 }}
             />,
         );
     } else if (valid.length === 1) {
         const o = valid[0];
         bandEls.push(
-            <line key="band1" x1={xOf(o.i)} y1={yOf(o.p.lo)} x2={xOf(o.i)} y2={yOf(o.p.hi)} strokeWidth={6} strokeLinecap="round" style={{ stroke: color, strokeOpacity: 0.3 }} />,
+            <line key="band1" x1={xOf(o.i)} y1={yOf(o.p.lo)} x2={xOf(o.i)} y2={yOf(o.p.hi)} strokeWidth={6} strokeLinecap="round" style={{ stroke: rangeColor, strokeOpacity: 0.3 }} />,
         );
     }
 
@@ -186,7 +187,7 @@ export const TrendChart = ({ points, domain, ariaLabel, showLegend = true }: Tre
     }
     for (const o of valid) {
         medEls.push(
-            <circle key={`md${o.i}`} cx={xOf(o.i)} cy={yOf(o.p.median)} r={3.25} strokeWidth={1.5} style={{ fill: 'var(--neutral-background-1)', stroke: medColor }} />,
+            <circle key={`md${o.i}`} cx={xOf(o.i)} cy={yOf(o.p.median)} r={3.25} strokeWidth={1.5} style={{ fill: 'var(--chart-marker-fill)', stroke: medColor }} />,
         );
     }
 
@@ -198,14 +199,14 @@ export const TrendChart = ({ points, domain, ariaLabel, showLegend = true }: Tre
     }
     for (const o of valid) {
         meanEls.push(
-            <circle key={`d${o.i}`} cx={xOf(o.i)} cy={yOf(o.p.mean)} r={3.25} strokeWidth={1.5} style={{ fill: 'var(--neutral-background-1)', stroke: color }}>
+            <circle key={`d${o.i}`} cx={xOf(o.i)} cy={yOf(o.p.mean)} r={3.25} strokeWidth={1.5} style={{ fill: 'var(--chart-marker-fill)', stroke: color }}>
                 <title>{`R${o.i + 1}: mean ${formatNumber(o.p.mean)}`}</title>
             </circle>,
         );
     }
 
     const xLabels = points.map((_p, i) => (
-        <text key={`xl${i}`} x={xOf(i)} y={H - 6} textAnchor="middle" fontSize={10} style={{ fill: 'var(--neutral-foreground-4)' }}>
+        <text key={`xl${i}`} x={xOf(i)} y={H - 6} textAnchor="middle" fontSize={10} style={{ fill: 'var(--chart-tick-text)' }}>
             {`R${i + 1}`}
         </text>
     ));

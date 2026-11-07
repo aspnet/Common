@@ -1,12 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-import { useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { type KeyboardEvent, type MouseEvent } from 'react';
 import { makeStyles, mergeClasses, useArrowNavigationGroup } from '@fluentui/react-components';
 import { ChevronRight16Regular } from '@fluentui/react-icons';
 import { useReportContext } from '../core/ReportContext';
 import { ScoreNode } from '../core/Summary';
-import { useReportStyles, type ReportStatus } from '../styles/reportStyles';
+import { useReportStyles } from '../styles/reportStyles';
 import { StatusPill } from '../styles/StatusPill';
 
 const useLocalStyles = makeStyles({
@@ -106,72 +106,75 @@ const DEPTH_PAD = [
 ] as const;
 const padForDepth = (depth: number) => DEPTH_PAD[Math.min(depth, DEPTH_PAD.length - 1)];
 
-const pillProps = (passing: number, total: number): { status: ReportStatus; appearance: 'ghost' | 'tint' } => {
+const pillProps = (passing: number, total: number): { solid: string; textColor: string; appearance: 'ghost' | 'tint' } => {
     if (total === 0 || passing >= total) {
-        return { status: 'neutral', appearance: 'ghost' };
+        return {
+            appearance: 'ghost',
+            solid: 'var(--neutral-solid)',
+            textColor: 'var(--neutral-text)',
+        };
     }
-    return { appearance: 'tint', status: passing / total < 0.5 ? 'danger' : 'warning' };
+
+    const failed = passing / total < 0.5;
+    return {
+        appearance: 'tint',
+        solid: failed ? 'var(--negative-solid)' : 'var(--warning-solid)',
+        textColor: failed ? 'var(--negative-text)' : 'var(--caution-text)',
+    };
 };
 
-export const SidebarTree = ({ labelledBy }: { labelledBy: string }) => {
+type SidebarTreeProps = {
+    labelledBy: string;
+    expanded: ReadonlySet<string>;
+    onToggle: (key: string) => void;
+    onSelect?: () => void;
+};
+
+export const SidebarTree = ({ labelledBy, expanded, onToggle, onSelect }: SidebarTreeProps) => {
     const local = useLocalStyles();
     const treeNav = useArrowNavigationGroup({ axis: 'vertical' });
     const { activeNode, selectedScenarioLevel, selectScenarioLevel } = useReportContext();
 
-    const [expanded, setExpanded] = useState<Set<string>>(
-        () => new Set(activeNode.childNodes.filter((n) => n.childNodes.length > 0).map((n) => n.nodeKey)),
-    );
-
-    const toggle = (key: string) =>
-        setExpanded((prev) => {
-            const next = new Set(prev);
-            if (next.has(key)) next.delete(key); else next.add(key);
-            return next;
-        });
-
-    const scopeTo = (nodeKey: string | undefined) => {
+    const selectScope = (nodeKey: string | undefined) => {
         const target = nodeKey ?? '';
         if (target !== (selectedScenarioLevel ?? '')) {
             selectScenarioLevel(target);
         }
+        onSelect?.();
     };
 
     // "All scenarios" occupies position 1 of the top-level set; top-level branches follow it.
     const topBranchCount = activeNode.childNodes.filter((n) => n.hasChildNodes).length;
 
-    const rows = useMemo<SidebarRowVM[]>(() => {
-        const out: SidebarRowVM[] = [];
-        const walk = (nodes: ScoreNode[], depth: number, posOffset: number, setSize: number) => {
-            const branches = nodes.filter((n) => n.hasChildNodes);
-            const sorted = [...branches].sort((a, b) => a.name.localeCompare(b.name));
-            sorted.forEach((node, i) => {
-                const hasChildren = node.childNodes.some((c) => c.hasChildNodes);
-                const isExpanded = expanded.has(node.nodeKey);
-                out.push({
-                    key: node.nodeKey,
-                    label: node.name,
-                    depth,
-                    hasChildren,
-                    expanded: isExpanded,
-                    selected: selectedScenarioLevel === node.nodeKey,
-                    isTopGroup: depth === 0 && hasChildren,
-                    passing: node.numPassingIterations,
-                    total: node.numPassingIterations + node.numFailingIterations,
-                    posInSet: posOffset + i + 1,
-                    setSize,
-                    onSelect: () => scopeTo(node.nodeKey),
-                    onToggle: () => toggle(node.nodeKey),
-                });
-                if (hasChildren && isExpanded) {
-                    const childSetSize = node.childNodes.filter((c) => c.hasChildNodes).length;
-                    walk(node.childNodes, depth + 1, 0, childSetSize);
-                }
+    const rows: SidebarRowVM[] = [];
+    const walk = (nodes: ScoreNode[], depth: number, posOffset: number, setSize: number) => {
+        const branches = nodes.filter((n) => n.hasChildNodes);
+        const sorted = [...branches].sort((a, b) => a.name.localeCompare(b.name));
+        sorted.forEach((node, i) => {
+            const hasChildren = node.childNodes.some((c) => c.hasChildNodes);
+            const isExpanded = expanded.has(node.nodeKey);
+            rows.push({
+                key: node.nodeKey,
+                label: node.name,
+                depth,
+                hasChildren,
+                expanded: isExpanded,
+                selected: selectedScenarioLevel === node.nodeKey,
+                isTopGroup: depth === 0 && hasChildren,
+                passing: node.numPassingIterations,
+                total: node.numPassingIterations + node.numFailingIterations,
+                posInSet: posOffset + i + 1,
+                setSize,
+                onSelect: () => selectScope(node.nodeKey),
+                onToggle: () => onToggle(node.nodeKey),
             });
-        };
-        walk(activeNode.childNodes, 0, 1, topBranchCount + 1);
-        return out;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeNode, expanded, selectedScenarioLevel]);
+            if (hasChildren && isExpanded) {
+                const childSetSize = node.childNodes.filter((c) => c.hasChildNodes).length;
+                walk(node.childNodes, depth + 1, 0, childSetSize);
+            }
+        });
+    };
+    walk(activeNode.childNodes, 0, 1, topBranchCount + 1);
 
     return (
         <div
@@ -188,7 +191,7 @@ export const SidebarTree = ({ labelledBy }: { labelledBy: string }) => {
                 isTopGroup={false}
                 posInSet={1}
                 setSize={topBranchCount + 1}
-                onSelect={() => scopeTo(undefined)}
+                onSelect={() => selectScope(undefined)}
             />
 
             {rows.length === 0 ? (

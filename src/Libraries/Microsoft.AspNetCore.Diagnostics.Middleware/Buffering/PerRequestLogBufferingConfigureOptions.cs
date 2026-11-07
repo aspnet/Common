@@ -39,6 +39,7 @@ internal sealed class PerRequestLogBufferingConfigureOptions : IConfigureOptions
         options.MaxLogRecordSizeInBytes = parsedOptions.MaxLogRecordSizeInBytes;
         options.MaxPerRequestBufferSizeInBytes = parsedOptions.MaxPerRequestBufferSizeInBytes;
         options.AutoFlushDuration = parsedOptions.AutoFlushDuration;
+        options.IncludeScopes = parsedOptions.IncludeScopes;
 
         foreach (LogBufferingFilterRule rule in parsedOptions.Rules)
         {

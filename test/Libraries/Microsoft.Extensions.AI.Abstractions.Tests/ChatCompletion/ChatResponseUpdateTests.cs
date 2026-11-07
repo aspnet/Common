@@ -246,12 +246,14 @@ public class ChatResponseUpdateTests
         var originalContents = new List<AIContent> { new TextContent("text1"), new TextContent("text2") };
         var originalRawRepresentation = new object();
         var originalCreatedAt = new DateTimeOffset(2022, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var originalContinuationToken = ResponseContinuationToken.FromBytes(new byte[] { 1, 2, 3 });
 
         var original = new ChatResponseUpdate
         {
             AdditionalProperties = originalAdditionalProperties,
             AuthorName = "author",
             Contents = originalContents,
+            ContinuationToken = originalContinuationToken,
             CreatedAt = originalCreatedAt,
             ConversationId = "conv123",
             FinishReason = ChatFinishReason.ContentFilter,
@@ -282,6 +284,7 @@ public class ChatResponseUpdateTests
         Assert.Same(original.AdditionalProperties, clone.AdditionalProperties);
         Assert.Same(original.Contents, clone.Contents);
         Assert.Same(original.RawRepresentation, clone.RawRepresentation);
+        Assert.Same(original.ContinuationToken, clone.ContinuationToken);
     }
 
     [Fact]

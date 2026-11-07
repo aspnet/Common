@@ -7,7 +7,7 @@
 // no signal rather than guessing.
 export type BetterDirection = 'higher' | 'lower' | 'none';
 
-export type DeltaJudgment = 'success' | 'danger' | 'neutral';
+export type DeltaJudgment = 'improved' | 'regressed' | 'unchanged';
 
 const RATING_GOODNESS: Partial<Record<EvaluationRating, number>> = {
     unacceptable: 1,
@@ -66,13 +66,13 @@ export const judgeValueDelta = (
 ): DeltaJudgment => {
     if (direction !== 'none' && Math.abs(valueDelta) > 1e-9) {
         const good = direction === 'higher' ? valueDelta > 0 : valueDelta < 0;
-        return good ? 'success' : 'danger';
+        return good ? 'improved' : 'regressed';
     }
     if (goodnessDelta !== undefined && Math.abs(goodnessDelta) > 1e-9) {
-        return goodnessDelta > 0 ? 'success' : 'danger';
+        return goodnessDelta > 0 ? 'improved' : 'regressed';
     }
-    return 'neutral';
+    return 'unchanged';
 };
 
 export const judgmentWord = (judgment: DeltaJudgment): 'improved' | 'regressed' | undefined =>
-    judgment === 'success' ? 'improved' : judgment === 'danger' ? 'regressed' : undefined;
+    judgment === 'unchanged' ? undefined : judgment;

@@ -8,6 +8,7 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useReportContext } from '../core/ReportContext';
 import { type ChatMessageDisplay, isTextContent, isImageContent } from '../core/Summary';
+import { useReportStyles } from '../styles/reportStyles';
 import './transcript.css';
 
 type FunctionCallLike = AIContent & {
@@ -346,14 +347,6 @@ const useStyles = makeStyles({
         padding: 'var(--spacing-m-nudge) var(--spacing-l)',
         borderBottom: '1px solid var(--neutral-stroke-3)',
     },
-    eyebrow: {
-        margin: 0,
-        fontSize: 'var(--font-size-100)',
-        fontWeight: 'var(--font-weight-semibold)',
-        color: 'var(--neutral-foreground-3)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.4px',
-    },
     blockBody: {
         padding: 'var(--spacing-xs) var(--spacing-l) var(--spacing-l)',
         display: 'flex',
@@ -425,7 +418,7 @@ const MD_COMPONENTS: Components = {
     h6: ({ children }) => <div className="md-h4">{children}</div>,
 };
 
-const TextNode = ({ content, altHint }: { content: AIContent; altHint?: string }) => {
+export const TextNode = ({ content, altHint }: { content: AIContent; altHint?: string }) => {
     const { renderMarkdown, prettifyJson } = useReportContext();
     const classes = useStyles();
 
@@ -553,6 +546,7 @@ const SystemGroup = ({ content, imageAlt }: { content: AIContent; imageAlt?: str
 export const TranscriptBlock = ({ messages, model: modelProp }: { messages: ChatMessageDisplay[]; model?: string }) => {
     const { dataset, prettifyJson } = useReportContext();
     const classes = useStyles();
+    const s = useReportStyles();
     const headingId = useId();
     const groups = buildGroups(messages, prettifyJson);
     const date = reportDate(dataset.createdAt);
@@ -561,7 +555,7 @@ export const TranscriptBlock = ({ messages, model: modelProp }: { messages: Chat
         <Card appearance="outline" className="eval-transcript">
             <div className={classes.card}>
                 <div className={classes.headerRow}>
-                    <h2 id={headingId} className={classes.eyebrow}>Transcript</h2>
+                    <h2 id={headingId} className={s.eyebrow} style={{ margin: 0 }}>Transcript</h2>
                 </div>
                 <div className={classes.blockBody} role="region" aria-labelledby={headingId}>
                     {groups.length === 0 && <div className={classes.empty}>No transcript for this case.</div>}

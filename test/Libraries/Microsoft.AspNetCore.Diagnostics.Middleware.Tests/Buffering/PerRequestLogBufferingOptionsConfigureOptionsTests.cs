@@ -72,6 +72,7 @@ public class PerRequestLogBufferingOptionsConfigureOptionsTests
         {
             ["PerIncomingRequestLogBuffering:MaxLogRecordSizeInBytes"] = "1024",
             ["PerIncomingRequestLogBuffering:MaxPerRequestBufferSizeInBytes"] = "4096",
+            ["PerIncomingRequestLogBuffering:IncludeScopes"] = "true",
             ["PerIncomingRequestLogBuffering:Rules:0:CategoryName"] = "TestCategory",
             ["PerIncomingRequestLogBuffering:Rules:0:LogLevel"] = "Information"
         };
@@ -89,6 +90,7 @@ public class PerRequestLogBufferingOptionsConfigureOptionsTests
         // Assert
         Assert.Equal(1024, options.MaxLogRecordSizeInBytes);
         Assert.Equal(4096, options.MaxPerRequestBufferSizeInBytes);
+        Assert.True(options.IncludeScopes);
         Assert.Single(options.Rules);
         Assert.Equal("TestCategory", options.Rules[0].CategoryName);
         Assert.Equal(LogLevel.Information, options.Rules[0].LogLevel);

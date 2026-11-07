@@ -13,7 +13,6 @@ Monthly releases start with all releasable packages. Servicing releases start wi
 Preparation may use project metadata provisionally, but the official `PackageArtifacts` `.nuspec`
 files determine the final closure and published manifest.
 
-Before publishing, verify every in-scope exact-version dependency resolves from staged artifacts or
-approved sources. After propagation, repeat the check for every published package from clean,
-consumer-visible sources, including packages without `lib` DLLs. Record the source and result.
-Unresolved dependencies block publishing, validation, and release-note finalization.
+Pin each selected artifact's exact ID/version (including preview/template-specific versions), account, path/hash, source SHA, AzDO/BAR IDs and nuspec repository commit. Monthly does **not** imply a uniform version: stable, preview and independently versioned templates may coexist. Require all selected nuspec repository commits to match the official build source SHA; investigate any mismatch. Exclude internal transport packages; a required internal dependency is a packaging blocker. Publish only individually approved manifest paths, never a wildcard directory.
+
+Before publishing, verify every in-scope exact-version dependency resolves from staged artifacts or approved sources. After propagation, repeat the check for every published package from clean, consumer-visible sources, including packages without `lib` DLLs. Record the source and result. Unresolved dependencies block publication/sign-off unless the user explicitly accepts a scoped exception under [the workflow contract](workflow.md). Separate API transport failure from confirmed missing versions; browser exact-version listings can establish listing but not consumer restore. Record source/feed, clean cache status, per-package/TFM results and failures (including no-lib packages). Scope/source changes invalidate the manifest and dependent approvals/build evidence.

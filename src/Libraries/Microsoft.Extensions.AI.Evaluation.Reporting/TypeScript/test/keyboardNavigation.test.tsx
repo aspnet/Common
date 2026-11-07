@@ -3,6 +3,7 @@
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { createScoreSummary, ReportContextProvider, useReportContext } from '../components';
 import { AppShell } from '../components/shell/AppShell';
 import { SidebarTree } from '../components/shell/SidebarTree';
@@ -36,6 +37,16 @@ const SidebarContextControls = () => {
             <button onClick={() => setExec('exec-2026-06-29')}>change execution</button>
         </>
     );
+};
+
+const ControlledSidebarTree = ({ initialExpanded = [] }: { initialExpanded?: string[] }) => {
+    const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(initialExpanded));
+    const onToggle = (key: string) => setExpanded((previous) => {
+        const next = new Set(previous);
+        if (next.has(key)) next.delete(key); else next.add(key);
+        return next;
+    });
+    return <SidebarTree labelledBy="scenario-label" expanded={expanded} onToggle={onToggle} />;
 };
 
 beforeAll(() => {
@@ -77,7 +88,7 @@ describe('AppShell tab focus defaults', () => {
 
 describe('Sidebar tree boundaries', () => {
     it('does not configure vertical arrow navigation to wrap', () => {
-        renderWithContext(<SidebarTree labelledBy="scenario-label" />);
+        renderWithContext(<SidebarTree labelledBy="scenario-label" expanded={new Set()} onToggle={() => {}} />);
 
         const tree = screen.getByRole('tree');
         const mover = JSON.parse(tree.getAttribute('data-tabster') ?? '{}').mover;
@@ -85,10 +96,10 @@ describe('Sidebar tree boundaries', () => {
         expect(mover.cyclic).toBe(false);
     });
 
-    it('initially expands top groups and preserves user expansion across context rerenders', () => {
-        const view = renderWithContext(
+    it('uses controlled expansion and preserves it across context rerenders', () => {
+        renderWithContext(
             <>
-                <SidebarTree labelledBy="scenario-label" />
+                <ControlledSidebarTree initialExpanded={['root.GroupA']} />
                 <SidebarContextControls />
             </>,
             richDataset,
@@ -105,6 +116,14 @@ describe('Sidebar tree boundaries', () => {
         expect(groupA).toHaveAttribute('aria-expanded', 'false');
         expect(screen.queryByRole('treeitem', { name: /^FactualAccuracy/ })).not.toBeInTheDocument();
 
+        fireEvent.keyDown(groupA, { key: 'ArrowRight' });
+        expect(groupA).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByRole('treeitem', { name: /^FactualAccuracy/ })).toBeVisible();
+
+        fireEvent.keyDown(groupA, { key: 'ArrowLeft' });
+        expect(groupA).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByRole('treeitem', { name: /^FactualAccuracy/ })).not.toBeInTheDocument();
+
         fireEvent.click(screen.getByRole('treeitem', { name: /^GroupB/ }));
         expect(groupA).toHaveAttribute('aria-expanded', 'false');
 
@@ -118,9 +137,5 @@ describe('Sidebar tree boundaries', () => {
         expect(groupA).toHaveAttribute('aria-setsize', '3');
         expect(screen.queryByRole('treeitem', { name: /^GroupC/ })).not.toBeInTheDocument();
 
-        view.unmount();
-        renderWithContext(<SidebarTree labelledBy="scenario-label" />, richDataset);
-        expect(screen.getByRole('treeitem', { name: /^GroupA/ })).toHaveAttribute('aria-expanded', 'true');
-        expect(screen.getByRole('treeitem', { name: /^FactualAccuracy/ })).toBeVisible();
     });
 });

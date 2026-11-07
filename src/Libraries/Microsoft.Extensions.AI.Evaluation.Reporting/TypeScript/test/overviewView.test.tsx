@@ -144,6 +144,51 @@ describe('OverviewView — needs-attention row + View action', () => {
         expect(screen.queryByText(/1 failing/i)).not.toBeInTheDocument();
         expect(screen.getByText('Cases failing').parentElement?.textContent).toContain('0');
     });
+
+    it('uses direct semantic rating tokens for weak- and fair-dominant markers', () => {
+        const weakRender = renderOverview(moversDataset);
+        const weakRow = weakRender.container.querySelector<HTMLElement>('.eval-attn-name[title="Alpha.Retrieval · safety"]')?.parentElement;
+        expect((weakRow?.firstElementChild as HTMLElement | null)?.style.background).toBe('var(--negative-solid)');
+        weakRender.unmount();
+
+        const fairRender = renderOverview(noMoversDataset);
+        const fairRow = fairRender.container.querySelector<HTMLElement>('.eval-attn-name[title="Beta.QA · clarity"]')?.parentElement;
+        expect((fairRow?.firstElementChild as HTMLElement | null)?.style.background).toBe('var(--caution-solid)');
+        expect(screen.getByText('0 weak · 1 fair')).toBeInTheDocument();
+    });
+});
+
+describe('OverviewView — pass-rate color thresholds', () => {
+    it('preserves the existing success, caution, warning, and danger boundaries', () => {
+        const groupRuns = (group: string, total: number, passing: number): ScenarioRunResult[] =>
+            Array.from({ length: total }, (_, index) => run(
+                `${group}.Case${index}`,
+                NEW,
+                T_NEW,
+                { score: numeric('score', index < passing ? 4 : 1, index < passing ? 'good' : 'poor', index >= passing) },
+            ));
+        const dataset: Dataset = {
+            generatorVersion: '0.0.1',
+            createdAt: T_NEW,
+            scenarioRunResults: [
+                ...groupRuns('Ninety', 10, 9),
+                ...groupRuns('SeventyFive', 4, 3),
+                ...groupRuns('Fifty', 2, 1),
+                ...groupRuns('Below', 2, 0),
+            ],
+        };
+        const { container } = renderOverview(dataset);
+        const groupDotBackground = (group: string): string | undefined => {
+            const row = [...container.querySelectorAll<HTMLElement>('.eval-grid6')]
+                .find((candidate) => candidate.firstElementChild?.textContent?.trim() === group);
+            return row?.firstElementChild?.querySelector<HTMLElement>('span[aria-hidden="true"]')?.style.background;
+        };
+
+        expect(groupDotBackground('Ninety')).toBe('var(--positive-solid)');
+        expect(groupDotBackground('SeventyFive')).toBe('var(--caution-solid)');
+        expect(groupDotBackground('Fifty')).toBe('var(--warning-solid)');
+        expect(groupDotBackground('Below')).toBe('var(--negative-solid)');
+    });
 });
 
 describe('OverviewView — mover delta rendering', () => {
@@ -237,15 +282,15 @@ describe('OverviewView — mover delta rendering', () => {
         expect(deltaCell?.textContent).toContain('increased by 0.004, improved');
     });
 
-    it('preserves success, danger, and unknown-rating neutral pill colors and labels', () => {
+    it('uses improved, regressed, and unchanged trend colors with borderless pills', () => {
         const { unmount } = renderOverview(moversDataset);
 
-        const successPill = moverDeltaCell('Alpha.Retrieval · accuracy')?.querySelector<HTMLElement>('span[style]');
-        const dangerPill = moverDeltaCell('Alpha.Retrieval · safety')?.querySelector<HTMLElement>('span[style]');
-        expect(successPill?.style.color).toBe('var(--status-success-background-3)');
-        expect(successPill?.style.border).toContain('var(--status-success-background-3)');
-        expect(dangerPill?.style.color).toBe('var(--status-danger-background-3)');
-        expect(dangerPill?.style.border).toContain('var(--status-danger-background-3)');
+        const improvedPill = moverDeltaCell('Alpha.Retrieval · accuracy')?.querySelector<HTMLElement>('span[style]');
+        const regressedPill = moverDeltaCell('Alpha.Retrieval · safety')?.querySelector<HTMLElement>('span[style]');
+        expect(improvedPill?.style.color).toBe('var(--positive-text)');
+        expect(improvedPill?.style.border).toBe('');
+        expect(regressedPill?.style.color).toBe('var(--negative-text)');
+        expect(regressedPill?.style.border).toBe('');
 
         unmount();
         const unknownRatings: Dataset = {
@@ -258,12 +303,12 @@ describe('OverviewView — mover delta rendering', () => {
         };
         renderOverview(unknownRatings);
 
-        const neutralCell = moverDeltaCell('Delta.Unrated · latency');
-        const neutralPill = neutralCell?.querySelector<HTMLElement>('span[style]');
-        expect(neutralCell?.textContent).toContain('increased by 20');
-        expect(neutralCell?.textContent).not.toMatch(/improved|regressed/i);
-        expect(neutralPill?.style.color).toBe('var(--neutral-foreground-3)');
-        expect(neutralPill?.style.border).toContain('var(--neutral-foreground-4)');
+        const unchangedCell = moverDeltaCell('Delta.Unrated · latency');
+        const unchangedPill = unchangedCell?.querySelector<HTMLElement>('span[style]');
+        expect(unchangedCell?.textContent).toContain('increased by 20');
+        expect(unchangedCell?.textContent).not.toMatch(/improved|regressed/i);
+        expect(unchangedPill?.style.color).toBe('var(--neutral-text)');
+        expect(unchangedPill?.style.border).toBe('');
     });
 });
 
@@ -309,7 +354,7 @@ describe('OverviewView — overall pass-rate delta when the suite grows between 
         expect(container.textContent).not.toContain('▲ +25%');
     });
 
-    it('preserves success, danger, and neutral group-delta text colors', () => {
+    it('uses improved, regressed, and unchanged group-delta text colors', () => {
         const statusDataset: Dataset = {
             generatorVersion: '0.0.1',
             createdAt: T_NEW,
@@ -330,10 +375,10 @@ describe('OverviewView — overall pass-rate delta when the suite grows between 
         };
 
         expect(deltaCell('Improved')?.textContent).toBe('▲ +100%');
-        expect(deltaCell('Improved')?.style.color).toBe('var(--status-success-background-3)');
+        expect(deltaCell('Improved')?.style.color).toBe('var(--positive-text)');
         expect(deltaCell('Regressed')?.textContent).toBe('▼ −100%');
-        expect(deltaCell('Regressed')?.style.color).toBe('var(--status-danger-background-3)');
+        expect(deltaCell('Regressed')?.style.color).toBe('var(--negative-text)');
         expect(deltaCell('Stable')?.textContent).toBe('—');
-        expect(deltaCell('Stable')?.style.color).toBe('var(--neutral-foreground-3)');
+        expect(deltaCell('Stable')?.style.color).toBe('var(--neutral-text)');
     });
 });

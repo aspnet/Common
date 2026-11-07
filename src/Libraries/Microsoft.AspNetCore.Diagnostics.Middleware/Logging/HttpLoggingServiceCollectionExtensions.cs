@@ -20,7 +20,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// <summary>
 /// Extension methods to register the HTTP logging feature within the service.
 /// </summary>
-public static class HttpLoggingServiceCollectionExtensions
+public static partial class HttpLoggingServiceCollectionExtensions
 {
     /// <summary>
     /// Enables enrichment and redaction of HTTP request logging output.
@@ -37,6 +37,7 @@ public static class HttpLoggingServiceCollectionExtensions
     {
         _ = Throw.IfNull(services);
 
+        _ = services.AddRedaction();
         _ = services.AddOptionsWithValidateOnStart<LoggingRedactionOptions, LoggingRedactionOptionsValidator>()
             .Configure(configure ?? (static _ => { }));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHttpLoggingInterceptor, HttpLoggingRedactionInterceptor>());

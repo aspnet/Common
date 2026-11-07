@@ -28,6 +28,7 @@ public static class HttpClientLatencyTelemetryExtensions
     {
         _ = Throw.IfNull(services);
 
+        _ = services.AddLatencyContext();
         _ = services.RegisterCheckpointNames(HttpCheckpoints.Checkpoints);
         _ = services.AddOptions<HttpClientLatencyTelemetryOptions>();
         _ = services.AddSingleton<HttpRequestLatencyListener>();

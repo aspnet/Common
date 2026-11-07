@@ -21,6 +21,7 @@ internal sealed partial class ExtendedLogger
         private const int TagCapacity = 4;
         private readonly List<KeyValuePair<string, object?>> _extraTags = new(TagCapacity);
         private IReadOnlyList<KeyValuePair<string, object?>>? _incomingTags;
+        private int _incomingTagsCount;
 
         public LegacyTagJoiner()
         {
@@ -33,7 +34,7 @@ internal sealed partial class ExtendedLogger
         {
             _extraTags.Clear();
             _incomingTags = null;
-            Count = 0;
+            _incomingTagsCount = 0;
             State = null;
             Formatter = null;
         }
@@ -42,7 +43,7 @@ internal sealed partial class ExtendedLogger
         public void SetIncomingTags(IReadOnlyList<KeyValuePair<string, object?>> value)
         {
             _incomingTags = value;
-            Count = _incomingTags.Count;
+            _incomingTagsCount = _incomingTags.Count;
         }
 
         public KeyValuePair<string, object?> this[int index]
@@ -76,17 +77,26 @@ internal sealed partial class ExtendedLogger
             }
         }
 
-        public int Count
-        {
-            get => field + _extraTags.Count + StaticTags!.Length;
-            private set;
-        }
+        public int Count => _incomingTagsCount + _extraTags.Count + StaticTags!.Length;
 
         public IEnumerator<KeyValuePair<string, object?>> GetEnumerator()
         {
-            for (int i = 0; i < Count; i++)
+            // The groups are iterated in the same order as by the indexer, so that "{OriginalFormat}" remains the last tag.
+            int extraTagsCount = _extraTags.Count;
+
+            foreach (var tag in StaticTags!)
             {
-                yield return this[i];
+                yield return tag;
+            }
+
+            for (int i = 0; i < extraTagsCount; i++)
+            {
+                yield return _extraTags[i];
+            }
+
+            for (int i = 0; i < _incomingTagsCount; i++)
+            {
+                yield return _incomingTags![i];
             }
         }
 

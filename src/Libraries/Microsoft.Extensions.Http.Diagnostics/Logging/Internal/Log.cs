@@ -164,10 +164,32 @@ internal static partial class Log
         var httpMethod = request[startIndex].Value;
         var httpHost = request[startIndex + 1].Value;
         var httpPath = request[startIndex + 2].Value;
+        var hasLeadingSlash =
+            httpPath is string path &&
+            path.Length > 0 &&
+            path[0] == '/';
 #if NET
-        return string.Create(CultureInfo.InvariantCulture, stackalloc char[256], $"{httpMethod} {httpHost}/{httpPath}");
+        if (hasLeadingSlash)
+        {
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                stackalloc char[256],
+                $"{httpMethod} {httpHost}{httpPath}");
+        }
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            stackalloc char[256],
+            $"{httpMethod} {httpHost}/{httpPath}");
 #else
-        return FormattableString.Invariant($"{httpMethod} {httpHost}/{httpPath}");
+        if (hasLeadingSlash)
+        {
+            return FormattableString.Invariant(
+                $"{httpMethod} {httpHost}{httpPath}");
+        }
+
+        return FormattableString.Invariant(
+            $"{httpMethod} {httpHost}/{httpPath}");
 #endif
     }
 

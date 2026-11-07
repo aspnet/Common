@@ -280,6 +280,50 @@ public class FunctionInvokingRealtimeClientTests
     }
 
     [Fact]
+    public async Task GetStreamingResponseAsync_FunctionErrorWithTerminate_StopsLoop()
+    {
+        AIFunction failFunc = AIFunctionFactory.Create(
+            new Func<string>(() =>
+            {
+                FunctionInvokingRealtimeClient.CurrentContext!.Terminate = true;
+                throw new InvalidOperationException("Something broke");
+            }),
+            "fail_func",
+            "Fails");
+
+        var injectedMessages = new List<RealtimeClientMessage>();
+        await using var inner = new TestRealtimeClientSession
+        {
+            Options = new RealtimeSessionOptions { Tools = [failFunc] },
+            GetStreamingResponseAsyncCallback = (ct) => YieldMessages(
+            [
+                CreateFunctionCallOutputItemMessage("call_fail", "fail_func", null),
+                new RealtimeServerMessage { Type = RealtimeServerMessageType.ResponseDone, MessageId = "should_not_reach" },
+            ], ct),
+            SendAsyncCallback = (msg, _) =>
+            {
+                injectedMessages.Add(msg);
+                return Task.CompletedTask;
+            },
+        };
+
+        using var client = CreateClient(inner);
+        await using var session = await client.CreateSessionAsync();
+
+        var received = new List<RealtimeServerMessage>();
+        await foreach (var msg in session.GetStreamingResponseAsync())
+        {
+            received.Add(msg);
+        }
+
+        // The function call message should be yielded, then the loop terminates
+        Assert.Single(received);
+
+        // No function results should be injected since we're terminating
+        Assert.Empty(injectedMessages);
+    }
+
+    [Fact]
     public async Task GetStreamingResponseAsync_FunctionError_IncludesDetailedErrors()
     {
         AIFunction failFunc = AIFunctionFactory.Create(

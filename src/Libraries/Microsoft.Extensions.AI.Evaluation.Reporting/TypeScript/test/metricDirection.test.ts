@@ -71,20 +71,20 @@ describe('inferBetterDirections — direction learned from interpretation.rating
 
 describe('judgeValueDelta — combines direction with the value delta, with a rating fallback', () => {
     it.each<[string, Array<[BetterDirection, number, number?]>, DeltaJudgment[]]>([
-        ['higher-better judges up as success and down as danger',
-            [['higher', 0.9], ['higher', -0.4]], ['success', 'danger']],
-        ['lower-better judges down as success and up as danger',
-            [['lower', -0.5], ['lower', 2]], ['success', 'danger']],
-        ['zero deltas stay neutral when no rating signal exists',
-            [['higher', 0], ['lower', 0]], ['neutral', 'neutral']],
+        ['higher-better judges up as improved and down as regressed',
+            [['higher', 0.9], ['higher', -0.4]], ['improved', 'regressed']],
+        ['lower-better judges down as improved and up as regressed',
+            [['lower', -0.5], ['lower', 2]], ['improved', 'regressed']],
+        ['zero deltas stay unchanged when no rating signal exists',
+            [['higher', 0], ['lower', 0]], ['unchanged', 'unchanged']],
         ['zero deltas defer to a rating-goodness signal',
-            [['higher', 0, 0.5], ['higher', 0, -0.5]], ['success', 'danger']],
+            [['higher', 0, 0.5], ['higher', 0, -0.5]], ['improved', 'regressed']],
         ['indeterminate direction defers to a rating-goodness signal',
-            [['none', 1, 0.5], ['none', 1, -0.5]], ['success', 'danger']],
-        ['indeterminate direction stays neutral without a rating signal',
-            [['none', 1], ['none', 1, 0]], ['neutral', 'neutral']],
+            [['none', 1, 0.5], ['none', 1, -0.5]], ['improved', 'regressed']],
+        ['indeterminate direction stays unchanged without a rating signal',
+            [['none', 1], ['none', 1, 0]], ['unchanged', 'unchanged']],
         ['an inferred direction takes precedence over the rating signal',
-            [['higher', -1, 5], ['lower', -1, -5]], ['danger', 'success']],
+            [['higher', -1, 5], ['lower', -1, -5]], ['regressed', 'improved']],
     ])('%s', (_name, cases, expected) => {
         expect(cases.map(([direction, valueDelta, goodnessDelta]) =>
             judgeValueDelta(direction, valueDelta, goodnessDelta))).toEqual(expected);
@@ -101,8 +101,8 @@ describe('ratingGoodness / judgmentWord', () => {
     });
 
     it('words only the judged states', () => {
-        expect(judgmentWord('success')).toBe('improved');
-        expect(judgmentWord('danger')).toBe('regressed');
-        expect(judgmentWord('neutral')).toBeUndefined();
+        expect(judgmentWord('improved')).toBe('improved');
+        expect(judgmentWord('regressed')).toBe('regressed');
+        expect(judgmentWord('unchanged')).toBeUndefined();
     });
 });

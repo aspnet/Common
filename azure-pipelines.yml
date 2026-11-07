@@ -78,6 +78,8 @@ variables:
     value: $(Build.Arcade.ArtifactsPath)TestResults/$(_BuildConfig)/
   - name: Build.Arcade.VSIXOutputPath
     value: $(Build.Arcade.ArtifactsPath)VSIX
+  - name: _WindowsBuildScript
+    value: $(Build.SourcesDirectory)/build.cmd -ci -NativeToolsOnMachine
 
   # Enable extraction of published outputs for analysis
   - name: GDN_EXTRACT_TOOLS
@@ -125,14 +127,19 @@ variables:
       value: true
 
   # Enable source index only for main branch builds
-  - ${{ if and(ne(variables['runAsPublic'], 'true'), notin(variables['Build.Reason'], 'PullRequest'), eq(variables['Build.SourceBranch'], 'refs/heads/main')) }}:
-    - name: enableSourceIndex
-      value: true
-  - ${{ else }}:
-    - name: enableSourceIndex
-      value: false
-  - name: sourceIndexBuildCommand
-    value: $(Build.SourcesDirectory)/build.cmd -ci -NativeToolsOnMachine
+  - name: sourceIndexCondition
+    value: |
+      and(
+        succeeded(),
+        or(
+          eq(variables['forceEnableSourceIndex'], 'true'),
+          and(
+            ne(variables['runAsPublic'], 'true'),
+            notin(variables['Build.Reason'], 'PullRequest'),
+            eq(variables['Build.SourceBranch'], 'refs/heads/main')
+          )
+        )
+      )
 
 resources:
   repositories:
@@ -175,9 +182,16 @@ extends:
               manifests: true
           enableMicrobuild: true
           enableTelemetry: true
-          enableSourceIndex: ${{ variables['enableSourceIndex'] }}
+          enableSourceIndex: true
           sourceIndexParams:
-            sourceIndexBuildCommand: ${{ variables['sourceIndexBuildCommand'] }}
+            condition: ${{ variables['sourceIndexCondition'] }}
+            sourceIndexBuildCommand: ''
+            preSteps:
+            - template: /eng/pipelines/templates/RestoreAndBuild.yml
+              parameters:
+                buildScript: $(_WindowsBuildScript)
+                buildConfig: Debug
+                repoLogPath: $(Build.SourcesDirectory)/artifacts/log/Debug
           runAsPublic: ${{ variables['runAsPublic'] }}
           # Publish test logs
           enablePublishTestResults: true
@@ -201,7 +215,7 @@ extends:
               os: windows
 
             variables:
-            - _buildScript: $(Build.SourcesDirectory)/build.cmd -ci -NativeToolsOnMachine
+            - _buildScript: $(_WindowsBuildScript)
 
             templateContext:
               outputs:
@@ -349,20 +363,18 @@ extends:
             name: NetCore1ESPool-Internal
             image: windows.vs2022.amd64
             os: windows
-          templateContext:
-            outputs:
-            - output: adoExtension
-              targetPath: '$(Pipeline.Workspace)\AzureDevOpsExtension'
-              connectedServiceNameAzureRM: arcade-extensions-marketplace-publish
-              fileType: vsix
-              vsixFile: '$(Pipeline.Workspace)\AzureDevOpsExtension\Microsoft.Extensions.AI.Evaluation.Reporting.vsix'
-              useV5: true
-              validateExtension: true
+
           steps:
           - checkout: none
 
+          # Install NodeJS to support TfxInstaller
+          - task: NodeTool@0
+            inputs:
+              versionSpec: 24.x
+
           - task: TfxInstaller@5
             displayName: Install TFX CLI (tfx)
+            
           - download: current
             artifact: VSIXArtifacts
             displayName: Download signed Azure DevOps extension
@@ -376,3 +388,13 @@ extends:
               $publishDirectory = New-Item '$(Pipeline.Workspace)\AzureDevOpsExtension' -ItemType Directory -Force
               Copy-Item $vsixFiles[0].FullName (Join-Path $publishDirectory 'Microsoft.Extensions.AI.Evaluation.Reporting.vsix')
             displayName: Prepare signed Azure DevOps extension
+
+          - task: 1ES.PublishAzureDevOpsExtension@1
+            displayName: Publish Extension
+            inputs:
+              targetPath: '$(Pipeline.Workspace)\AzureDevOpsExtension'
+              connectedServiceNameAzureRM: arcade-extensions-marketplace-publish
+              fileType: vsix
+              vsixFile: '$(Pipeline.Workspace)\AzureDevOpsExtension\Microsoft.Extensions.AI.Evaluation.Reporting.vsix'
+              useV5: true
+              validateExtension: false

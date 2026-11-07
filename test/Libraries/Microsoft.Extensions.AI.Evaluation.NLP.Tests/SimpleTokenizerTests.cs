@@ -32,6 +32,13 @@ public class SimpleTokenizerTests
         new[] { "IT", "IS", "A", "GUIDE", "TO", "ACTION", "THAT", "ENSURES", "THAT", "THE", "MILITARY", "WILL", "FOREVER", "HEED", "PARTY", "COMMANDS", "." })]
     [InlineData("Good muffins cost $3.88 (roughly 3,36 euros)\nin New York.  Please buy me\ntwo of them.\nThanks.",
         new[] { "GOOD", "MUFFINS", "COST", "$", "3.88", "(", "ROUGHLY", "3,36", "EUROS", ")", "IN", "NEW", "YORK", ".", "PLEASE", "BUY", "ME", "TWO", "OF", "THEM", ".", "THANKS", "." })]
+    [InlineData("I have 42.", new[] { "I", "HAVE", "42", "." })]
+    [InlineData("It costs 3,36.", new[] { "IT", "COSTS", "3,36", "." })]
+    [InlineData("42, 43", new[] { "42", ",", "43" })]
+    [InlineData("42%", new[] { "42", "%" })]
+    [InlineData("(42)", new[] { "(", "42", ")" })]
+    [InlineData("42.x", new[] { "42", ".", "X" })]
+    [InlineData("1.2.3", new[] { "1.2.3" })]
     [InlineData("", new string[0])]
     [InlineData(" This is a test.", new[] { "THIS", "IS", "A", "TEST", "." })]
     [InlineData("Hello, world! How's it going?", new[] { "HELLO", ",", "WORLD", "!", "HOW", "'", "S", "IT", "GOING", "?" })]

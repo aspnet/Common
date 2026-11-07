@@ -57,6 +57,24 @@ describe('ComparisonView — twoExecutionDataset', () => {
         expect(screen.getByLabelText(/current execution/i)).toBeInTheDocument();
     });
 
+    it('keeps one ordered, noninteractive headline summary', () => {
+        renderWith(twoExecutionDataset, <ComparisonView />);
+
+        const labels = ['Metrics increased', 'Metrics decreased', 'Biggest change'];
+        const stats = labels.map((label) => screen.getByText(label).parentElement!);
+        expect(stats.map((stat) => [...stat.children].map((child) => child.textContent))).toEqual([
+            ['Metrics increased', '2', 'of 4 comparable metrics'],
+            ['Metrics decreased', '1', 'of 4 comparable metrics'],
+            ['Biggest change', '▼ 3', 'safety'],
+        ]);
+        expect(stats.every((stat) => stat.children.length === 3)).toBe(true);
+        expect(new Set(stats.map((stat) => stat.parentElement)).size).toBe(1);
+        expect(stats[0].parentElement?.querySelectorAll('button, [role="button"]')).toHaveLength(0);
+        expect(screen.getAllByRole('combobox')).toHaveLength(2);
+        expect(screen.getByRole('combobox', { name: 'Baseline execution' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Current execution' })).toBeInTheDocument();
+    });
+
     const metricRowNames = (container: HTMLElement): string[] =>
         [...container.querySelectorAll('[role="rowgroup"] .eval-grid3[role="row"]')].map(
             (row) => row.firstElementChild?.textContent?.trim() ?? '',

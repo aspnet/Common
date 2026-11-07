@@ -273,6 +273,38 @@ public class OpenAIChatClientTests
     }
 
     [Fact]
+    public async Task StreamingResponse_ModelId_IgnoresEmptyChunks()
+    {
+        const string Output = """
+            data: {"id":"","object":"chat.completion.chunk","created":0,"model":"","choices":[],"prompt_filter_results":[]}
+
+            data: {"id":"chatcmpl-test","object":"chat.completion.chunk","created":1727889370,"model":"gpt-4o-mini-2024-07-18","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello!"},"finish_reason":null}]}
+
+            data: {"id":"chatcmpl-test","object":"chat.completion.chunk","created":1727889370,"model":"","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+            data: [DONE]
+
+            """;
+
+        using VerbatimHttpHandler handler = new(new HttpHandlerExpectedInput(), Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateChatClient(httpClient, "gpt-4o-mini");
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (var update in client.GetStreamingResponseAsync("hello"))
+        {
+            updates.Add(update);
+        }
+
+        Assert.Equal(3, updates.Count);
+        Assert.Null(updates[0].ModelId);
+        Assert.Equal("gpt-4o-mini-2024-07-18", updates[1].ModelId);
+        Assert.Equal("gpt-4o-mini-2024-07-18", updates[2].ModelId);
+        Assert.Equal("Hello!", updates[1].Text);
+        Assert.Equal(ChatFinishReason.Stop, updates[2].FinishReason);
+    }
+
+    [Fact]
     public async Task ChatOptions_StrictRespected()
     {
         const string Input = """
@@ -1515,8 +1547,13 @@ public class OpenAIChatClientTests
     public Task DataContentMessage_Image_AdditionalProperty_StringDetail_NonStreaming()
         => DataContentMessage_Image_AdditionalPropertyDetail_NonStreaming(ChatImageDetailLevel.High);
 
-    private static async Task DataContentMessage_Image_AdditionalPropertyDetail_NonStreaming(object detailValue)
+    [Fact]
+    public Task DataContentMessage_Image_AdditionalProperty_InvalidDetail_NonStreaming()
+        => DataContentMessage_Image_AdditionalPropertyDetail_NonStreaming(42, expectedDetail: null);
+
+    private static async Task DataContentMessage_Image_AdditionalPropertyDetail_NonStreaming(object detailValue, string? expectedDetail = "high")
     {
+        string detailProperty = expectedDetail is not null ? $"\"detail\": \"{expectedDetail}\"," : string.Empty;
         string input = $$"""
             {
               "messages": [
@@ -1530,7 +1567,7 @@ public class OpenAIChatClientTests
                     {
                       "type": "image_url",
                       "image_url": {
-                        "detail": "high",
+                        {{detailProperty}}
                         "url": "{{ImageDataUri.GetImageDataUri()}}"
                       }
                     }
@@ -1969,6 +2006,50 @@ public class OpenAIChatClientTests
 
         // Verify regular content was also captured from the content deltas
         Assert.Equal("9.8 is larger.", string.Concat(updates.Select(u => u.Text)));
+    }
+
+    [Fact]
+    public async Task Streaming_NullDeltaContentFilterChunk_ContinuesToUsage()
+    {
+        const string Input = """
+            {
+                "messages":[{"role":"user","content":"Hello"}],
+                "model":"example-model",
+                "stream":true,
+                "stream_options":{"include_usage":true}
+            }
+            """;
+
+        const string Output = """
+            data: {"id":"chatcmpl-example","object":"chat.completion.chunk","created":0,"model":"example-model","choices":[{"index":0,"delta":{"role":"assistant","content":"OK"},"finish_reason":null}]}
+
+            data: {"id":"chatcmpl-example","object":"chat.completion.chunk","created":0,"model":"example-model","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+            data: {"choices":[{"content_filter_offsets":{"check_offset":2,"start_offset":0,"end_offset":2},"content_filter_results":{"hate":{"filtered":false,"severity":"safe"}},"finish_reason":null,"index":0}],"created":0,"id":"","model":"","object":""}
+
+            data: {"id":"chatcmpl-example","object":"chat.completion.chunk","created":0,"model":"example-model","choices":[],"usage":{"completion_tokens":1,"prompt_tokens":1,"total_tokens":2}}
+
+            data: [DONE]
+
+            """;
+
+        using VerbatimHttpHandler handler = new(Input, Output);
+        using HttpClient httpClient = new(handler);
+        using IChatClient client = CreateChatClient(httpClient, "example-model");
+
+        List<ChatResponseUpdate> updates = [];
+        await foreach (ChatResponseUpdate update in client.GetStreamingResponseAsync("Hello"))
+        {
+            updates.Add(update);
+        }
+
+        Assert.Equal("OK", string.Concat(updates.Select(u => u.Text)));
+        Assert.Contains(updates, u => u.FinishReason == ChatFinishReason.Stop);
+
+        UsageContent usage = updates.SelectMany(u => u.Contents).OfType<UsageContent>().Single();
+        Assert.Equal(1, usage.Details.InputTokenCount);
+        Assert.Equal(1, usage.Details.OutputTokenCount);
+        Assert.Equal(2, usage.Details.TotalTokenCount);
     }
 
     [Theory]

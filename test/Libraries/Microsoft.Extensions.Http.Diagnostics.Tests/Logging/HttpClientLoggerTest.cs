@@ -256,6 +256,35 @@ public class HttpClientLoggerTest
     }
 
     [Fact]
+    public async Task HttpLoggingHandler_UnredactedPath_DoesNotDuplicateSeparator()
+    {
+        var options = new LoggingOptions
+        {
+            RequestPathParameterRedactionMode = HttpRouteParameterRedactionMode.None
+        };
+        var fakeLogger = new FakeLogger<HttpClientLogger>();
+        var headersReader = new HttpHeadersReader(options.ToOptionsMonitor(), Mock.Of<IHttpHeadersRedactor>());
+        var requestReader = new HttpRequestReader(
+            options,
+            GetHttpRouteFormatter(),
+            Mock.Of<IHttpRouteParser>(),
+            headersReader,
+            RequestMetadataContext);
+
+        using var handler = new TestLoggingHandler(
+            new HttpClientLogger(fakeLogger, requestReader, Array.Empty<IHttpClientLogEnricher>(), options),
+            new TestingHandlerStub((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK))));
+        using var client = new HttpClient(handler);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://default-uri.com/foo/bar");
+
+        await client.SendAsync(request, It.IsAny<CancellationToken>());
+
+        var logRecord = Assert.Single(fakeLogger.Collector.GetSnapshot());
+        Assert.Equal("GET default-uri.com/foo/bar", logRecord.Message);
+        logRecord.GetStructuredState().Contains(HttpClientLoggingTagNames.Path, "/foo/bar");
+    }
+
+    [Fact]
     public async Task HttpLoggingHandler_AllOptionsWithLogRequestStart_LogsOutgoingRequestWithTwoRecords()
     {
         var requestContent = _fixture.Create<string>();

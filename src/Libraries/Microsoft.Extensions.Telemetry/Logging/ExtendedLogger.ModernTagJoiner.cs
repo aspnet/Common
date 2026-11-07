@@ -37,7 +37,9 @@ internal sealed partial class ExtendedLogger
         {
             _extraTags.Clear();
             _incomingTags = null;
+            _incomingTagsCount = 0;
             _redactedTags = null;
+            _redactedTagsCount = 0;
             State = null;
             Formatter = null;
         }
@@ -85,9 +87,27 @@ internal sealed partial class ExtendedLogger
 
         public IEnumerator<KeyValuePair<string, object?>> GetEnumerator()
         {
-            for (int i = 0; i < Count; i++)
+            // The groups are iterated in the same order as by the indexer, so that "{OriginalFormat}" remains the last tag.
+            int extraTagsCount = _extraTags.Count;
+
+            for (int i = 0; i < _redactedTagsCount; i++)
             {
-                yield return this[i];
+                yield return _redactedTags![i];
+            }
+
+            for (int i = 0; i < extraTagsCount; i++)
+            {
+                yield return _extraTags[i];
+            }
+
+            foreach (var tag in StaticTags!)
+            {
+                yield return tag;
+            }
+
+            for (int i = 0; i < _incomingTagsCount; i++)
+            {
+                yield return _incomingTags![i];
             }
         }
 

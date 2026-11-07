@@ -11,6 +11,8 @@ This stage is operational and produces no commit. Both actions are **irreversibl
 
 ## Prerequisites
 
+- Apply [candidate/artifact/metadata and BAR schema gates](../../references/candidate-validation.md). Stage 4a is required before irreversible publication; full URL validation waits for public source.
+
 - Stage 3 is complete: the official release build succeeded and produced the `PackageArtifacts`.
 - For the channel promotion: the `darc` CLI, authenticated to the Build Asset Registry (BAR).
 
@@ -27,18 +29,17 @@ exact commands for the user to run outside the session, then continue based on t
 
 Publishing is irreversible (a published version cannot be overwritten or truly deleted) and requires nuget.org API keys, so the agent only prepares the set; the user runs the push.
 
-1. Download and extract the `PackageArtifacts` from the official build.
+1. Inspect artifact `resource.type`, then download/extract matching official `PackageArtifacts` with the appropriate PipelineArtifact or authenticated Container ZIP mechanism.
    - If in-session artifact download/auth fails, hand off this step to the user's terminal and ask
      them to return the local extracted package folder path.
 2. Build and obtain approval for the artifact-derived manifest by following
    [package scope and dependency validation](../../references/package-scope-and-dependency-validation.md).
    Treat any required `Microsoft.Internal.*` package as a blocking packaging error.
-3. Validate the approved manifest's dependencies as required by that shared invariant before any push.
+3. Validate dependencies and all selected library TFMs' **original** Portable PDB identity/checksum, usable nonempty Source Link mappings and coverage as required by the candidate gate. Record results and source artifact; publication approval is tied to source/build/BAR/manifest hashes.
 4. Two nuget.org accounts are involved: almost all packages publish from the **dotnetframework** account; **`Microsoft.Agents.AI.ProjectTemplates`** publishes from the **MicrosoftAgentFramework** account, so it must be pushed separately with that account's key.
 5. Order the staged package paths dependency-first where possible. The **user** runs `dotnet nuget push` with the appropriate API key(s) in their terminal (outside
    the agent session). Never run the push, and never handle the API keys.
-6. After propagation, repeat the shared invariant's dependency validation and record the approved
-   **final published manifest** for validate-release and write-release-notes.
+6. Verify exact nuget.org ID/version listings and record the **final published manifest** for validate-release and notes; attempt consumer restore separately. A listing is not a restore.
 
 ### Secure API key entry (user-run helper)
 
@@ -114,6 +115,8 @@ After a successful push, **delete or regenerate the API key on nuget.org** ([nug
 
 ### Terminal handoff expectation
 
+If NuGet API/CLI connectivity fails but the browser works, offer the human nuget.org upload/listing flow immediately. Verify every exact ID/version page (the UI can fall back to a different version), including previews and account ownership. Do not infer "missing" from transport errors. Track upload, listing, API reachability, clean consumer restore, dotnet-public mirror and symbols as separate states. Mirror availability may lag by policy even after all exact listings are public; do not repeat uploads or poll indefinitely. Browser/cached metadata is not consumer restore proof. Follow the canonical bounded monitoring window and recheck the version premise on expiry. If the user explicitly waives/defer postpublish restore, record that exception rather than passing the check; it does not authorize unrelated exceptions or suppress failures.
+
 When handing off Sub-stage 1 commands, provide a copy/paste-ready command block and ask the user to
 run it in terminal, then report:
 
@@ -135,6 +138,8 @@ Determine whether manual promotion is required:
    - If `.NET <major>` is already present, record that and skip manual promotion.
    - If `.NET <major>` is absent, promote with `darc add-build-to-channel --id <bar-id> --channel ".NET <major>"` **only after explicit user confirmation**.
 4. If promotion was required, wait for it to complete, then confirm `.NET <major>` appears in `darc get-build --id <bar-id>`.
+
+Use the shared BAR schema normalization (channels may be strings; `get-channels` may be wrapped). A monitor/schema failure after successful promotion calls for a read-only state check, not another promotion. Inspect child vs parent run/artifact idempotence before any retry; no blind `PublishAssets` replay or artifact deletion.
 
 ## After the stage
 

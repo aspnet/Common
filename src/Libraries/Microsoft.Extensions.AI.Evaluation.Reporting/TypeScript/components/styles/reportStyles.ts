@@ -4,6 +4,8 @@
 import type { CSSProperties } from 'react';
 import { makeStyles } from '@fluentui/react-components';
 
+export const trendTone = { improved: 'positive', regressed: 'negative', unchanged: 'neutral' } as const;
+
 export const srOnlyStyle: CSSProperties = {
     position: 'absolute',
     width: '1px',
@@ -19,13 +21,13 @@ export const srOnlyStyle: CSSProperties = {
 
 export const useReportStyles = makeStyles({
     card: {
-        backgroundColor: 'var(--neutral-background-1)',
+        backgroundColor: 'var(--report-surface-card)',
         border: '1px solid var(--neutral-stroke-1)',
         borderRadius: 'var(--radius-card)',
         overflow: 'hidden',
     },
     cardNested: {
-        backgroundColor: 'var(--neutral-background-2)',
+        backgroundColor: 'var(--report-surface-nested-card)',
         border: '1px solid var(--neutral-stroke-1)',
         borderRadius: 'var(--radius-large)',
         overflow: 'hidden',
@@ -50,6 +52,13 @@ export const useReportStyles = makeStyles({
         color: 'var(--neutral-foreground-3)',
         textTransform: 'uppercase',
         letterSpacing: '0.4px',
+    },
+    compactTableHeader: {
+        fontSize: 'var(--font-size-100)',
+        fontWeight: 'var(--font-weight-semibold)',
+        color: 'var(--neutral-foreground-4)',
+        textTransform: 'uppercase',
+        letterSpacing: '.5px',
     },
     badge: {
         display: 'inline-flex',
@@ -79,8 +88,11 @@ export const useReportStyles = makeStyles({
         fontFamily: 'inherit',
         textAlign: 'left',
         borderRadius: 'var(--radius-medium)',
-        minHeight: '32px',
+        minHeight: 'var(--interactive-size-compact)',
         padding: 'var(--spacing-s-nudge) var(--spacing-m-nudge)',
+        '@media (max-width: 900px), (pointer: coarse)': {
+            minHeight: 'var(--interactive-size-touch)',
+        },
     },
     sidebarItemLabel: {
         flex: '1 1 auto',
@@ -165,18 +177,3 @@ export const useReportStyles = makeStyles({
         },
     },
 });
-
-export type ReportStatus = 'success' | 'caution' | 'warning' | 'danger' | 'neutral';
-
-export const statusSolidVar = (status: ReportStatus): string =>
-    status === 'success' ? 'var(--status-success-background-3)'
-        : status === 'caution' ? 'var(--palette-orange-background3)'
-            : status === 'warning' ? 'var(--status-warning-foreground-2)'
-                : status === 'danger' ? 'var(--status-danger-background-3)'
-                    : 'var(--neutral-foreground-4)';
-
-export const statusTextVar = (status: ReportStatus): string =>
-    status === 'warning' || status === 'caution' ? 'var(--status-warning-foreground-1)'
-        : status === 'success' ? 'var(--status-success-background-3)'
-            : status === 'danger' ? 'var(--status-danger-background-3)'
-                : 'var(--neutral-foreground-3)';

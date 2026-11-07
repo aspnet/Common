@@ -67,7 +67,7 @@ export const DiagnosticsContent = ({ diagnostics, metricName }: { diagnostics: E
                 </TableHeader>
                 <TableBody>
                     {diagnostics.map((diag, index) => (
-                        <TableRow key={`diag-${index}`}>
+                        <tr key={`diag-${index}`}>
                             <TableCell className={classes.diagnosticSeverityCell}>
                                 {renderSeverityCell(diag)}
                             </TableCell>
@@ -86,7 +86,7 @@ export const DiagnosticsContent = ({ diagnostics, metricName }: { diagnostics: E
                                     <Copy16Regular />
                                 </button>
                             </TableCell>
-                        </TableRow>
+                        </tr>
                     ))}
                 </TableBody>
             </Table>

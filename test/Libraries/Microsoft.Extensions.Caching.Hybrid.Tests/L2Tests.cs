@@ -155,6 +155,57 @@ public class L2Tests(ITestOutputHelper log) : IClassFixture<TestEventListener>
         Assert.Equal(12, backend.OpCount); // GET, SET
     }
 
+    [Fact]
+    public async Task PendingTagInvalidationUsesPayloadCreationTimestamp()
+    {
+        var clock = new DistributedCacheTests.FakeTime();
+        var shared = new MemoryDistributedCache(new Options<MemoryDistributedCacheOptions>(new()));
+        var delayed = new DelayedTagReadCache(shared, "tag");
+
+        // Provider A doesn't need delayed behavior, but can't use the MemoryDistributedCache,
+        // because HybridCache ignores it when combined with MemoryCache.
+        using var providerA = CreateNode(delayed, clock);
+        using var providerB = CreateNode(delayed, clock);
+        var cacheA = providerA.GetRequiredService<HybridCache>();
+        var cacheB = providerB.GetRequiredService<HybridCache>();
+
+        await cacheA.SetAsync("key", "original", tags: ["tag"]);
+        await delayed.EntryWritten;
+
+        clock.Add(TimeSpan.FromSeconds(1));
+        await cacheA.RemoveByTagAsync("tag");
+        Assert.NotNull(await shared.GetAsync("__MSFT_HCT__tag"));
+        clock.Add(TimeSpan.FromSeconds(1));
+
+        bool factoryRan = false;
+        ValueTask<string> read = cacheB.GetOrCreateAsync(
+            "key",
+            _ =>
+            {
+                factoryRan = true;
+                return new ValueTask<string>("regenerated");
+            },
+            tags: ["tag"]);
+
+        // This is guaranteed to succeed, because all GetOrCreateAsync code until the tag read is executed synchronously.
+        Assert.True(delayed.TagReadStarted);
+
+        Assert.False(read.IsCompleted);
+        delayed.CompleteTagRead();
+
+        Assert.Equal("regenerated", await read);
+        Assert.True(factoryRan);
+
+        static ServiceProvider CreateNode(IDistributedCache backend, TimeProvider clock)
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton(backend);
+            services.AddSingleton(clock);
+            services.AddHybridCache();
+            return services.BuildServiceProvider();
+        }
+    }
+
     private class BufferLoggingCache : LoggingCache, IBufferDistributedCache
     {
         public BufferLoggingCache(ITestOutputHelper log, IDistributedCache tail)
@@ -269,6 +320,56 @@ public class L2Tests(ITestOutputHelper log) : IClassFixture<TestEventListener>
             Log.WriteLine($"SetAsync (byte[]): {key} (expiry: {options.AbsoluteExpirationRelativeToNow})");
             return Tail.SetAsync(key, value, options, token);
         }
+    }
+
+    private sealed class DelayedTagReadCache(IDistributedCache inner, string tag) : IDistributedCache
+    {
+        private readonly TaskCompletionSource<bool> _entryWritten = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<byte[]?> _tagRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly string _tagKey = "__MSFT_HCT__" + tag;
+
+        public Task EntryWritten => _entryWritten.Task;
+        public bool TagReadStarted { get; private set; }
+
+        public byte[]? Get(string key) => inner.Get(key);
+
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Usage",
+            "VSTHRD003:Avoid awaiting or returning a Task representing work that was not started within your context",
+            Justification = "The test controls completion.")]
+        public Task<byte[]?> GetAsync(string key, CancellationToken token = default)
+        {
+            if (key == _tagKey)
+            {
+                TagReadStarted = true;
+                return _tagRead.Task;
+            }
+
+            // Complete entry reads synchronously so parsing reaches the gated tag check before returning to the test.
+            return Task.FromResult(inner.Get(key));
+        }
+
+        public void Refresh(string key) => inner.Refresh(key);
+
+        public Task RefreshAsync(string key, CancellationToken token = default) => inner.RefreshAsync(key, token);
+
+        public void Remove(string key) => inner.Remove(key);
+
+        public Task RemoveAsync(string key, CancellationToken token = default) => inner.RemoveAsync(key, token);
+
+        public void Set(string key, byte[] value, DistributedCacheEntryOptions options) => inner.Set(key, value, options);
+
+        public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default)
+        {
+            await inner.SetAsync(key, value, options, token);
+
+            if (key == "key")
+            {
+                _entryWritten.TrySetResult(true);
+            }
+        }
+
+        public void CompleteTagRead() => _tagRead.SetResult(inner.Get(_tagKey));
     }
 
     private static string Me([CallerMemberName] string caller = "") => caller;

@@ -2,16 +2,6 @@
   "Name": "Microsoft.Extensions.AI.OpenAI, Version=10.6.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
   "Types": [
     {
-      "Type": "static class OpenAI.Assistants.MicrosoftExtensionsAIAssistantsExtensions",
-      "Stage": "Experimental",
-      "Methods": [
-        {
-          "Member": "static OpenAI.Assistants.FunctionToolDefinition OpenAI.Assistants.MicrosoftExtensionsAIAssistantsExtensions.AsOpenAIAssistantsFunctionToolDefinition(this Microsoft.Extensions.AI.AIFunctionDeclaration function);",
-          "Stage": "Experimental"
-        }
-      ]
-    },
-    {
       "Type": "static class OpenAI.Chat.MicrosoftExtensionsAIChatExtensions",
       "Stage": "Stable",
       "Methods": [
@@ -115,14 +105,6 @@
         },
         {
           "Member": "static Microsoft.Extensions.AI.IChatClient Microsoft.Extensions.AI.OpenAIClientExtensions.AsIChatClient(this OpenAI.Responses.ResponsesClient responseClient, string? defaultModelId = null);",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "static Microsoft.Extensions.AI.IChatClient Microsoft.Extensions.AI.OpenAIClientExtensions.AsIChatClient(this OpenAI.Assistants.AssistantClient assistantClient, string assistantId, string? threadId = null);",
-          "Stage": "Experimental"
-        },
-        {
-          "Member": "static Microsoft.Extensions.AI.IChatClient Microsoft.Extensions.AI.OpenAIClientExtensions.AsIChatClient(this OpenAI.Assistants.AssistantClient assistantClient, OpenAI.Assistants.Assistant assistant, string? threadId = null);",
           "Stage": "Experimental"
         },
         {

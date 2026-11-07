@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -180,5 +181,31 @@ public sealed class WindowsSnapshotProviderTests
 
         var meter = meterFactory.Meters.Single();
         Assert.Equal(ResourceUtilizationInstruments.MeterName, meter.Name);
+    }
+
+    [Fact]
+    public void Provider_Registers_Instruments_With_Descriptions()
+    {
+        using var meterFactory = new TestMeterFactory();
+
+        _ = new WindowsSnapshotProvider(_fakeLogger, meterFactory, _options);
+
+        var meter = meterFactory.Meters.Single();
+        var instruments = new List<Instrument>();
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, _) =>
+            {
+                if (ReferenceEquals(meter, instrument.Meter))
+                {
+                    instruments.Add(instrument);
+                }
+            }
+        };
+
+        listener.Start();
+
+        Assert.NotEmpty(instruments);
+        Assert.All(instruments, instrument => Assert.False(string.IsNullOrWhiteSpace(instrument.Description), $"Instrument '{instrument.Name}' has no description."));
     }
 }
